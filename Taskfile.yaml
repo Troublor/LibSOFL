@@ -1,0 +1,13 @@
+version: 3
+
+tasks:
+  # save a checkpoint as git commit then push to remote
+  checkpoint:
+    vars:
+      TIMESTAMP:
+        sh: date +'%Y-%m-%d %H:%M:%S UTC%z'
+    cmds:
+      - git add --all
+      - git commit -m "checkpoint {{.TIMESTAMP}}"
+      - git push --rebase=true
+

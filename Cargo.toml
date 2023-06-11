@@ -1,0 +1,51 @@
+[package]
+name = "see_fuzz"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[patch.crates-io]
+revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+
+[dependencies]
+ethers = "2.0.7"
+futures = "0.3.28"
+tokio = { version = "1.28.2", features = ["macros"] }
+tracing = "0.1"
+tracing-subscriber = "0.3"
+
+# misc
+eyre = "0.6.8"
+
+# reth
+revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+reth-config = { path = "./reth/crates/config" }
+reth-primitives = { path = "./reth/crates/primitives", features = ["arbitrary"] }
+reth-db = { path = "./reth/crates/storage/db", features = ["mdbx", "test-utils"] }
+reth-provider = { path = "./reth/crates/storage/provider", features = ["test-utils"] }
+reth-revm = { path = "./reth/crates/revm" }
+reth-revm-inspectors = { path = "./reth/crates/revm/revm-inspectors" }
+reth-staged-sync = { path = "./reth/crates/staged-sync" }
+reth-stages = { path = "./reth/crates/stages" }
+reth-interfaces = { path = "./reth/crates/interfaces", features = ["test-utils"] }
+reth-transaction-pool = { path = "./reth/crates/transaction-pool" }
+reth-beacon-consensus = { path = "./reth/crates/consensus/beacon" }
+reth-auto-seal-consensus = { path = "./reth/crates/consensus/auto-seal" }
+reth-blockchain-tree = { path = "./reth/crates/blockchain-tree" }
+reth-rpc-engine-api = { path = "./reth/crates/rpc/rpc-engine-api" }
+reth-rpc-builder = { path = "./reth/crates/rpc/rpc-builder" }
+reth-rpc = { path = "./reth/crates/rpc/rpc" }
+reth-rlp = { path = "./reth/crates/rlp" }
+reth-network = { path = "./reth/crates/net/network", features = ["serde"] }
+reth-network-api = { path = "./reth/crates/net/network-api" }
+reth-downloaders = { path = "./reth/crates/net/downloaders", features = ["test-utils"] }
+reth-tracing = { path = "./reth/crates/tracing" }
+reth-tasks = { path = "./reth/crates/tasks" }
+reth-net-nat = { path = "./reth/crates/net/nat" }
+reth-payload-builder = { path = "./reth/crates/payload/builder" }
+reth-basic-payload-builder = { path = "./reth/crates/payload/basic" }
+reth-discv4 = { path = "./reth/crates/net/discv4" }
+reth-metrics = { path = "./reth/crates/metrics" }
