@@ -9,5 +9,6 @@ tasks:
     cmds:
       - git add --all
       - git commit -m "checkpoint {{.TIMESTAMP}}"
-      - git push --rebase=true
+      - git pull --rebase=true
+      - git push
 
