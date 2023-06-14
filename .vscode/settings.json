@@ -1,0 +1,8 @@
+{
+    "rust-analyzer.check.command": "clippy",
+    "editor.formatOnSave": true,
+    "rust-analyzer.linkedProjects": [
+        "./Cargo.toml",
+    ],
+    "rust-analyzer.showUnlinkedFileNotification": false
+}

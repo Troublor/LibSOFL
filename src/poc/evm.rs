@@ -6,10 +6,11 @@ use reth_db::database::{Database, DatabaseGAT};
 use reth_db::mdbx::tx::Tx;
 use reth_db::mdbx::{Env, WriteMap, RO, RW};
 use reth_db::transaction::DbTx;
+use reth_interfaces::blockchain_tree::BlockchainTreeViewer;
 use reth_interfaces::consensus::Consensus;
 use reth_primitives::{
-    BlockHashOrNumber, BlockId, BlockNumberOrTag, Chain, ChainSpec, ChainSpecBuilder, H160, H256,
-    U256,
+    BlockHashOrNumber, BlockId, BlockNumberOrTag, Chain, ChainSpec, ChainSpecBuilder,
+    TransactionSigned, H160, H256, U256,
 };
 use reth_provider::providers::BlockchainProvider;
 use reth_provider::{
@@ -19,10 +20,13 @@ use reth_provider::{
 use reth_revm::database::{State, SubState};
 use reth_revm::env::fill_tx_env;
 use reth_revm::Factory;
+use reth_revm_inspectors::tracing::{TracingInspector, TracingInspectorConfig};
 use reth_rpc::eth::error::EthApiError;
 use reth_staged_sync::utils::init::init_genesis;
-use revm::{Database as revmDatabase, DatabaseCommit as revmDatabaseCommit};
-use revm_primitives::{BlockEnv, CfgEnv, Env as revmEnv, TxEnv};
+use revm::db::{CacheDB, DatabaseRef as revmDatabaseRef};
+use revm::inspectors::NoOpInspector;
+use revm::{Database as revmDatabase, DatabaseCommit as revmDatabaseCommit, Inspector};
+use revm_primitives::{BlockEnv, CfgEnv, Env as revmEnv, ExecutionResult, TxEnv};
 use std::path::Path;
 use std::str::FromStr;
 use std::sync::Arc;
@@ -94,49 +98,77 @@ async fn test_reproduce_tx() {
         BlockchainTree::new(tree_externals, sender, BlockchainTreeConfig::default()).unwrap();
     let shareable_blockchain_tree = ShareableBlockchainTree::new(blockchain_tree);
     let database = ShareableDatabase::new(db.clone(), chain_spec.clone());
-    let blockchain_provider = BlockchainProvider::new(database, shareable_blockchain_tree).unwrap();
-    let state_provider = blockchain_provider
-        .state_by_block_id(BlockId::from(16000000_u64))
-        .unwrap();
+    let blockchain_provider: BlockchainProvider<
+        Arc<Env<WriteMap>>,
+        ShareableBlockchainTree<Arc<Env<WriteMap>>, Arc<dyn Consensus>, Factory>,
+    > = BlockchainProvider::new(database, shareable_blockchain_tree).unwrap();
 
     let tx_hash =
-        H256::from_str("0x05e9769544c867897687bdceb217056ae081925c1f1c23590bf6dfabb9c45002")
+        H256::from_str("0x0fe2542079644e107cbf13690eb9c2c65963ccb79089ff96bfaf8dced2331c92")
             .unwrap();
-    let signed_tx = blockchain_provider
-        .transaction_by_hash(tx_hash)
+    let (signed_tx, tx_meta) = blockchain_provider
+        .transaction_by_hash_with_meta(tx_hash)
         .unwrap()
         .unwrap();
-    let mut tx_env = TxEnv::default();
-    let signer = signed_tx
-        .recover_signer()
-        .ok_or_else(|| EthApiError::InvalidTransactionSignature)
-        .unwrap();
-    fill_tx_env(&mut tx_env, signed_tx, signer);
 
-    let next_bn = BlockHashOrNumber::from(16000001_u64);
+    let next_bn = BlockHashOrNumber::from(tx_meta.block_number);
     let mut cfg = CfgEnv::default();
     let mut block_env = BlockEnv::default();
     blockchain_provider
         .fill_env_at(&mut cfg, &mut block_env, next_bn)
         .unwrap();
 
-    let env = revmEnv {
-        cfg,
-        block: block_env,
-        tx: tx_env,
-    };
-    let evm_db = SubState::new(State::new(state_provider));
-    let mut evm = revm::EVM::with_env(env);
-    evm.database(evm_db);
-    let res = evm.transact().unwrap();
-    let evm_db = evm.db.as_mut().unwrap();
-    evm_db.commit(res.state);
+    let state_provider = blockchain_provider
+        .state_by_block_id(BlockId::from(tx_meta.block_number - 1))
+        .unwrap();
+    let mut evm_db = SubState::new(State::new(state_provider));
 
-    let contract = H160::from_str("0x87B1d1B59725209879CC5C5adEb99d8BC9EcCf12").unwrap();
-    let slot = U256::from_str("0x0000000000000000000000000000000000000000000000000000000000000000")
+    let mut execute_fn = |signed_tx: &TransactionSigned, inspect: bool| -> ExecutionResult {
+        let mut tx_env = TxEnv::default();
+        let signer = signed_tx
+            .recover_signer()
+            .ok_or_else(|| EthApiError::InvalidTransactionSignature)
+            .unwrap();
+        fill_tx_env(&mut tx_env, signed_tx, signer);
+        let env = revmEnv {
+            cfg: cfg.clone(),
+            block: block_env.clone(),
+            tx: tx_env,
+        };
+        let mut evm = revm::EVM::with_env(env);
+        evm.database(&mut evm_db);
+        let res;
+        if inspect {
+            // let inspector = TracingInspector::new(TracingInspectorConfig::all());
+            let inspector = NoOpInspector {};
+            res = evm.inspect(inspector).unwrap();
+        } else {
+            res = evm.transact().unwrap();
+        }
+        let evm_db = evm.db.as_mut().unwrap();
+        evm_db.commit(res.state);
+        res.result
+    };
+
+    if tx_meta.index != 0 {
+        // execute preceeding transactions in the same block
+        let txs = blockchain_provider
+            .transactions_by_block(BlockHashOrNumber::Hash(tx_meta.block_hash))
+            .unwrap()
+            .unwrap();
+        for tx in txs.iter().take(tx_meta.index as usize) {
+            let _ = execute_fn(tx, false);
+        }
+    }
+
+    let result = execute_fn(&signed_tx, true);
+    println!("result: {:?}", result.gas_used());
+
+    let contract = H160::from_str("0x1f9840a85d5aF5bf1D1762F925BDADdC4201F984").unwrap();
+    let slot = U256::from_str("0x3b9cbacbd776ffc60dc8ffcea5c6d1b23ef35a63d5c1034813ed3dd8beb825a1")
         .unwrap();
     let expected =
-        U256::from_str("0x00010000b400b4005302071000000000000002ffec2a28260553fac2e4aa3bf4")
+        U256::from_str("0x0000000000000000000000000000000000000000000000000000000000000000")
             .unwrap();
     let actual = evm_db.storage(contract, slot).unwrap();
     assert_eq!(actual, expected);
