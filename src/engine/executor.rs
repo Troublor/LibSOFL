@@ -1,4 +1,5 @@
-use reth_provider::{EvmEnvProvider, StateProvider};
+use reth_primitives::BlockId;
+use reth_provider::{EvmEnvProvider, StateProviderBox, StateProviderFactory, TransactionsProvider};
 use reth_revm::database::{State, SubState};
 use revm::{
     db::{CacheDB, EmptyDB},
@@ -9,7 +10,7 @@ use revm_primitives::{
     BlockEnv, Bytes, CfgEnv, EVMError, Env, Eval, ExecutionResult, Output, ResultAndState, U256,
 };
 
-use super::transaction::{Tx, TxPosition};
+use super::transaction::{Tx, TxPosition, TxPositionOutOfRangeError};
 
 #[derive(Debug)]
 pub enum ExecutorError<DBERR> {
@@ -31,15 +32,34 @@ pub struct Executor<S> {
     evm: EVM<S>,
 }
 
-impl<P: StateProvider + EvmEnvProvider> Executor<SubState<P>> {
-    fn fork(p: P, pos: TxPosition) -> Self {
+impl<'a> Executor<SubState<StateProviderBox<'a>>> {
+    /// Create an executor with fork state from a transaction position.
+    /// The forked state is the the state after the transaction at the position is executed.
+    pub fn fork_from<BP: StateProviderFactory + EvmEnvProvider + TransactionsProvider>(
+        p: &'a BP,
+        pos: TxPosition,
+    ) -> Result<Self, TxPositionOutOfRangeError> {
+        let mut pos = pos;
+        pos.shift(p, 1)?;
+        Self::fork_at(p, pos)
+    }
+
+    /// Create an executor with fork state from a transaction position.
+    /// The forked state is the the state before the transaction at the position is executed.
+    pub fn fork_at<BP: StateProviderFactory + EvmEnvProvider + TransactionsProvider>(
+        p: &'a BP,
+        pos: TxPosition,
+    ) -> Result<Self, TxPositionOutOfRangeError> {
         // prepare env
         let mut cfg = CfgEnv::default();
         let mut block_env = BlockEnv::default();
-        p.fill_env_at(&mut cfg, &mut block_env, pos.block).unwrap();
+        let pos1 = pos.clone();
+        p.fill_env_at(&mut cfg, &mut block_env, pos.block)
+            .map_err(|_| TxPositionOutOfRangeError::unknown_block(pos1, p))?;
 
         // create state
-        let wrapped = State::new(p);
+        let sp = p.state_by_block_id(BlockId::from(pos.block)).unwrap();
+        let wrapped = State::new(sp);
         let state = CacheDB::new(wrapped);
 
         // create evm
@@ -48,7 +68,24 @@ impl<P: StateProvider + EvmEnvProvider> Executor<SubState<P>> {
         evm.env.block = block_env;
         evm.database(state);
 
-        Self { evm }
+        let mut executor = Self { evm };
+        // execute preceeding transactions
+        if pos.index > 0 {
+            // block must exist because we have checked it in fill_env_at
+            let txs = p.transactions_by_block(pos.block).unwrap().unwrap();
+            if pos.index >= txs.len() as u64 {
+                return Err(TxPositionOutOfRangeError::IndexOverflow((
+                    txs.len() as u64,
+                    pos.index,
+                )));
+            }
+            for tx in txs.iter().take(pos.index as usize) {
+                let tx = Tx::Signed(tx.clone());
+                // the transact of historical transaction must be non-error
+                executor.transact::<NoInspector>(tx, None).unwrap();
+            }
+        }
+        Ok(executor)
     }
 }
 
@@ -81,6 +118,14 @@ impl Executor<CacheDB<EmptyDB>> {
             };
             (cfg, block_env)
         })
+    }
+}
+
+impl<S: BcState + Clone> Clone for Executor<S> {
+    fn clone(&self) -> Self {
+        Self {
+            evm: self.evm.clone(),
+        }
     }
 }
 
@@ -164,9 +209,10 @@ impl<S: BcState> Executor<S> {
 
 #[cfg(test)]
 mod tests {
-    use std::str::FromStr;
+    use std::path::Path;
 
     use reth_primitives::{Transaction, TransactionKind, TxLegacy};
+    use reth_provider::{ReceiptProvider, TransactionsProvider};
     use revm::{
         db::{CacheDB, EmptyDB},
         Database,
@@ -175,7 +221,13 @@ mod tests {
         Account, AccountInfo, Address, Bytecode, Bytes, ExecutionResult, B160, U256,
     };
 
-    use crate::engine::transaction::{StateChange, Tx};
+    use crate::{
+        config::flags::SeeFuzzConfig,
+        engine::{
+            provider::BlockchainProviderBuilder,
+            transaction::{StateChange, Tx, TxPosition},
+        },
+    };
 
     use super::{Executor, NoInspector};
 
@@ -261,5 +313,40 @@ mod tests {
             Some(Bytecode::new_raw(Bytes::from("0x1234"))),
             "account code should be 0x1234"
         );
+    }
+
+    #[test]
+    fn test_reproduce_block() {
+        let datadir = SeeFuzzConfig::load().unwrap().reth.datadir;
+        let datadir = Path::new(&datadir);
+        let bp = BlockchainProviderBuilder::mainnet()
+            .with_existing_db(datadir)
+            .unwrap();
+        let fork_at = TxPosition::new(17000000, 0);
+        let mut exe = Executor::fork_at(&bp, fork_at.clone()).unwrap();
+        let txs = bp.transactions_by_block(fork_at.block).unwrap().unwrap();
+        let receipts = bp.receipts_by_block(fork_at.block).unwrap().unwrap();
+        let results = txs
+            .iter()
+            .map(|tx| {
+                exe.transact::<NoInspector>(Tx::Signed(tx.clone()), None)
+                    .unwrap()
+            })
+            .collect::<Vec<ExecutionResult>>();
+        assert_eq!(results.len(), receipts.len());
+        for (result, receipt) in results.iter().zip(receipts.iter()) {
+            match result {
+                ExecutionResult::Success { logs, .. } => {
+                    assert!(receipt.success);
+                    assert_eq!(receipt.logs.len(), logs.len());
+                    for (log, receipt_log) in logs.iter().zip(receipt.logs.iter()) {
+                        assert_eq!(log.address, receipt_log.address);
+                        assert_eq!(log.topics, receipt_log.topics);
+                        assert_eq!(*log.data, *receipt_log.data);
+                    }
+                }
+                _ => assert!(!receipt.success),
+            }
+        }
     }
 }
