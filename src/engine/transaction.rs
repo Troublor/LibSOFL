@@ -213,13 +213,12 @@ impl TxPosition {
                     cur_txs_count = get_txs_count(self.block)?;
                 }
                 self.add_assign(offset);
-                self.index += offset as u64;
                 Ok(())
             }
             i64::MIN..=-1_i64 => {
                 let mut offset = offset.unsigned_abs();
                 while self.index < offset {
-                    offset -= self.index;
+                    offset -= self.index + 1;
                     self.shl_assign(1);
                     self.index = get_txs_count(self.block)? - 1;
                 }
@@ -245,13 +244,22 @@ mod tx_position_tests {
         let bp = BlockchainProviderBuilder::mainnet()
             .with_existing_db(datadir)
             .unwrap();
+
+        let mut pos = TxPosition::new(16000000, 0);
+        pos.shift(&bp, -1).unwrap();
+        assert_eq!(pos, TxPosition::new(15999999, 260));
+
+        let mut pos = TxPosition::new(16000000, 210);
+        pos.shift(&bp, 1).unwrap();
+        assert_eq!(pos, TxPosition::new(16000001, 0));
+
         let mut pos = TxPosition::new(16000000, 10);
         pos.shift(&bp, -10).unwrap();
         assert_eq!(pos, TxPosition::new(16000000, 0));
 
         let mut pos = TxPosition::new(16000000, 10);
         pos.shift(&bp, -20).unwrap();
-        assert_eq!(pos, TxPosition::new(15999999, 151));
+        assert_eq!(pos, TxPosition::new(15999999, 251));
 
         let mut pos = TxPosition::new(16000000, 10);
         pos.shift(&bp, 100).unwrap();

@@ -1,4 +1,4 @@
-use reth_primitives::BlockId;
+use reth_primitives::{BlockHashOrNumber, BlockId};
 use reth_provider::{EvmEnvProvider, StateProviderBox, StateProviderFactory, TransactionsProvider};
 use reth_revm::database::{State, SubState};
 use revm::{
@@ -58,7 +58,14 @@ impl<'a> Executor<SubState<StateProviderBox<'a>>> {
             .map_err(|_| TxPositionOutOfRangeError::unknown_block(pos1, p))?;
 
         // create state
-        let sp = p.state_by_block_id(BlockId::from(pos.block)).unwrap();
+        let bn = match pos.block {
+            BlockHashOrNumber::Hash(h) => p
+                .block_number(h)
+                .unwrap()
+                .ok_or(TxPositionOutOfRangeError::UnknownHash(h))?,
+            BlockHashOrNumber::Number(n) => n,
+        };
+        let sp = p.state_by_block_id(BlockId::from(bn - 1)).unwrap();
         let wrapped = State::new(sp);
         let state = CacheDB::new(wrapped);
 
