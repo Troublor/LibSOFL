@@ -64,7 +64,7 @@ impl BlockchainProviderBuilder {
 mod tests {
     use std::path::Path;
 
-    use crate::{config::flags::SeeFuzzConfig, engine::builders::BlockchainProviderBuilder};
+    use crate::{config::flags::SeeFuzzConfig, engine::provider::BlockchainProviderBuilder};
 
     #[test]
     fn test_build_blockchain_provider_from_reth_db() {
