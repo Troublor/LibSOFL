@@ -1613,6 +1613,7 @@ dependencies = [
  "bytes",
  "enr",
  "ethers-core",
+ "futures-channel",
  "futures-core",
  "futures-timer",
  "futures-util",
@@ -5240,6 +5241,7 @@ version = "0.1.0"
 dependencies = [
  "config",
  "ethers",
+ "ethers-providers",
  "eyre",
  "futures",
  "reth-auto-seal-consensus",

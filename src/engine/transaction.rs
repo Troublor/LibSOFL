@@ -233,7 +233,7 @@ impl TxPosition {
 mod tx_position_tests {
     use std::path::Path;
 
-    use crate::{config::flags::SeeFuzzConfig, engine::provider::BlockchainProviderBuilder};
+    use crate::{config::flags::SeeFuzzConfig, engine::providers::BcProviderBuilder};
 
     use super::TxPosition;
 
@@ -241,9 +241,7 @@ mod tx_position_tests {
     fn test_shift() {
         let cfg = SeeFuzzConfig::load().unwrap();
         let datadir = Path::new(cfg.reth.datadir.as_str());
-        let bp = BlockchainProviderBuilder::mainnet()
-            .with_existing_db(datadir)
-            .unwrap();
+        let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
 
         let mut pos = TxPosition::new(16000000, 0);
         pos.shift(&bp, -1).unwrap();

@@ -231,7 +231,7 @@ mod tests {
     use crate::{
         config::flags::SeeFuzzConfig,
         engine::{
-            provider::BlockchainProviderBuilder,
+            providers::BcProviderBuilder,
             transaction::{StateChange, Tx, TxPosition},
         },
     };
@@ -326,9 +326,7 @@ mod tests {
     fn test_reproduce_block() {
         let datadir = SeeFuzzConfig::load().unwrap().reth.datadir;
         let datadir = Path::new(&datadir);
-        let bp = BlockchainProviderBuilder::mainnet()
-            .with_existing_db(datadir)
-            .unwrap();
+        let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
         let fork_at = TxPosition::new(17000000, 0);
         let mut exe = Executor::fork_at(&bp, fork_at.clone()).unwrap();
         let txs = bp.transactions_by_block(fork_at.block).unwrap().unwrap();
