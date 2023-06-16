@@ -14,8 +14,23 @@ impl Default for RethConfig {
     }
 }
 
+#[derive(Debug, Deserialize, Serialize)]
+#[allow(unused)]
+pub struct JsonRpcConfig {
+    pub endpoint: String,
+}
+
+impl Default for JsonRpcConfig {
+    fn default() -> Self {
+        Self {
+            endpoint: String::from("http://localhost:8545"),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Default)]
 #[allow(unused)]
-pub struct SeeFuzzConfig {
+pub struct SoflConfig {
     pub reth: RethConfig,
+    pub jsonrpc: JsonRpcConfig,
 }

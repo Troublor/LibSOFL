@@ -233,13 +233,13 @@ impl TxPosition {
 mod tx_position_tests {
     use std::path::Path;
 
-    use crate::{config::flags::SeeFuzzConfig, engine::providers::BcProviderBuilder};
+    use crate::{config::flags::SoflConfig, engine::providers::BcProviderBuilder};
 
     use super::TxPosition;
 
     #[test]
     fn test_shift() {
-        let cfg = SeeFuzzConfig::load().unwrap();
+        let cfg = SoflConfig::load().unwrap();
         let datadir = Path::new(cfg.reth.datadir.as_str());
         let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
 

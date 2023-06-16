@@ -2839,6 +2839,50 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "f7012b1bbb0719e1097c47611d3898568c546d597c2e74d66f6087edd5233ff4"
 
 [[package]]
+name = "libsofl"
+version = "0.1.0"
+dependencies = [
+ "config",
+ "ethers",
+ "ethers-providers",
+ "eyre",
+ "futures",
+ "reth-auto-seal-consensus",
+ "reth-basic-payload-builder",
+ "reth-beacon-consensus",
+ "reth-blockchain-tree",
+ "reth-config",
+ "reth-db",
+ "reth-discv4",
+ "reth-downloaders",
+ "reth-interfaces",
+ "reth-metrics",
+ "reth-net-nat",
+ "reth-network",
+ "reth-network-api",
+ "reth-payload-builder",
+ "reth-primitives",
+ "reth-provider",
+ "reth-revm",
+ "reth-revm-inspectors",
+ "reth-rlp",
+ "reth-rpc",
+ "reth-rpc-builder",
+ "reth-rpc-engine-api",
+ "reth-staged-sync",
+ "reth-stages",
+ "reth-tasks",
+ "reth-tracing",
+ "reth-transaction-pool",
+ "revm",
+ "revm-primitives",
+ "serde",
+ "tokio",
+ "tracing",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "linked-hash-map"
 version = "0.5.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -5233,50 +5277,6 @@ checksum = "f51d0c0d83bec45f16480d0ce0058397a69e48fcdc52d1dc8855fb68acbd31a7"
 dependencies = [
  "core-foundation-sys",
  "libc",
-]
-
-[[package]]
-name = "see_fuzz"
-version = "0.1.0"
-dependencies = [
- "config",
- "ethers",
- "ethers-providers",
- "eyre",
- "futures",
- "reth-auto-seal-consensus",
- "reth-basic-payload-builder",
- "reth-beacon-consensus",
- "reth-blockchain-tree",
- "reth-config",
- "reth-db",
- "reth-discv4",
- "reth-downloaders",
- "reth-interfaces",
- "reth-metrics",
- "reth-net-nat",
- "reth-network",
- "reth-network-api",
- "reth-payload-builder",
- "reth-primitives",
- "reth-provider",
- "reth-revm",
- "reth-revm-inspectors",
- "reth-rlp",
- "reth-rpc",
- "reth-rpc-builder",
- "reth-rpc-engine-api",
- "reth-staged-sync",
- "reth-stages",
- "reth-tasks",
- "reth-tracing",
- "reth-transaction-pool",
- "revm",
- "revm-primitives",
- "serde",
- "tokio",
- "tracing",
- "tracing-subscriber",
 ]
 
 [[package]]

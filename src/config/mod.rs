@@ -2,12 +2,12 @@ pub mod flags;
 
 use std::env;
 
-use self::flags::SeeFuzzConfig;
+use self::flags::SoflConfig;
 use config::{Config, ConfigError, Environment, File, FileFormat};
 
-impl SeeFuzzConfig {
+impl SoflConfig {
     pub fn load() -> Result<Self, ConfigError> {
-        let default_config = SeeFuzzConfig::default();
+        let default_config = SoflConfig::default();
         let default_source = Config::try_from(&default_config)?;
         let config_file = env::var("SEEFUZZ_CONFIG").unwrap_or_else(|_| "config".into());
         let cfg = Config::builder()
@@ -23,18 +23,18 @@ impl SeeFuzzConfig {
 mod tests {
     use std::env;
 
-    use crate::config::flags::SeeFuzzConfig;
+    use crate::config::flags::SoflConfig;
 
     #[test]
     fn test_default_config() {
-        let cfg = super::SeeFuzzConfig::load().unwrap();
-        assert_eq!(cfg.reth.datadir, SeeFuzzConfig::default().reth.datadir);
+        let cfg = super::SoflConfig::load().unwrap();
+        assert_eq!(cfg.reth.datadir, SoflConfig::default().reth.datadir);
     }
 
     #[test]
     fn test_load_local_config() {
         env::set_var("SEEFUZZ_CONFIG", "tests/data/test_config.toml");
-        let cfg = super::SeeFuzzConfig::load().unwrap();
+        let cfg = super::SoflConfig::load().unwrap();
         assert_eq!(cfg.reth.datadir, "blockchain");
     }
 }

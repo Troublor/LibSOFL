@@ -229,7 +229,7 @@ mod tests {
     };
 
     use crate::{
-        config::flags::SeeFuzzConfig,
+        config::flags::SoflConfig,
         engine::{
             providers::BcProviderBuilder,
             transaction::{StateChange, Tx, TxPosition},
@@ -324,7 +324,7 @@ mod tests {
 
     #[test]
     fn test_reproduce_block() {
-        let datadir = SeeFuzzConfig::load().unwrap().reth.datadir;
+        let datadir = SoflConfig::load().unwrap().reth.datadir;
         let datadir = Path::new(&datadir);
         let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
         let fork_at = TxPosition::new(17000000, 0);

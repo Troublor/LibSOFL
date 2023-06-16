@@ -6,7 +6,7 @@ use ethers::types::{
     TransactionReceipt as ethersTransactionReceipt, TxHash as ethersTxHash,
 };
 use ethers_providers::Http;
-use ethers_providers::HttpClientError;
+
 use ethers_providers::JsonRpcClient;
 use futures::executor::block_on;
 use futures::future::join_all;
@@ -20,9 +20,12 @@ use reth_primitives::{
 use reth_provider::{BlockHashProvider, BlockNumProvider, ProviderError, TransactionsProvider};
 use reth_rlp::Decodable;
 use revm_primitives::B256 as H256;
+use tokio::runtime::Runtime;
 
 use super::{BcProvider, BcProviderBuilder};
 use futures::join;
+
+#[derive(Debug, Clone)]
 pub enum JsonRpcError {
     InvalidEndpoint(String),
 }
@@ -32,14 +35,16 @@ impl BcProviderBuilder {
         // TODO: use retry client
         let provider =
             Provider::<Http>::try_from(&url).map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
-        Ok(JsonRpcBcProvider { provider })
+        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+        Ok(JsonRpcBcProvider { provider, runtime })
     }
 
     // TODO: websocket support
 }
 
 pub struct JsonRpcBcProvider<P: JsonRpcClient> {
-    provider: Provider<P>,
+    pub(crate) provider: Provider<P>,
+    runtime: tokio::runtime::Runtime,
 }
 
 impl<P: JsonRpcClient> BlockHashProvider for JsonRpcBcProvider<P> {
@@ -108,7 +113,9 @@ impl<P: JsonRpcClient> BlockNumProvider for JsonRpcBcProvider<P> {
 
     #[doc = " Returns the last block number associated with the last canonical header in the database."]
     fn last_block_number(&self) -> rethResult<BlockNumber> {
-        let bn = block_on(self.provider.get_block_number())
+        let bn = self
+            .runtime
+            .block_on(self.provider.get_block_number())
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
             .as_u64();
         Ok(bn)
@@ -212,9 +219,10 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             }
             BlockHashOrNumber::Number(n) => ethersBlockId::Number(n.into()),
         };
-        let block: Option<ethersBlock<ethersTransaction>> =
-            block_on(self.provider.get_block_with_txs(block_id))
-                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let block: Option<ethersBlock<ethersTransaction>> = self
+            .runtime
+            .block_on(self.provider.get_block_with_txs(block_id))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         if block.is_none() {
             return Ok(None);
         }
@@ -256,5 +264,46 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             bs.push(b);
         }
         Ok(bs)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::ops::Range;
+
+    use ethers_providers::{Http, Middleware};
+    use reth_provider::{BlockNumProvider, TransactionsProvider};
+
+    use crate::{config::flags::SoflConfig, engine::providers::BcProviderBuilder};
+
+    use super::JsonRpcBcProvider;
+
+    fn get_bc_provider() -> JsonRpcBcProvider<Http> {
+        let cfg = SoflConfig::load().unwrap();
+        let url = cfg.jsonrpc.endpoint;
+        BcProviderBuilder::with_jsonrpc_via_http(url).unwrap()
+    }
+
+    #[test]
+    fn test_connection() {
+        let provider = get_bc_provider();
+        let bn = provider.last_block_number().unwrap();
+        assert!(bn > 0);
+    }
+
+    #[test]
+    fn test_get_block_txs() {
+        let provider = get_bc_provider();
+        let range = Range {
+            start: 14000000,
+            end: 14000003,
+        };
+        let block_txs = provider.transactions_by_block_range(range);
+        assert!(block_txs.is_ok());
+        let block_txs = block_txs.unwrap();
+        assert_eq!(block_txs.len(), 3);
+        assert_eq!(block_txs[0].len(), 112);
+        assert_eq!(block_txs[1].len(), 33);
+        assert_eq!(block_txs[2].len(), 335);
     }
 }
