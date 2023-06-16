@@ -215,7 +215,7 @@ impl<S: BcState> Executor<S> {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_nodep {
     use std::path::Path;
 
     use reth_primitives::{Transaction, TransactionKind, TxLegacy};

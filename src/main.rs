@@ -2,8 +2,6 @@ use ::ethers::types::U256;
 
 mod config;
 mod engine;
-#[cfg(test)]
-mod poc;
 
 fn main() {
     let a = U256::from(100_u128);
