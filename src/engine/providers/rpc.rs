@@ -268,7 +268,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_with_jsonrpc {
     use std::ops::Range;
 
     use ethers_providers::{Http, Middleware};

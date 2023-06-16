@@ -321,6 +321,23 @@ mod tests {
             "account code should be 0x1234"
         );
     }
+}
+
+#[cfg(test)]
+mod tests_with_db {
+    use std::path::Path;
+
+    use reth_provider::{ReceiptProvider, TransactionsProvider};
+    use revm_primitives::ExecutionResult;
+
+    use crate::{
+        config::flags::SoflConfig,
+        engine::{
+            executor::{Executor, NoInspector},
+            providers::BcProviderBuilder,
+            transaction::{Tx, TxPosition},
+        },
+    };
 
     #[test]
     fn test_reproduce_block() {

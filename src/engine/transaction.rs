@@ -230,7 +230,7 @@ impl TxPosition {
 }
 
 #[cfg(test)]
-mod tx_position_tests {
+mod tests_with_db {
     use std::path::Path;
 
     use crate::{config::flags::SoflConfig, engine::providers::BcProviderBuilder};
