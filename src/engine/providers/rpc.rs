@@ -1,3 +1,4 @@
+use std::any::Any;
 use std::ops::{Bound, RangeBounds};
 
 use ethers::providers::{Middleware, Provider};
@@ -11,6 +12,8 @@ use ethers_providers::JsonRpcClient;
 use futures::executor::block_on;
 use futures::future::join_all;
 use futures::StreamExt;
+use reqwest::header::HeaderMap;
+use reqwest::{Client, Url};
 use reth_interfaces::Error as rethError;
 use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
@@ -32,10 +35,30 @@ pub enum JsonRpcError {
 
 impl BcProviderBuilder {
     pub fn with_jsonrpc_via_http(url: String) -> Result<JsonRpcBcProvider<Http>, JsonRpcError> {
+        BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, None)
+    }
+    pub fn with_jsonrpc_via_http_with_auth(
+        url: String,
+        auth: impl Into<Option<HeaderMap>>,
+    ) -> Result<JsonRpcBcProvider<Http>, JsonRpcError> {
         // TODO: use retry client
-        let provider =
-            Provider::<Http>::try_from(&url).map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
-        let mut runtime = tokio::runtime::Runtime::new().unwrap();
+        let auth: Option<HeaderMap> = auth.into();
+        let provider;
+        if let Some(auth) = auth {
+            let mut headers = HeaderMap::new();
+            headers.extend::<HeaderMap>(auth);
+            let client = Client::builder()
+                .default_headers(headers)
+                .build()
+                .map_err(|_| JsonRpcError::InvalidEndpoint(url.clone()))?;
+            let url = Url::parse(url.as_str()).map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
+            let http_provider = Http::new_with_client(url, client);
+            provider = Provider::<Http>::new(http_provider);
+        } else {
+            provider =
+                Provider::<Http>::try_from(&url).map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
+        }
+        let runtime = tokio::runtime::Runtime::new().unwrap();
         Ok(JsonRpcBcProvider { provider, runtime })
     }
 
@@ -280,8 +303,8 @@ mod tests_with_jsonrpc {
 
     fn get_bc_provider() -> JsonRpcBcProvider<Http> {
         let cfg = SoflConfig::load().unwrap();
-        let url = cfg.jsonrpc.endpoint;
-        BcProviderBuilder::with_jsonrpc_via_http(url).unwrap()
+        let url = cfg.jsonrpc.endpoint.clone();
+        BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, cfg.jsonrpc).unwrap()
     }
 
     #[test]

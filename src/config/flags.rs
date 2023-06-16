@@ -1,3 +1,4 @@
+use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Deserialize, Serialize)]
@@ -18,12 +19,33 @@ impl Default for RethConfig {
 #[allow(unused)]
 pub struct JsonRpcConfig {
     pub endpoint: String,
+    pub cloudflare_client_id: Option<String>,
+    pub cloudflare_client_secret: Option<String>,
+}
+
+impl From<JsonRpcConfig> for Option<HeaderMap> {
+    fn from(val: JsonRpcConfig) -> Self {
+        let mut headers = HeaderMap::new();
+        if let Some(id) = val.cloudflare_client_id {
+            headers.insert("CF-Access-Client-Id", id.parse().unwrap());
+        } else {
+            return None;
+        }
+        if let Some(secret) = val.cloudflare_client_secret {
+            headers.insert("CF-Access-Client-Secret", secret.parse().unwrap());
+        } else {
+            return None;
+        }
+        Some(headers)
+    }
 }
 
 impl Default for JsonRpcConfig {
     fn default() -> Self {
         Self {
             endpoint: String::from("http://localhost:8545"),
+            cloudflare_client_id: None,
+            cloudflare_client_secret: None,
         }
     }
 }

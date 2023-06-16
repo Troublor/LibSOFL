@@ -22,6 +22,9 @@ serde = "1.0.164"
 # misc
 eyre = "0.6.8"
 
+# lift dependencies of dependencies
+reqwest = "0.11.18"
+
 # reth
 revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
 revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
