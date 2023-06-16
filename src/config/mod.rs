@@ -12,7 +12,7 @@ impl SoflConfig {
         let cfg = Config::builder()
             .add_source(default_source)
             .add_source(File::new(config_file.to_str().unwrap(), FileFormat::Toml).required(false))
-            .add_source(Environment::with_prefix("SOFL"))
+            .add_source(Environment::with_prefix("SOFL").separator("__"))
             .build()?;
         cfg.try_deserialize()
     }
