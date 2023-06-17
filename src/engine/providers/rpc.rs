@@ -6,6 +6,7 @@ use ethers::types::{
     Block as ethersBlock, BlockId as ethersBlockId,
     Transaction as ethersTransaction,
     TransactionReceipt as ethersTransactionReceipt, TxHash as ethersTxHash,
+    H256 as ethersH256, U256 as ethersU256,
 };
 use ethers_providers::Http;
 
@@ -19,15 +20,16 @@ use reth_interfaces::Error as rethError;
 use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
-    BlockHashOrNumber, BlockNumber, ChainInfo, Header, TransactionMeta,
+    Address, BlockHash, BlockHashOrNumber, BlockNumber, Bloom, ChainInfo,
+    ChainSpec, ChainSpecBuilder, Header, SealedHeader, TransactionMeta,
     TransactionSigned, TxHash, TxNumber,
 };
 use reth_provider::{
-    BlockHashProvider, BlockNumProvider, EvmEnvProvider, ProviderError,
-    TransactionsProvider,
+    BlockHashProvider, BlockNumProvider, EvmEnvProvider, HeaderProvider,
+    ProviderError, TransactionsProvider,
 };
 use reth_rlp::Decodable;
-use revm_primitives::{BlockEnv, CfgEnv, B256 as H256};
+use revm_primitives::{BlockEnv, CfgEnv, B256 as H256, U256};
 use tokio::runtime::Runtime;
 
 use super::{BcProvider, BcProviderBuilder};
@@ -307,6 +309,157 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     }
 }
 
+fn convert_ethers_block_to_sealed_header(
+    block: ethersBlock<ethersTxHash>,
+) -> Option<SealedHeader> {
+    if block.author.is_none() {
+        // return None if the block is still pending
+        return None;
+    }
+    let header = Header {
+        parent_hash: H256::from_slice(block.parent_hash.as_bytes()),
+        ommers_hash: H256::from_slice(block.uncles_hash.as_bytes()),
+        beneficiary: Address::from_slice(block.author.unwrap().as_bytes()),
+        state_root: H256::from_slice(block.state_root.as_bytes()),
+        transactions_root: H256::from_slice(block.transactions_root.as_bytes()),
+        receipts_root: H256::from_slice(block.receipts_root.as_bytes()),
+        withdrawals_root: block
+            .withdrawals_root
+            .map(|r| H256::from_slice(r.as_bytes())),
+        logs_bloom: Bloom::from_slice(block.logs_bloom.unwrap().as_bytes()),
+        difficulty: U256::from(block.difficulty.as_u64()),
+        number: block.number.unwrap().as_u64(),
+        gas_limit: block.gas_limit.as_u64(),
+        gas_used: block.gas_used.as_u64(),
+        timestamp: block.timestamp.as_u64(),
+        mix_hash: H256::from_slice(block.mix_hash.unwrap().as_bytes()),
+        nonce: block.nonce.unwrap().to_low_u64_be(), // TODO: check whether big-endian is
+        // correct
+        base_fee_per_gas: block.base_fee_per_gas.map(|f| f.as_u64()),
+        extra_data: block.extra_data.0.into(),
+    };
+    let hash = block.hash.unwrap().0.into();
+    Some(SealedHeader { header, hash })
+}
+impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
+    #[doc = " Get header by block hash"]
+    fn header(&self, block_hash: &BlockHash) -> rethResult<Option<Header>> {
+        let hash = block_hash.as_slice();
+        let hash = ethersH256::from_slice(hash);
+        let block: Option<ethersBlock<ethersH256>> =
+            block_on(self.provider.get_block(ethersBlockId::from(hash)))
+                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        if block.is_none() {
+            return Ok(None);
+        }
+        let block = block.unwrap();
+        let header = convert_ethers_block_to_sealed_header(block);
+        Ok(header.map(|h| h.header))
+    }
+
+    #[doc = " Get header by block number"]
+    fn header_by_number(&self, num: u64) -> rethResult<Option<Header>> {
+        let block_hash = self.block_hash(num)?;
+        if block_hash.is_none() {
+            return Ok(None);
+        }
+        let block_hash = block_hash.unwrap();
+        self.header(&block_hash)
+    }
+
+    #[doc = " Get total difficulty by block hash."]
+    fn header_td(&self, hash: &BlockHash) -> rethResult<Option<U256>> {
+        let block = self.header(hash)?;
+        Ok(block.map(|b| b.difficulty))
+    }
+
+    #[doc = " Get total difficulty by block number."]
+    fn header_td_by_number(
+        &self,
+        number: BlockNumber,
+    ) -> rethResult<Option<U256>> {
+        let block = self.header_by_number(number)?;
+        Ok(block.map(|b| b.difficulty))
+    }
+
+    #[doc = " Get headers in range of block numbers"]
+    fn headers_range(
+        &self,
+        range: impl RangeBounds<BlockNumber>,
+    ) -> rethResult<Vec<Header>> {
+        let start = match range.start_bound() {
+            Bound::Included(n) => *n,
+            Bound::Excluded(n) => n + 1,
+            Bound::Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            Bound::Included(n) => n + 1,
+            Bound::Excluded(n) => *n,
+            Bound::Unbounded => self.last_block_number()? + 1,
+        };
+        let mut bs = Vec::new();
+        for bn in start..end {
+            let b = self.header_by_number(bn)?;
+            if b.is_none() {
+                break;
+            }
+            let b = b.unwrap();
+            bs.push(b);
+        }
+        Ok(bs)
+    }
+
+    #[doc = " Get headers in range of block numbers"]
+    fn sealed_headers_range(
+        &self,
+        range: impl RangeBounds<BlockNumber>,
+    ) -> rethResult<Vec<SealedHeader>> {
+        let start = match range.start_bound() {
+            Bound::Included(n) => *n,
+            Bound::Excluded(n) => n + 1,
+            Bound::Unbounded => 0,
+        };
+        let end = match range.end_bound() {
+            Bound::Included(n) => n + 1,
+            Bound::Excluded(n) => *n,
+            Bound::Unbounded => self.last_block_number()? + 1,
+        };
+        let mut bs = Vec::new();
+        for bn in start..end {
+            let b = self.sealed_header(bn)?;
+            if b.is_none() {
+                break;
+            }
+            let b = b.unwrap();
+            bs.push(b);
+        }
+        todo!()
+    }
+
+    #[doc = " Get a single sealed header by block number"]
+    fn sealed_header(
+        &self,
+        number: BlockNumber,
+    ) -> rethResult<Option<SealedHeader>> {
+        let number = ethersBlockId::from(number);
+        let block: Option<ethersBlock<ethersH256>> =
+            block_on(self.provider.get_block(number))
+                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        if block.is_none() {
+            return Ok(None);
+        }
+        let block = block.unwrap();
+        Ok(convert_ethers_block_to_sealed_header(block))
+    }
+}
+
+fn chain_id_to_chain_spec(id: u64) -> ChainSpec {
+    match id {
+        1 => ChainSpecBuilder::mainnet().build(),
+        _ => panic!("Unsupported chain id: {}", id),
+    }
+}
+
 impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
     #[doc = " Fills the [CfgEnv] and [BlockEnv] fields with values specific to the given"]
     #[doc = " [BlockHashOrNumber]."]
@@ -316,7 +469,15 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         block_env: &mut BlockEnv,
         at: BlockHashOrNumber,
     ) -> rethResult<()> {
-        todo!()
+        let header = match at {
+            BlockHashOrNumber::Hash(h) => self.header(&h)?,
+            BlockHashOrNumber::Number(n) => self.header_by_number(n)?,
+        };
+        if header.is_none() {
+            return Err(rethError::Provider(ProviderError::HeaderNotFound(at)));
+        }
+        let header = header.unwrap();
+        self.fill_env_with_header(cfg, block_env, &header)
     }
 
     #[doc = " Fills the [CfgEnv] and [BlockEnv]  fields with values specific to the given [Header]."]
@@ -326,7 +487,9 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         block_env: &mut BlockEnv,
         header: &Header,
     ) -> rethResult<()> {
-        todo!()
+        let _ = self.fill_cfg_env_with_header(cfg, header)?;
+        let _ = self.fill_block_env_with_header(block_env, header)?;
+        Ok(())
     }
 
     #[doc = " Fills the [BlockEnv] fields with values specific to the given [BlockHashOrNumber]."]
@@ -335,7 +498,15 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         block_env: &mut BlockEnv,
         at: BlockHashOrNumber,
     ) -> rethResult<()> {
-        todo!()
+        let header = match at {
+            BlockHashOrNumber::Hash(h) => self.header(&h)?,
+            BlockHashOrNumber::Number(n) => self.header_by_number(n)?,
+        };
+        if header.is_none() {
+            return Err(rethError::Provider(ProviderError::HeaderNotFound(at)));
+        }
+        let header = header.unwrap();
+        self.fill_block_env_with_header(block_env, &header)
     }
 
     #[doc = " Fills the [BlockEnv] fields with values specific to the given [Header]."]
@@ -344,7 +515,26 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         block_env: &mut BlockEnv,
         header: &Header,
     ) -> rethResult<()> {
-        todo!()
+        let chain_id = self
+            .runtime
+            .block_on(self.provider.get_chainid())
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
+            .as_u64();
+        let chain_spec = chain_id_to_chain_spec(chain_id);
+        let after_merge;
+        if chain_spec.paris_block_and_final_difficulty.is_none() {
+            after_merge = false;
+        } else {
+            after_merge = header.number
+                >= chain_spec.paris_block_and_final_difficulty.unwrap().0;
+        }
+        reth_revm::env::fill_block_env(
+            block_env,
+            &chain_spec,
+            header,
+            after_merge,
+        );
+        Ok(())
     }
 
     #[doc = " Fills the [CfgEnv] fields with values specific to the given [BlockHashOrNumber]."]
@@ -353,7 +543,17 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         cfg: &mut CfgEnv,
         at: BlockHashOrNumber,
     ) -> rethResult<()> {
-        todo!()
+        let header = match at {
+            BlockHashOrNumber::Hash(hash) => self.header(&hash)?,
+            BlockHashOrNumber::Number(number) => {
+                self.header_by_number(number)?
+            }
+        };
+        if header.is_none() {
+            return Err(rethError::Provider(ProviderError::HeaderNotFound(at)));
+        }
+        let header = header.unwrap();
+        self.fill_cfg_env_with_header(cfg, &header)
     }
 
     #[doc = " Fills the [CfgEnv] fields with values specific to the given [Header]."]
@@ -362,7 +562,19 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         cfg: &mut CfgEnv,
         header: &Header,
     ) -> rethResult<()> {
-        todo!()
+        let chain_id = self
+            .runtime
+            .block_on(self.provider.get_chainid())
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
+            .as_u64();
+        let chain_spec = chain_id_to_chain_spec(chain_id);
+        reth_revm::env::fill_cfg_env(
+            cfg,
+            &chain_spec,
+            &header,
+            header.difficulty,
+        );
+        Ok(())
     }
 }
 
