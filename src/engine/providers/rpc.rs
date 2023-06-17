@@ -10,8 +10,8 @@ use ethers::types::{
     TransactionReceipt as ethersTransactionReceipt, TxHash as ethersTxHash,
     H256 as ethersH256, U256 as ethersU256,
 };
-use ethers_providers::Http;
 use ethers_providers::JsonRpcClient;
+use ethers_providers::{Http, Ws};
 use futures::executor::block_on;
 use futures::future::join_all;
 use futures::StreamExt;
@@ -76,7 +76,16 @@ impl BcProviderBuilder {
         Ok(JsonRpcBcProvider { provider, runtime })
     }
 
-    // TODO: websocket support
+    pub fn with_jsonrpc_via_ws(
+        url: String,
+    ) -> Result<JsonRpcBcProvider<Ws>, JsonRpcError> {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let ws_provider = runtime
+            .block_on(Ws::connect(url.as_str()))
+            .map_err(|_| JsonRpcError::InvalidEndpoint(url.clone()))?;
+        let provider = Arc::new(Provider::<Ws>::new(ws_provider));
+        Ok(JsonRpcBcProvider { provider, runtime })
+    }
 }
 
 pub struct JsonRpcBcProvider<P: JsonRpcClient> {
