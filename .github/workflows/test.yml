@@ -8,6 +8,10 @@ on:
 
 env:
   CARGO_TERM_COLOR: always
+  
+concurrency:
+  group: test
+  cancel-in-progress: true
 
 jobs:
   build:
