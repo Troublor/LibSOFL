@@ -1,15 +1,16 @@
 use std::any::Any;
+use std::collections::HashMap;
 use std::ops::{Bound, RangeBounds};
+use std::sync::Arc;
 
 use ethers::providers::{Middleware, Provider};
 use ethers::types::{
-    Block as ethersBlock, BlockId as ethersBlockId,
+    Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
     Transaction as ethersTransaction,
     TransactionReceipt as ethersTransactionReceipt, TxHash as ethersTxHash,
     H256 as ethersH256, U256 as ethersU256,
 };
 use ethers_providers::Http;
-
 use ethers_providers::JsonRpcClient;
 use futures::executor::block_on;
 use futures::future::join_all;
@@ -20,13 +21,15 @@ use reth_interfaces::Error as rethError;
 use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
-    Address, BlockHash, BlockHashOrNumber, BlockNumber, Bloom, ChainInfo,
-    ChainSpec, ChainSpecBuilder, Header, SealedHeader, TransactionMeta,
-    TransactionSigned, TxHash, TxNumber,
+    Account, Address, BlockHash, BlockHashOrNumber, BlockNumber, Bloom,
+    Bytecode, Bytes, ChainInfo, ChainSpec, ChainSpecBuilder, Header,
+    SealedHeader, StorageKey, StorageValue, TransactionMeta, TransactionSigned,
+    TxHash, TxNumber,
 };
 use reth_provider::{
-    BlockHashProvider, BlockNumProvider, EvmEnvProvider, HeaderProvider,
-    ProviderError, TransactionsProvider,
+    AccountProvider, BlockHashProvider, BlockIdProvider, BlockNumProvider,
+    EvmEnvProvider, HeaderProvider, PostState, ProviderError, StateProvider,
+    StateProviderFactory, StateRootProvider, TransactionsProvider,
 };
 use reth_rlp::Decodable;
 use revm_primitives::{BlockEnv, CfgEnv, B256 as H256, U256};
@@ -68,6 +71,7 @@ impl BcProviderBuilder {
             provider = Provider::<Http>::try_from(&url)
                 .map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
         }
+        let provider = Arc::new(provider);
         let runtime = tokio::runtime::Runtime::new().unwrap();
         Ok(JsonRpcBcProvider { provider, runtime })
     }
@@ -76,7 +80,7 @@ impl BcProviderBuilder {
 }
 
 pub struct JsonRpcBcProvider<P: JsonRpcClient> {
-    pub(crate) provider: Provider<P>,
+    pub(crate) provider: Arc<Provider<P>>,
     runtime: tokio::runtime::Runtime,
 }
 
@@ -327,7 +331,7 @@ fn convert_ethers_block_to_sealed_header(
             .withdrawals_root
             .map(|r| H256::from_slice(r.as_bytes())),
         logs_bloom: Bloom::from_slice(block.logs_bloom.unwrap().as_bytes()),
-        difficulty: U256::from(block.difficulty.as_u64()),
+        difficulty: U256::from_be_bytes(block.difficulty.into()),
         number: block.number.unwrap().as_u64(),
         gas_limit: block.gas_limit.as_u64(),
         gas_used: block.gas_used.as_u64(),
@@ -575,6 +579,227 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
             header.difficulty,
         );
         Ok(())
+    }
+}
+
+impl<P: JsonRpcClient> BlockIdProvider for JsonRpcBcProvider<P> {
+    #[doc = " Get the current pending block number and hash."]
+    fn pending_block_num_hash(
+        &self,
+    ) -> rethResult<Option<reth_primitives::BlockNumHash>> {
+        self.finalized_block_num_hash()
+    }
+
+    #[doc = " Get the current safe block number and hash."]
+    fn safe_block_num_hash(
+        &self,
+    ) -> rethResult<Option<reth_primitives::BlockNumHash>> {
+        self.finalized_block_num_hash()
+    }
+
+    #[doc = " Get the current finalized block number and hash."]
+    fn finalized_block_num_hash(
+        &self,
+    ) -> rethResult<Option<reth_primitives::BlockNumHash>> {
+        let bn = self.last_block_number()?;
+        let hash = self.block_hash(bn)?.unwrap();
+        Ok(Some(reth_primitives::BlockNumHash { number: bn, hash }))
+    }
+}
+
+impl<P: JsonRpcClient> StateProviderFactory for JsonRpcBcProvider<P> {
+    fn latest(&self) -> rethResult<reth_provider::StateProviderBox<'_>> {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        Ok(Box::new(JsonRpcStateProvider {
+            runtime,
+            provider: self.provider.clone(),
+            at: None,
+        }))
+    }
+
+    fn history_by_block_number(
+        &self,
+        block: BlockNumber,
+    ) -> rethResult<reth_provider::StateProviderBox<'_>> {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        Ok(Box::new(JsonRpcStateProvider {
+            runtime,
+            provider: self.provider.clone(),
+            at: Some(block),
+        }))
+    }
+
+    fn history_by_block_hash(
+        &self,
+        block: BlockHash,
+    ) -> rethResult<reth_provider::StateProviderBox<'_>> {
+        let runtime = tokio::runtime::Runtime::new().unwrap();
+        let block = self.block_number(block)?.unwrap();
+        Ok(Box::new(JsonRpcStateProvider {
+            runtime,
+            provider: self.provider.clone(),
+            at: Some(block),
+        }))
+    }
+
+    fn state_by_block_hash(
+        &self,
+        block: BlockHash,
+    ) -> rethResult<reth_provider::StateProviderBox<'_>> {
+        self.history_by_block_hash(block)
+    }
+
+    fn pending(&self) -> rethResult<reth_provider::StateProviderBox<'_>> {
+        todo!()
+    }
+
+    fn pending_with_provider(
+        &self,
+        post_state_data: Box<dyn reth_provider::PostStateDataProvider>,
+    ) -> rethResult<reth_provider::StateProviderBox<'_>> {
+        todo!()
+    }
+}
+
+struct JsonRpcStateProvider<P> {
+    runtime: tokio::runtime::Runtime,
+    provider: Arc<Provider<P>>,
+    at: Option<BlockNumber>,
+}
+
+impl<P: JsonRpcClient> JsonRpcStateProvider<P> {
+    fn get_ethers_block_id(&self) -> Option<ethersBlockId> {
+        self.at.map(|n| ethersBlockId::from(n))
+    }
+}
+
+impl<P: JsonRpcClient> BlockHashProvider for JsonRpcStateProvider<P> {
+    #[doc = " Get the hash of the block with the given number. Returns `None` if no block with this number"]
+    #[doc = " exists."]
+    fn block_hash(&self, number: BlockNumber) -> rethResult<Option<H256>> {
+        if let Some(at) = self.at {
+            if number > at {
+                return Ok(None);
+            }
+        }
+        let h = block_on(self.provider.get_block(number))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
+            .and_then(|b| b.hash)
+            .map(|h| h.0.into());
+        Ok(h)
+    }
+
+    #[doc = " Get headers in range of block hashes or numbers"]
+    fn canonical_hashes_range(
+        &self,
+        start: BlockNumber,
+        end: BlockNumber,
+    ) -> rethResult<Vec<H256>> {
+        let mut hashes = Vec::new();
+        for i in start..end {
+            if let Some(h) = self.block_hash(i)? {
+                hashes.push(h);
+            } else {
+                break;
+            }
+        }
+        Ok(hashes)
+    }
+}
+
+impl<P: JsonRpcClient> AccountProvider for JsonRpcStateProvider<P> {
+    #[doc = " Get basic account information."]
+    #[doc = ""]
+    #[doc = " Returns `None` if the account doesn\'t exist."]
+    fn basic_account(&self, address: Address) -> rethResult<Option<Account>> {
+        let nonce = self
+            .runtime
+            .block_on(self.provider.get_transaction_count(
+                ethersAddress::from_slice(address.as_slice()),
+                self.get_ethers_block_id(),
+            ))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let balance = self
+            .runtime
+            .block_on(self.provider.get_balance(
+                ethersAddress::from_slice(address.as_slice()),
+                self.get_ethers_block_id(),
+            ))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let code = self
+            .runtime
+            .block_on(self.provider.get_code(
+                ethersAddress::from_slice(address.as_slice()),
+                self.get_ethers_block_id(),
+            ))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let code_hash;
+        if code.len() == 0 {
+            code_hash = None;
+        } else {
+            let code: &[u8] = &code.0.as_ref();
+            let hash = reth_primitives::keccak256(code);
+            code_hash = Some(hash);
+        }
+        Ok(Some(Account {
+            nonce: nonce.as_u64(),
+            balance: U256::from_be_bytes(balance.into()),
+            bytecode_hash: code_hash,
+        }))
+    }
+}
+
+impl<P: JsonRpcClient> StateRootProvider for JsonRpcStateProvider<P> {
+    #[doc = " Returns the state root of the PostState on top of the current state."]
+    fn state_root(&self, post_state: PostState) -> rethResult<H256> {
+        Err(rethError::Provider(
+            ProviderError::StateRootNotAvailableForHistoricalBlock,
+        ))
+    }
+}
+
+impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
+    #[doc = " Get storage of given account."]
+    fn storage(
+        &self,
+        account: Address,
+        storage_key: StorageKey,
+    ) -> rethResult<Option<StorageValue>> {
+        let value = self
+            .runtime
+            .block_on(self.provider.get_storage_at(
+                ethersAddress::from_slice(account.as_slice()),
+                storage_key.into(),
+                self.get_ethers_block_id(),
+            ))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        Ok(Some(U256::from_be_bytes(value.into())))
+    }
+
+    #[doc = " Get account code by its hash"]
+    fn bytecode_by_hash(
+        &self,
+        code_hash: H256,
+    ) -> rethResult<Option<Bytecode>> {
+        let code = self
+            .runtime
+            .block_on(self.provider.get_code(
+                ethersAddress::from_slice(code_hash.as_bytes()),
+                self.get_ethers_block_id(),
+            ))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        Ok(Some(Bytecode::new_raw(code.0)))
+    }
+
+    #[doc = " Get account and storage proofs."]
+    fn proof(
+        &self,
+        address: Address,
+        keys: &[H256],
+    ) -> rethResult<(Vec<Bytes>, H256, Vec<Vec<Bytes>>)> {
+        Err(rethError::Provider(
+            ProviderError::StateRootNotAvailableForHistoricalBlock,
+        ))
     }
 }
 
