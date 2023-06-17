@@ -1,5 +1,8 @@
 use reth_primitives::{BlockHashOrNumber, BlockId};
-use reth_provider::{EvmEnvProvider, StateProviderBox, StateProviderFactory, TransactionsProvider};
+use reth_provider::{
+    EvmEnvProvider, StateProviderBox, StateProviderFactory,
+    TransactionsProvider,
+};
 use reth_revm::database::{State, SubState};
 use revm::{
     db::{CacheDB, EmptyDB},
@@ -7,7 +10,8 @@ use revm::{
     Database, DatabaseCommit, Inspector, EVM,
 };
 use revm_primitives::{
-    BlockEnv, Bytes, CfgEnv, EVMError, Env, Eval, ExecutionResult, Output, ResultAndState, U256,
+    BlockEnv, Bytes, CfgEnv, EVMError, Env, Eval, ExecutionResult, Output,
+    ResultAndState, U256,
 };
 
 use super::transaction::{Tx, TxPosition, TxPositionOutOfRangeError};
@@ -35,7 +39,9 @@ pub struct Executor<S> {
 impl<'a> Executor<SubState<StateProviderBox<'a>>> {
     /// Create an executor with fork state from a transaction position.
     /// The forked state is the the state after the transaction at the position is executed.
-    pub fn fork_from<BP: StateProviderFactory + EvmEnvProvider + TransactionsProvider>(
+    pub fn fork_from<
+        BP: StateProviderFactory + EvmEnvProvider + TransactionsProvider,
+    >(
         p: &'a BP,
         pos: TxPosition,
     ) -> Result<Self, TxPositionOutOfRangeError> {
@@ -46,7 +52,9 @@ impl<'a> Executor<SubState<StateProviderBox<'a>>> {
 
     /// Create an executor with fork state from a transaction position.
     /// The forked state is the the state before the transaction at the position is executed.
-    pub fn fork_at<BP: StateProviderFactory + EvmEnvProvider + TransactionsProvider>(
+    pub fn fork_at<
+        BP: StateProviderFactory + EvmEnvProvider + TransactionsProvider,
+    >(
         p: &'a BP,
         pos: TxPosition,
     ) -> Result<Self, TxPositionOutOfRangeError> {
@@ -97,7 +105,9 @@ impl<'a> Executor<SubState<StateProviderBox<'a>>> {
 }
 
 impl Executor<CacheDB<EmptyDB>> {
-    pub fn create(initialize: impl Fn(&mut CacheDB<EmptyDB>) -> (CfgEnv, BlockEnv)) -> Self {
+    pub fn create(
+        initialize: impl Fn(&mut CacheDB<EmptyDB>) -> (CfgEnv, BlockEnv),
+    ) -> Self {
         let db = EmptyDB {};
         let mut state = CacheDB::new(db);
         let (cfg, block_env) = initialize(&mut state);
@@ -161,7 +171,8 @@ impl<S: BcState> Executor<S> {
             // execute tx
             let result;
             if let Some(inspector) = inspector {
-                result = self.evm.inspect(inspector).map_err(ExecutorError::Evm);
+                result =
+                    self.evm.inspect(inspector).map_err(ExecutorError::Evm);
             } else {
                 result = self.evm.transact().map_err(ExecutorError::Evm);
             }
@@ -199,7 +210,11 @@ impl<S: BcState> Executor<S> {
         &self.evm.env
     }
 
-    pub fn commit_block(&mut self, cfg: Option<CfgEnv>, block_env: Option<BlockEnv>) {
+    pub fn commit_block(
+        &mut self,
+        cfg: Option<CfgEnv>,
+        block_env: Option<BlockEnv>,
+    ) {
         if let Some(cfg) = cfg {
             self.evm.env.cfg = cfg;
         }
@@ -225,7 +240,8 @@ mod tests_nodep {
         Database,
     };
     use revm_primitives::{
-        Account, AccountInfo, Address, Bytecode, Bytes, ExecutionResult, B160, U256,
+        Account, AccountInfo, Address, Bytecode, Bytes, ExecutionResult, B160,
+        U256,
     };
 
     use crate::{
@@ -243,9 +259,17 @@ mod tests_nodep {
         let spender = Address::from(0);
         let receiver = Address::from(1);
         let mut exe = Executor::test_create(|state| {
-            let acc = AccountInfo::new(U256::from(1000), Default::default(), Bytecode::new());
+            let acc = AccountInfo::new(
+                U256::from(1000),
+                Default::default(),
+                Bytecode::new(),
+            );
             state.insert_account_info(spender, acc);
-            let acc = AccountInfo::new(U256::from(0), Default::default(), Bytecode::new());
+            let acc = AccountInfo::new(
+                U256::from(0),
+                Default::default(),
+                Bytecode::new(),
+            );
             state.insert_account_info(receiver, acc);
         });
         let tx = Transaction::Legacy(TxLegacy {
@@ -361,7 +385,9 @@ mod tests_with_db {
                 ExecutionResult::Success { logs, .. } => {
                     assert!(receipt.success);
                     assert_eq!(receipt.logs.len(), logs.len());
-                    for (log, receipt_log) in logs.iter().zip(receipt.logs.iter()) {
+                    for (log, receipt_log) in
+                        logs.iter().zip(receipt.logs.iter())
+                    {
                         assert_eq!(log.address, receipt_log.address);
                         assert_eq!(log.topics, receipt_log.topics);
                         assert_eq!(*log.data, *receipt_log.data);

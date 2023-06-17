@@ -3,7 +3,8 @@ use std::ops::{Bound, RangeBounds};
 
 use ethers::providers::{Middleware, Provider};
 use ethers::types::{
-    Block as ethersBlock, BlockId as ethersBlockId, Transaction as ethersTransaction,
+    Block as ethersBlock, BlockId as ethersBlockId,
+    Transaction as ethersTransaction,
     TransactionReceipt as ethersTransactionReceipt, TxHash as ethersTxHash,
 };
 use ethers_providers::Http;
@@ -18,11 +19,15 @@ use reth_interfaces::Error as rethError;
 use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
-    BlockHashOrNumber, BlockNumber, ChainInfo, TransactionMeta, TransactionSigned, TxHash, TxNumber,
+    BlockHashOrNumber, BlockNumber, ChainInfo, Header, TransactionMeta,
+    TransactionSigned, TxHash, TxNumber,
 };
-use reth_provider::{BlockHashProvider, BlockNumProvider, ProviderError, TransactionsProvider};
+use reth_provider::{
+    BlockHashProvider, BlockNumProvider, EvmEnvProvider, ProviderError,
+    TransactionsProvider,
+};
 use reth_rlp::Decodable;
-use revm_primitives::B256 as H256;
+use revm_primitives::{BlockEnv, CfgEnv, B256 as H256};
 use tokio::runtime::Runtime;
 
 use super::{BcProvider, BcProviderBuilder};
@@ -34,7 +39,9 @@ pub enum JsonRpcError {
 }
 
 impl BcProviderBuilder {
-    pub fn with_jsonrpc_via_http(url: String) -> Result<JsonRpcBcProvider<Http>, JsonRpcError> {
+    pub fn with_jsonrpc_via_http(
+        url: String,
+    ) -> Result<JsonRpcBcProvider<Http>, JsonRpcError> {
         BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, None)
     }
     pub fn with_jsonrpc_via_http_with_auth(
@@ -51,12 +58,13 @@ impl BcProviderBuilder {
                 .default_headers(headers)
                 .build()
                 .map_err(|_| JsonRpcError::InvalidEndpoint(url.clone()))?;
-            let url = Url::parse(url.as_str()).map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
+            let url = Url::parse(url.as_str())
+                .map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
             let http_provider = Http::new_with_client(url, client);
             provider = Provider::<Http>::new(http_provider);
         } else {
-            provider =
-                Provider::<Http>::try_from(&url).map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
+            provider = Provider::<Http>::try_from(&url)
+                .map_err(|_| JsonRpcError::InvalidEndpoint(url))?;
         }
         let runtime = tokio::runtime::Runtime::new().unwrap();
         Ok(JsonRpcBcProvider { provider, runtime })
@@ -88,11 +96,10 @@ impl<P: JsonRpcClient> BlockHashProvider for JsonRpcBcProvider<P> {
         end: BlockNumber,
     ) -> rethResult<Vec<H256>> {
         let get_block = |n| async move {
-            let b: rethResult<Option<ethersBlock<ethersTxHash>>> = self
-                .provider
-                .get_block(n)
-                .await
-                .map_err(|_| rethError::Network(NetworkError::ChannelClosed));
+            let b: rethResult<Option<ethersBlock<ethersTxHash>>> =
+                self.provider.get_block(n).await.map_err(|_| {
+                    rethError::Network(NetworkError::ChannelClosed)
+                });
             b
         };
         let fs = (start..end).map(get_block);
@@ -167,12 +174,18 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     }
 
     #[doc = " Get transaction by id."]
-    fn transaction_by_id(&self, id: TxNumber) -> rethResult<Option<TransactionSigned>> {
+    fn transaction_by_id(
+        &self,
+        id: TxNumber,
+    ) -> rethResult<Option<TransactionSigned>> {
         todo!()
     }
 
     #[doc = " Get transaction by transaction hash."]
-    fn transaction_by_hash(&self, hash: TxHash) -> rethResult<Option<TransactionSigned>> {
+    fn transaction_by_hash(
+        &self,
+        hash: TxHash,
+    ) -> rethResult<Option<TransactionSigned>> {
         let tx = block_on(
             self.provider
                 .get_transaction(ethersTxHash::from_slice(hash.as_bytes())),
@@ -200,11 +213,11 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             return Ok(None);
         }
         let tx = tx.unwrap();
-        let receipt: Option<ethersTransactionReceipt> = block_on(
-            self.provider
-                .get_transaction_receipt(ethersTxHash::from_slice(hash.as_bytes())),
-        )
-        .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let receipt: Option<ethersTransactionReceipt> =
+            block_on(self.provider.get_transaction_receipt(
+                ethersTxHash::from_slice(hash.as_bytes()),
+            ))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         if receipt.is_none() {
             return Ok(None);
         }
@@ -227,7 +240,10 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     }
 
     #[doc = " Get transaction block number"]
-    fn transaction_block(&self, id: TxNumber) -> rethResult<Option<BlockNumber>> {
+    fn transaction_block(
+        &self,
+        id: TxNumber,
+    ) -> rethResult<Option<BlockNumber>> {
         todo!()
     }
 
@@ -279,7 +295,8 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         };
         let mut bs = Vec::new();
         for bn in start..end {
-            let b = self.transactions_by_block(BlockHashOrNumber::Number(bn))?;
+            let b =
+                self.transactions_by_block(BlockHashOrNumber::Number(bn))?;
             if b.is_none() {
                 break;
             }
@@ -290,6 +307,65 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     }
 }
 
+impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
+    #[doc = " Fills the [CfgEnv] and [BlockEnv] fields with values specific to the given"]
+    #[doc = " [BlockHashOrNumber]."]
+    fn fill_env_at(
+        &self,
+        cfg: &mut CfgEnv,
+        block_env: &mut BlockEnv,
+        at: BlockHashOrNumber,
+    ) -> rethResult<()> {
+        todo!()
+    }
+
+    #[doc = " Fills the [CfgEnv] and [BlockEnv]  fields with values specific to the given [Header]."]
+    fn fill_env_with_header(
+        &self,
+        cfg: &mut CfgEnv,
+        block_env: &mut BlockEnv,
+        header: &Header,
+    ) -> rethResult<()> {
+        todo!()
+    }
+
+    #[doc = " Fills the [BlockEnv] fields with values specific to the given [BlockHashOrNumber]."]
+    fn fill_block_env_at(
+        &self,
+        block_env: &mut BlockEnv,
+        at: BlockHashOrNumber,
+    ) -> rethResult<()> {
+        todo!()
+    }
+
+    #[doc = " Fills the [BlockEnv] fields with values specific to the given [Header]."]
+    fn fill_block_env_with_header(
+        &self,
+        block_env: &mut BlockEnv,
+        header: &Header,
+    ) -> rethResult<()> {
+        todo!()
+    }
+
+    #[doc = " Fills the [CfgEnv] fields with values specific to the given [BlockHashOrNumber]."]
+    fn fill_cfg_env_at(
+        &self,
+        cfg: &mut CfgEnv,
+        at: BlockHashOrNumber,
+    ) -> rethResult<()> {
+        todo!()
+    }
+
+    #[doc = " Fills the [CfgEnv] fields with values specific to the given [Header]."]
+    fn fill_cfg_env_with_header(
+        &self,
+        cfg: &mut CfgEnv,
+        header: &Header,
+    ) -> rethResult<()> {
+        todo!()
+    }
+}
+
 #[cfg(test)]
 mod tests_with_jsonrpc {
     use std::ops::Range;
@@ -297,14 +373,17 @@ mod tests_with_jsonrpc {
     use ethers_providers::{Http, Middleware};
     use reth_provider::{BlockNumProvider, TransactionsProvider};
 
-    use crate::{config::flags::SoflConfig, engine::providers::BcProviderBuilder};
+    use crate::{
+        config::flags::SoflConfig, engine::providers::BcProviderBuilder,
+    };
 
     use super::JsonRpcBcProvider;
 
     fn get_bc_provider() -> JsonRpcBcProvider<Http> {
         let cfg = SoflConfig::load().unwrap();
         let url = cfg.jsonrpc.endpoint.clone();
-        BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, cfg.jsonrpc).unwrap()
+        BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, cfg.jsonrpc)
+            .unwrap()
     }
 
     #[test]

@@ -1,7 +1,9 @@
 use std::{
     error::Error,
     fmt::Display,
-    ops::{Add, AddAssign, Deref, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign},
+    ops::{
+        Add, AddAssign, Deref, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign,
+    },
 };
 
 use reth_primitives::BlockHashOrNumber;
@@ -233,7 +235,9 @@ impl TxPosition {
 mod tests_with_db {
     use std::path::Path;
 
-    use crate::{config::flags::SoflConfig, engine::providers::BcProviderBuilder};
+    use crate::{
+        config::flags::SoflConfig, engine::providers::BcProviderBuilder,
+    };
 
     use super::TxPosition;
 

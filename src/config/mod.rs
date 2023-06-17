@@ -11,14 +11,18 @@ impl SoflConfig {
         let default_source = Config::try_from(&default_config)?;
         let cfg = Config::builder()
             .add_source(default_source)
-            .add_source(File::new(config_file.to_str().unwrap(), FileFormat::Toml).required(false))
+            .add_source(
+                File::new(config_file.to_str().unwrap(), FileFormat::Toml)
+                    .required(false),
+            )
             .add_source(Environment::with_prefix("SOFL").separator("__"))
             .build()?;
         cfg.try_deserialize()
     }
 
     pub fn load() -> Result<Self, ConfigError> {
-        let config_file = env::var("SOFL_CONFIG").unwrap_or_else(|_| "config".into());
+        let config_file =
+            env::var("SOFL_CONFIG").unwrap_or_else(|_| "config".into());
         Self::load_file(Path::new(&config_file))
     }
 }
@@ -37,7 +41,10 @@ mod tests_nodep {
 
     #[test]
     fn test_load_local_config() {
-        let cfg = super::SoflConfig::load_file(Path::new("tests/data/test_config.toml")).unwrap();
+        let cfg = super::SoflConfig::load_file(Path::new(
+            "tests/data/test_config.toml",
+        ))
+        .unwrap();
         assert_eq!(cfg.reth.datadir, "blockchain");
     }
 }
