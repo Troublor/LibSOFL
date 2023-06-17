@@ -16,10 +16,17 @@ jobs:
 
     steps:
     - uses: actions/checkout@v3
+      with:
+        fetch-depth: 0
+        ref: main
+        submodules: recursive
+        
     - name: Build
       run: cargo build --verbose
+      
     - name: Run tests without external dependency
       run: cargo test tests_nodep
+      
     - name: Run tests with jsonrpc dependency
       run: |
         export SOFL__JSONRPC__ENDPOINT=https://libsofl.eth.troublor.xyz/v1/mainnet
