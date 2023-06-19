@@ -359,7 +359,7 @@ mod tests_with_db {
         engine::{
             executor::{Executor, NoInspector},
             providers::BcProviderBuilder,
-            transaction::{Tx, TxPosition},
+            transaction::TxPosition,
         },
     };
 
@@ -375,7 +375,7 @@ mod tests_with_db {
         let results = txs
             .iter()
             .map(|tx| {
-                exe.transact::<NoInspector>(Tx::Signed(tx.clone()), None)
+                exe.transact::<NoInspector>(tx.clone().into(), None)
                     .unwrap()
             })
             .collect::<Vec<ExecutionResult>>();
@@ -396,5 +396,46 @@ mod tests_with_db {
                 _ => assert!(!receipt.success),
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests_with_jsonrpc {
+    use reth_provider::{ReceiptProvider, TransactionsProvider};
+
+    use crate::{
+        config::flags::SoflConfig,
+        engine::{providers::BcProviderBuilder, transaction::TxPosition},
+        utils::conversion::{Convert, ToPrimitive},
+    };
+
+    use super::{Executor, NoInspector};
+
+    #[test]
+    fn test_reproduce_tx() {
+        let cfg = SoflConfig::load().unwrap();
+        let url = cfg.jsonrpc.endpoint.clone();
+        let bp = BcProviderBuilder::with_jsonrpc_via_http_with_auth(
+            url,
+            cfg.jsonrpc,
+        )
+        .unwrap();
+        let fork_at = TxPosition::new(17000000, 0);
+        let mut exe = Executor::fork_at(&bp, fork_at.clone()).unwrap();
+        let tx_hash = ToPrimitive::cvt("0xa278205118a242c87943b9ed83aacafe9906002627612ac3672d8ea224e38181");
+        let tx = bp.transaction_by_hash(tx_hash).unwrap().unwrap();
+        let r = exe
+            .simulate::<NoInspector>(tx.clone().into(), None)
+            .unwrap();
+        assert!(r.is_success());
+        let receipt = bp.receipt_by_hash(tx_hash).unwrap().unwrap();
+        assert_eq!(receipt.success, r.is_success());
+        assert_eq!(receipt.logs.len(), r.logs().len());
+        for (log, receipt_log) in r.logs().iter().zip(receipt.logs.iter()) {
+            assert_eq!(log.address, receipt_log.address);
+            assert_eq!(log.topics, receipt_log.topics);
+            assert_eq!(*log.data, *receipt_log.data);
+        }
+        println!("again");
     }
 }

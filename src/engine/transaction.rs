@@ -279,6 +279,24 @@ pub enum Tx<'a, S> {
     Pseudo(&'a dyn Fn(&S) -> StateChange),
 }
 
+impl<'a, S> From<reth_primitives::TransactionSigned> for Tx<'a, S> {
+    fn from(tx: reth_primitives::TransactionSigned) -> Self {
+        Tx::Signed(tx)
+    }
+}
+
+impl<'a, S> From<(Address, reth_primitives::Transaction)> for Tx<'a, S> {
+    fn from(tx: (Address, reth_primitives::Transaction)) -> Self {
+        Tx::Unsigned(tx)
+    }
+}
+
+impl<'a, S> From<&'a dyn Fn(&S) -> StateChange> for Tx<'a, S> {
+    fn from(tx: &'a dyn Fn(&S) -> StateChange) -> Self {
+        Tx::Pseudo(tx)
+    }
+}
+
 impl<'a, S> Clone for Tx<'a, S> {
     fn clone(&self) -> Self {
         match self {

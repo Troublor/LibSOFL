@@ -2,13 +2,14 @@ use std::ops::{Range, RangeBounds, RangeInclusive};
 
 use ethers::types::{
     Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
-    BlockNumber as ethersBlockNumber, Transaction as ethersTransaction,
+    BlockNumber as ethersBlockNumber, Bytes as ethersBytes, Log as ethersLog,
+    Transaction as ethersTransaction, TransactionReceipt as ethersReceipt,
     TxHash as ethersTxHash, H256 as ethersH256, U256 as ethersU256,
     U64 as ethersU64,
 };
 use reth_primitives::{
-    Address, BlockHash, BlockHashOrNumber, Bloom, Header, SealedHeader,
-    TransactionSigned,
+    Address, BlockHash, BlockHashOrNumber, Bloom, Bytecode, Bytes, Header, Log,
+    Receipt, SealedHeader, TransactionSigned, TxType,
 };
 
 use reth_rlp::Decodable;
@@ -26,11 +27,36 @@ pub trait Convert<F, T> {
 
 pub struct ToPrimitive {}
 
-impl Convert<ethersU256, U256> for ToPrimitive {
-    fn cvt(v: ethersU256) -> U256 {
+impl Convert<&ethersU256, U256> for ToPrimitive {
+    fn cvt(v: &ethersU256) -> U256 {
         let mut b: [u8; 32] = [0; 32];
         v.to_big_endian(&mut b);
         U256::from_be_bytes(b)
+    }
+}
+
+impl Convert<&ethersAddress, Address> for ToPrimitive {
+    fn cvt(v: &ethersAddress) -> Address {
+        (*v).into()
+    }
+}
+
+impl Convert<&ethersBytes, Bytes> for ToPrimitive {
+    fn cvt(v: &ethersBytes) -> Bytes {
+        v.clone().0.into()
+    }
+}
+
+impl Convert<&ethersH256, H256> for ToPrimitive {
+    fn cvt(v: &ethersH256) -> H256 {
+        v.0.into()
+    }
+}
+
+impl Convert<&[u8], Bytecode> for ToPrimitive {
+    fn cvt(v: &[u8]) -> Bytecode {
+        let bytes = Bytes::from(v);
+        Bytecode::new_raw(bytes.0)
     }
 }
 
@@ -60,6 +86,14 @@ impl Convert<&str, H256> for ToPrimitive {
         let v = v.trim_start_matches("0x");
         hex::decode_to_slice(v, &mut b).unwrap();
         H256::from_slice(&b)
+    }
+}
+
+impl Convert<&str, Bytes> for ToPrimitive {
+    fn cvt(v: &str) -> Bytes {
+        let v = v.trim_start_matches("0x");
+        let b = hex::decode(v).unwrap();
+        b.into()
     }
 }
 
@@ -95,6 +129,39 @@ impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for ToPrimitive {
         };
         let hash = block.hash.unwrap().0.into();
         Some(SealedHeader { header, hash })
+    }
+}
+
+impl Convert<&ethersLog, Log> for ToPrimitive {
+    fn cvt(v: &ethersLog) -> Log {
+        Log {
+            address: ToPrimitive::cvt(&v.address),
+            topics: v.topics.iter().map(|t| ToPrimitive::cvt(t)).collect(),
+            data: ToPrimitive::cvt(&v.data),
+        }
+    }
+}
+
+impl Convert<&ethersReceipt, Receipt> for ToPrimitive {
+    fn cvt(v: &ethersReceipt) -> Receipt {
+        let tx_type = match v.transaction_type.map(|t| t.as_u64()) {
+            None => TxType::Legacy,
+            Some(1) => TxType::EIP2930,
+            Some(2) => TxType::EIP1559,
+            Some(n) => panic!("Unsupported transaction type: {}", n),
+        };
+        let success = match v.status.map(|s| s.as_u64()) {
+            None => true,
+            Some(0) => false,
+            Some(1) => true,
+            Some(n) => panic!("Invalid status: {}", n),
+        };
+        Receipt {
+            tx_type,
+            success,
+            cumulative_gas_used: v.cumulative_gas_used.as_u64(),
+            logs: v.logs.iter().map(|l| ToPrimitive::cvt(l)).collect(),
+        }
     }
 }
 

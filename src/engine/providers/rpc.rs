@@ -1,5 +1,5 @@
 use std::ops::RangeBounds;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use ethers::providers::{Middleware, Provider};
 use ethers::types::{
@@ -18,16 +18,17 @@ use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
     Account, Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytecode,
-    Bytes, ChainInfo, ChainSpec, ChainSpecBuilder, Header, SealedHeader,
-    StorageKey, StorageValue, TransactionMeta, TransactionSigned, TxHash,
-    TxNumber,
+    Bytes, ChainInfo, ChainSpec, ChainSpecBuilder, Header, Receipt,
+    SealedHeader, StorageKey, StorageValue, TransactionMeta, TransactionSigned,
+    TxHash, TxNumber,
 };
 use reth_provider::{
     AccountProvider, BlockHashProvider, BlockIdProvider, BlockNumProvider,
-    EvmEnvProvider, HeaderProvider, PostState, ProviderError, StateProvider,
-    StateProviderFactory, StateRootProvider, TransactionsProvider,
+    EvmEnvProvider, HeaderProvider, PostState, ProviderError, ReceiptProvider,
+    StateProvider, StateProviderFactory, StateRootProvider,
+    TransactionsProvider,
 };
-use revm_primitives::{BlockEnv, CfgEnv, B256 as H256, U256};
+use revm_primitives::{BlockEnv, CfgEnv, HashMap, B256 as H256, U256};
 
 use crate::utils::conversion::{Convert, ToEthers, ToIterator, ToPrimitive};
 
@@ -304,6 +305,55 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     }
 }
 
+impl<P: JsonRpcClient> ReceiptProvider for JsonRpcBcProvider<P> {
+    #[doc = " Get receipt by transaction number"]
+    fn receipt(&self, id: TxNumber) -> rethResult<Option<Receipt>> {
+        todo!()
+    }
+
+    #[doc = " Get receipt by transaction hash."]
+    fn receipt_by_hash(&self, hash: TxHash) -> rethResult<Option<Receipt>> {
+        let receipt: Option<ethersTransactionReceipt> = self
+            .runtime
+            .block_on(
+                self.provider.get_transaction_receipt::<ethersTxHash>(
+                    ToEthers::cvt(&hash),
+                ),
+            )
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        if receipt.is_none() {
+            return Ok(None);
+        }
+        let receipt = receipt.unwrap();
+        Ok(Some(ToPrimitive::cvt(&receipt)))
+    }
+
+    #[doc = " Get receipts by block num or hash."]
+    fn receipts_by_block(
+        &self,
+        block: BlockHashOrNumber,
+    ) -> rethResult<Option<Vec<Receipt>>> {
+        let block = self
+            .runtime
+            .block_on(
+                self.provider
+                    .get_block::<ethersBlockId>(ToEthers::cvt(&block)),
+            )
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        if block.is_none() {
+            return Ok(None);
+        }
+        let block = block.unwrap();
+        let receipts = block
+            .transactions
+            .iter()
+            .map(|t| ToPrimitive::cvt(t))
+            .map(|t| self.receipt_by_hash(t).unwrap().unwrap())
+            .collect();
+        Ok(Some(receipts))
+    }
+}
+
 impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
     #[doc = " Get header by block hash"]
     fn header(&self, block_hash: &BlockHash) -> rethResult<Option<Header>> {
@@ -344,7 +394,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         if block.is_none() {
             return Ok(None);
         }
-        Ok(block.map(|b| ToPrimitive::cvt(b.total_difficulty.unwrap())))
+        Ok(block.map(|b| ToPrimitive::cvt(&b.total_difficulty.unwrap())))
     }
 
     #[doc = " Get total difficulty by block number."]
@@ -359,7 +409,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
                     .get_block::<ethersBlockId>(ToEthers::cvt(&number)),
             )
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
-        Ok(block.map(|b| ToPrimitive::cvt(b.total_difficulty.unwrap())))
+        Ok(block.map(|b| ToPrimitive::cvt(&b.total_difficulty.unwrap())))
     }
 
     #[doc = " Get headers in range of block numbers"]
@@ -618,6 +668,20 @@ impl<P: JsonRpcClient> StateProviderFactory for JsonRpcBcProvider<P> {
     }
 }
 
+/// Global map from code hash to code.
+/// This global mapping is possible because we assume unique code hash must map to unique code.
+static CODE_HASH_TO_CODE: Mutex<Option<Arc<Mutex<HashMap<H256, Bytecode>>>>> =
+    Mutex::new(None);
+
+fn get_code_hash_map() -> Arc<Mutex<HashMap<H256, Bytecode>>> {
+    let mut maybe_map = CODE_HASH_TO_CODE.lock().unwrap();
+    if maybe_map.is_none() {
+        let mut new_map = Arc::new(Mutex::new(HashMap::new()));
+        *maybe_map = Some(new_map);
+    }
+    maybe_map.as_ref().unwrap().clone()
+}
+
 struct JsonRpcStateProvider<P> {
     runtime: tokio::runtime::Runtime,
     provider: Arc<Provider<P>>,
@@ -699,10 +763,15 @@ impl<P: JsonRpcClient> AccountProvider for JsonRpcStateProvider<P> {
             let code: &[u8] = &code.0.as_ref();
             let hash = reth_primitives::keccak256(code);
             code_hash = Some(hash);
+            let code_hash_map = get_code_hash_map();
+            code_hash_map
+                .lock()
+                .unwrap()
+                .insert(hash, ToPrimitive::cvt(code));
         }
         Ok(Some(Account {
             nonce: nonce.as_u64(),
-            balance: U256::from_be_bytes(balance.into()),
+            balance: ToPrimitive::cvt(&balance),
             bytecode_hash: code_hash,
         }))
     }
@@ -738,9 +807,19 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
     #[doc = " Get account code by its hash"]
     fn bytecode_by_hash(
         &self,
-        _code_hash: H256,
+        code_hash: H256,
     ) -> rethResult<Option<Bytecode>> {
-        todo!()
+        // FIXME: this implmenetation assumes that get_code (fn basic_account) is called previously for the account
+        // with code_hash.
+        // This is due to the limitation that we cannot directly get code from code hash from
+        // JSON-RPC.
+        // If get_code is not called previously, this method will return None, even if the account
+        // may have code on the blockchain.
+        let code_hash_map = get_code_hash_map();
+        let binding = code_hash_map.lock().unwrap();
+        let code = binding.get(&code_hash);
+        let code = code.map(|c| c.clone());
+        Ok(code)
     }
 
     #[doc = " Get account and storage proofs."]
