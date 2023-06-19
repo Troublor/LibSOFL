@@ -12,3 +12,14 @@ tasks:
       - git pull --rebase=true
       - git push
 
+  test_jsonrpc:
+    cmds:
+      - cargo test tests_with_jsonrpc
+
+  test_nodep:
+    cmds:
+      - cargo test tests_nodep
+
+  test_db:
+    cmds:
+      - cargo test tests_with_db

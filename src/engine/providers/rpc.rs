@@ -1,5 +1,3 @@
-use std::any::Any;
-use std::collections::HashMap;
 use std::ops::{Bound, RangeBounds};
 use std::sync::Arc;
 
@@ -8,13 +6,11 @@ use ethers::types::{
     Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
     Transaction as ethersTransaction,
     TransactionReceipt as ethersTransactionReceipt, TxHash as ethersTxHash,
-    H256 as ethersH256, U256 as ethersU256,
+    H256 as ethersH256,
 };
 use ethers_providers::JsonRpcClient;
 use ethers_providers::{Http, Ws};
-use futures::executor::block_on;
 use futures::future::join_all;
-use futures::StreamExt;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Url};
 use reth_interfaces::Error as rethError;
@@ -33,10 +29,10 @@ use reth_provider::{
 };
 use reth_rlp::Decodable;
 use revm_primitives::{BlockEnv, CfgEnv, B256 as H256, U256};
-use tokio::runtime::Runtime;
 
-use super::{BcProvider, BcProviderBuilder};
-use futures::join;
+use crate::utils::conversion::{Convert, FromEthers, ToEthers, ToIterator};
+
+use super::BcProviderBuilder;
 
 #[derive(Debug, Clone)]
 pub enum JsonRpcError {
@@ -97,7 +93,9 @@ impl<P: JsonRpcClient> BlockHashProvider for JsonRpcBcProvider<P> {
     #[doc = " Get the hash of the block with the given number. Returns `None` if no block with this number"]
     #[doc = " exists."]
     fn block_hash(&self, number: BlockNumber) -> rethResult<Option<H256>> {
-        let h = block_on(self.provider.get_block(number))
+        let h = self
+            .runtime
+            .block_on(self.provider.get_block(number))
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
             .and_then(|b| b.hash)
             .map(|h| h.0.into());
@@ -118,7 +116,7 @@ impl<P: JsonRpcClient> BlockHashProvider for JsonRpcBcProvider<P> {
             b
         };
         let fs = (start..end).map(get_block);
-        let bs = block_on(join_all(fs));
+        let bs = self.runtime.block_on(join_all(fs));
         let mut hs = Vec::new();
         // if any one of the blocks is not found, return an error
         for b in bs.iter() {
@@ -168,13 +166,13 @@ impl<P: JsonRpcClient> BlockNumProvider for JsonRpcBcProvider<P> {
 
     #[doc = " Gets the `BlockNumber` for the given hash. Returns `None` if no block with this hash exists."]
     fn block_number(&self, hash: H256) -> rethResult<Option<BlockNumber>> {
-        let h = block_on(
-            self.provider
-                .get_block(ethersTxHash::from_slice(hash.as_bytes())),
-        )
-        .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
-        .and_then(|b| b.number)
-        .map(|n| n.as_u64());
+        let block_id: ethersBlockId = ToEthers::cvt(&hash);
+        let h = self
+            .runtime
+            .block_on(self.provider.get_block(block_id))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
+            .and_then(|b| b.number)
+            .map(|n| n.as_u64());
         Ok(h)
     }
 }
@@ -184,14 +182,14 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     #[doc = ""]
     #[doc = " This is the inverse of [TransactionsProvider::transaction_by_id]."]
     #[doc = " Returns None if the transaction is not found."]
-    fn transaction_id(&self, tx_hash: TxHash) -> rethResult<Option<TxNumber>> {
+    fn transaction_id(&self, _tx_hash: TxHash) -> rethResult<Option<TxNumber>> {
         todo!()
     }
 
     #[doc = " Get transaction by id."]
     fn transaction_by_id(
         &self,
-        id: TxNumber,
+        _id: TxNumber,
     ) -> rethResult<Option<TransactionSigned>> {
         todo!()
     }
@@ -201,18 +199,18 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         &self,
         hash: TxHash,
     ) -> rethResult<Option<TransactionSigned>> {
-        let tx = block_on(
-            self.provider
-                .get_transaction(ethersTxHash::from_slice(hash.as_bytes())),
-        )
-        .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let tx = self
+            .runtime
+            .block_on(
+                self.provider
+                    .get_transaction::<ethersH256>(ToEthers::cvt(&hash)),
+            )
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         if tx.is_none() {
             return Ok(None);
         }
         let tx = tx.unwrap();
-        let rlp = tx.rlp();
-        let mut rlp = rlp.as_ref();
-        let tx = TransactionSigned::decode(&mut rlp).unwrap();
+        let tx = FromEthers::cvt(&tx);
         Ok(Some(tx))
     }
 
@@ -228,18 +226,22 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             return Ok(None);
         }
         let tx = tx.unwrap();
-        let receipt: Option<ethersTransactionReceipt> =
-            block_on(self.provider.get_transaction_receipt(
-                ethersTxHash::from_slice(hash.as_bytes()),
-            ))
+        let receipt: Option<ethersTransactionReceipt> = self
+            .runtime
+            .block_on(
+                self.provider.get_transaction_receipt::<ethersTxHash>(
+                    ToEthers::cvt(&hash),
+                ),
+            )
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         if receipt.is_none() {
             return Ok(None);
         }
         let receipt = receipt.unwrap();
-        let block: Option<ethersBlock<ethersTxHash>> =
-            block_on(self.provider.get_block(receipt.block_hash.unwrap()))
-                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let block: Option<ethersBlock<ethersTxHash>> = self
+            .runtime
+            .block_on(self.provider.get_block(receipt.block_hash.unwrap()))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         if block.is_none() {
             return Ok(None);
         }
@@ -257,7 +259,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     #[doc = " Get transaction block number"]
     fn transaction_block(
         &self,
-        id: TxNumber,
+        _id: TxNumber,
     ) -> rethResult<Option<BlockNumber>> {
         todo!()
     }
@@ -267,12 +269,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         &self,
         block: BlockHashOrNumber,
     ) -> rethResult<Option<Vec<TransactionSigned>>> {
-        let block_id: ethersBlockId = match block {
-            BlockHashOrNumber::Hash(h) => {
-                ethersBlockId::Hash(ethersTxHash::from_slice(h.as_bytes()))
-            }
-            BlockHashOrNumber::Number(n) => ethersBlockId::Number(n.into()),
-        };
+        let block_id: ethersBlockId = ToEthers::cvt(&block);
         let block: Option<ethersBlock<ethersTransaction>> = self
             .runtime
             .block_on(self.provider.get_block_with_txs(block_id))
@@ -284,11 +281,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         let txs = block
             .transactions
             .iter()
-            .map(|tx| {
-                let rlp = tx.rlp();
-                let mut rlp = rlp.as_ref();
-                TransactionSigned::decode(&mut rlp).unwrap()
-            })
+            .map(|tx| FromEthers::cvt(tx))
             .collect();
         Ok(Some(txs))
     }
@@ -298,18 +291,8 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         &self,
         range: impl RangeBounds<BlockNumber>,
     ) -> rethResult<Vec<Vec<TransactionSigned>>> {
-        let start = match range.start_bound() {
-            Bound::Included(n) => *n,
-            Bound::Excluded(n) => n + 1,
-            Bound::Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Bound::Included(n) => n + 1,
-            Bound::Excluded(n) => *n,
-            Bound::Unbounded => self.last_block_number()? + 1,
-        };
         let mut bs = Vec::new();
-        for bn in start..end {
+        for bn in ToIterator::cvt(range) {
             let b =
                 self.transactions_by_block(BlockHashOrNumber::Number(bn))?;
             if b.is_none() {
@@ -322,51 +305,21 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
     }
 }
 
-fn convert_ethers_block_to_sealed_header(
-    block: ethersBlock<ethersTxHash>,
-) -> Option<SealedHeader> {
-    if block.author.is_none() {
-        // return None if the block is still pending
-        return None;
-    }
-    let header = Header {
-        parent_hash: H256::from_slice(block.parent_hash.as_bytes()),
-        ommers_hash: H256::from_slice(block.uncles_hash.as_bytes()),
-        beneficiary: Address::from_slice(block.author.unwrap().as_bytes()),
-        state_root: H256::from_slice(block.state_root.as_bytes()),
-        transactions_root: H256::from_slice(block.transactions_root.as_bytes()),
-        receipts_root: H256::from_slice(block.receipts_root.as_bytes()),
-        withdrawals_root: block
-            .withdrawals_root
-            .map(|r| H256::from_slice(r.as_bytes())),
-        logs_bloom: Bloom::from_slice(block.logs_bloom.unwrap().as_bytes()),
-        difficulty: U256::from_be_bytes(block.difficulty.into()),
-        number: block.number.unwrap().as_u64(),
-        gas_limit: block.gas_limit.as_u64(),
-        gas_used: block.gas_used.as_u64(),
-        timestamp: block.timestamp.as_u64(),
-        mix_hash: H256::from_slice(block.mix_hash.unwrap().as_bytes()),
-        nonce: block.nonce.unwrap().to_low_u64_be(), // TODO: check whether big-endian is
-        // correct
-        base_fee_per_gas: block.base_fee_per_gas.map(|f| f.as_u64()),
-        extra_data: block.extra_data.0.into(),
-    };
-    let hash = block.hash.unwrap().0.into();
-    Some(SealedHeader { header, hash })
-}
 impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
     #[doc = " Get header by block hash"]
     fn header(&self, block_hash: &BlockHash) -> rethResult<Option<Header>> {
-        let hash = block_hash.as_slice();
-        let hash = ethersH256::from_slice(hash);
-        let block: Option<ethersBlock<ethersH256>> =
-            block_on(self.provider.get_block(ethersBlockId::from(hash)))
-                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let block: Option<ethersBlock<ethersH256>> = self
+            .runtime
+            .block_on(
+                self.provider
+                    .get_block::<ethersBlockId>(ToEthers::cvt(block_hash)),
+            )
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         if block.is_none() {
             return Ok(None);
         }
         let block = block.unwrap();
-        let header = convert_ethers_block_to_sealed_header(block);
+        let header = FromEthers::cvt(block);
         Ok(header.map(|h| h.header))
     }
 
@@ -382,8 +335,17 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
 
     #[doc = " Get total difficulty by block hash."]
     fn header_td(&self, hash: &BlockHash) -> rethResult<Option<U256>> {
-        let block = self.header(hash)?;
-        Ok(block.map(|b| b.difficulty))
+        let block: Option<ethersBlock<ethersH256>> = self
+            .runtime
+            .block_on(
+                self.provider
+                    .get_block::<ethersBlockId>(ToEthers::cvt(hash)),
+            )
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        if block.is_none() {
+            return Ok(None);
+        }
+        Ok(block.map(|b| FromEthers::cvt(b.total_difficulty.unwrap())))
     }
 
     #[doc = " Get total difficulty by block number."]
@@ -391,8 +353,14 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         &self,
         number: BlockNumber,
     ) -> rethResult<Option<U256>> {
-        let block = self.header_by_number(number)?;
-        Ok(block.map(|b| b.difficulty))
+        let block: Option<ethersBlock<ethersH256>> = self
+            .runtime
+            .block_on(
+                self.provider
+                    .get_block::<ethersBlockId>(ToEthers::cvt(&number)),
+            )
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        Ok(block.map(|b| FromEthers::cvt(b.total_difficulty.unwrap())))
     }
 
     #[doc = " Get headers in range of block numbers"]
@@ -400,18 +368,8 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         &self,
         range: impl RangeBounds<BlockNumber>,
     ) -> rethResult<Vec<Header>> {
-        let start = match range.start_bound() {
-            Bound::Included(n) => *n,
-            Bound::Excluded(n) => n + 1,
-            Bound::Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Bound::Included(n) => n + 1,
-            Bound::Excluded(n) => *n,
-            Bound::Unbounded => self.last_block_number()? + 1,
-        };
         let mut bs = Vec::new();
-        for bn in start..end {
+        for bn in ToIterator::cvt(range) {
             let b = self.header_by_number(bn)?;
             if b.is_none() {
                 break;
@@ -427,18 +385,8 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         &self,
         range: impl RangeBounds<BlockNumber>,
     ) -> rethResult<Vec<SealedHeader>> {
-        let start = match range.start_bound() {
-            Bound::Included(n) => *n,
-            Bound::Excluded(n) => n + 1,
-            Bound::Unbounded => 0,
-        };
-        let end = match range.end_bound() {
-            Bound::Included(n) => n + 1,
-            Bound::Excluded(n) => *n,
-            Bound::Unbounded => self.last_block_number()? + 1,
-        };
         let mut bs = Vec::new();
-        for bn in start..end {
+        for bn in ToIterator::cvt(range) {
             let b = self.sealed_header(bn)?;
             if b.is_none() {
                 break;
@@ -455,14 +403,15 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         number: BlockNumber,
     ) -> rethResult<Option<SealedHeader>> {
         let number = ethersBlockId::from(number);
-        let block: Option<ethersBlock<ethersH256>> =
-            block_on(self.provider.get_block(number))
-                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let block: Option<ethersBlock<ethersH256>> = self
+            .runtime
+            .block_on(self.provider.get_block(number))
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         if block.is_none() {
             return Ok(None);
         }
         let block = block.unwrap();
-        Ok(convert_ethers_block_to_sealed_header(block))
+        Ok(FromEthers::cvt(block))
     }
 }
 
@@ -664,7 +613,7 @@ impl<P: JsonRpcClient> StateProviderFactory for JsonRpcBcProvider<P> {
 
     fn pending_with_provider(
         &self,
-        post_state_data: Box<dyn reth_provider::PostStateDataProvider>,
+        _post_state_data: Box<dyn reth_provider::PostStateDataProvider>,
     ) -> rethResult<reth_provider::StateProviderBox<'_>> {
         todo!()
     }
@@ -678,7 +627,7 @@ struct JsonRpcStateProvider<P> {
 
 impl<P: JsonRpcClient> JsonRpcStateProvider<P> {
     fn get_ethers_block_id(&self) -> Option<ethersBlockId> {
-        self.at.map(|n| ethersBlockId::from(n))
+        self.at.map(|n| ToEthers::cvt(&n))
     }
 }
 
@@ -691,7 +640,9 @@ impl<P: JsonRpcClient> BlockHashProvider for JsonRpcStateProvider<P> {
                 return Ok(None);
             }
         }
-        let h = block_on(self.provider.get_block(number))
+        let h = self
+            .runtime
+            .block_on(self.provider.get_block(number))
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
             .and_then(|b| b.hash)
             .map(|h| h.0.into());
@@ -724,24 +675,24 @@ impl<P: JsonRpcClient> AccountProvider for JsonRpcStateProvider<P> {
         let nonce = self
             .runtime
             .block_on(self.provider.get_transaction_count(
-                ethersAddress::from_slice(address.as_slice()),
+                ToEthers::cvt(&address),
                 self.get_ethers_block_id(),
             ))
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         let balance = self
             .runtime
             .block_on(self.provider.get_balance(
-                ethersAddress::from_slice(address.as_slice()),
+                ToEthers::cvt(&address),
                 self.get_ethers_block_id(),
             ))
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
-        let code = self
-            .runtime
-            .block_on(self.provider.get_code(
-                ethersAddress::from_slice(address.as_slice()),
-                self.get_ethers_block_id(),
-            ))
-            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let code =
+            self.runtime
+                .block_on(self.provider.get_code(
+                    ToEthers::cvt(&address),
+                    self.get_ethers_block_id(),
+                ))
+                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         let code_hash;
         if code.len() == 0 {
             code_hash = None;
@@ -760,7 +711,7 @@ impl<P: JsonRpcClient> AccountProvider for JsonRpcStateProvider<P> {
 
 impl<P: JsonRpcClient> StateRootProvider for JsonRpcStateProvider<P> {
     #[doc = " Returns the state root of the PostState on top of the current state."]
-    fn state_root(&self, post_state: PostState) -> rethResult<H256> {
+    fn state_root(&self, _post_state: PostState) -> rethResult<H256> {
         Err(rethError::Provider(
             ProviderError::StateRootNotAvailableForHistoricalBlock,
         ))
@@ -777,8 +728,8 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
         let value = self
             .runtime
             .block_on(self.provider.get_storage_at(
-                ethersAddress::from_slice(account.as_slice()),
-                storage_key.into(),
+                ToEthers::cvt(&account),
+                ToEthers::cvt(&storage_key),
                 self.get_ethers_block_id(),
             ))
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
@@ -788,23 +739,16 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
     #[doc = " Get account code by its hash"]
     fn bytecode_by_hash(
         &self,
-        code_hash: H256,
+        _code_hash: H256,
     ) -> rethResult<Option<Bytecode>> {
-        let code = self
-            .runtime
-            .block_on(self.provider.get_code(
-                ethersAddress::from_slice(code_hash.as_bytes()),
-                self.get_ethers_block_id(),
-            ))
-            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
-        Ok(Some(Bytecode::new_raw(code.0)))
+        todo!()
     }
 
     #[doc = " Get account and storage proofs."]
     fn proof(
         &self,
-        address: Address,
-        keys: &[H256],
+        _address: Address,
+        _keys: &[H256],
     ) -> rethResult<(Vec<Bytes>, H256, Vec<Vec<Bytes>>)> {
         Err(rethError::Provider(
             ProviderError::StateRootNotAvailableForHistoricalBlock,
@@ -816,8 +760,10 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
 mod tests_with_jsonrpc {
     use std::ops::Range;
 
-    use ethers_providers::{Http, Middleware};
+    use ethers_providers::Http;
+    use reth_provider::HeaderProvider;
     use reth_provider::{BlockNumProvider, TransactionsProvider};
+    use revm_primitives::hex;
 
     use crate::{
         config::flags::SoflConfig, engine::providers::BcProviderBuilder,
@@ -839,19 +785,75 @@ mod tests_with_jsonrpc {
         assert!(bn > 0);
     }
 
-    #[test]
-    fn test_get_block_txs() {
-        let provider = get_bc_provider();
-        let range = Range {
-            start: 14000000,
-            end: 14000003,
-        };
-        let block_txs = provider.transactions_by_block_range(range);
-        assert!(block_txs.is_ok());
-        let block_txs = block_txs.unwrap();
-        assert_eq!(block_txs.len(), 3);
-        assert_eq!(block_txs[0].len(), 112);
-        assert_eq!(block_txs[1].len(), 33);
-        assert_eq!(block_txs[2].len(), 335);
+    mod tests_transactions_provider {
+        use std::ops::Range;
+
+        use reth_provider::TransactionsProvider;
+
+        use crate::engine::providers::rpc::tests_with_jsonrpc::get_bc_provider;
+
+        #[test]
+        fn test_get_block_txs() {
+            let provider = get_bc_provider();
+            let range = Range {
+                start: 14000000,
+                end: 14000003,
+            };
+            let block_txs = provider.transactions_by_block_range(range);
+            assert!(block_txs.is_ok());
+            let block_txs = block_txs.unwrap();
+            assert_eq!(block_txs.len(), 3);
+            assert_eq!(block_txs[0].len(), 112);
+            assert_eq!(block_txs[1].len(), 33);
+            assert_eq!(block_txs[2].len(), 335);
+        }
+    }
+
+    mod tests_header_provider {
+        use reth_provider::HeaderProvider;
+        use revm_primitives::hex;
+
+        use crate::engine::providers::rpc::tests_with_jsonrpc::get_bc_provider;
+
+        #[test]
+        fn test_get_header() {
+            let provider = get_bc_provider();
+            let sealed_header = provider.sealed_header(14000000).unwrap();
+            assert!(sealed_header.is_some());
+            let sealed_header = sealed_header.unwrap();
+            assert_eq!(sealed_header.number, 14000000);
+            assert_eq!(
+            hex::encode(sealed_header.hash.as_slice()),
+            "9bff49171de27924fa958faf7b7ce605c1ff0fdee86f4c0c74239e6ae20d9446"
+        );
+            assert_eq!(sealed_header.gas_used, 8119826)
+        }
+    }
+
+    mod test_evm_env_provider {
+        use reth_provider::EvmEnvProvider;
+        use revm_primitives::{BlockEnv, CfgEnv, U256};
+
+        use super::get_bc_provider;
+
+        #[test]
+        fn test_fill_env_at() {
+            let provider = get_bc_provider();
+            let mut cfg = CfgEnv::default();
+            let mut block_env = BlockEnv::default();
+            let r =
+                provider.fill_env_at(&mut cfg, &mut block_env, 14000000.into());
+            assert!(r.is_ok());
+            assert_eq!(cfg.chain_id, U256::from(1));
+            assert_eq!(block_env.number, U256::from(14000000));
+            assert_eq!(
+                block_env.difficulty,
+                U256::from_str_radix("12316581093827601", 10).unwrap()
+            );
+            assert_eq!(
+                block_env.gas_limit,
+                U256::from_str_radix("30058561", 10).unwrap()
+            );
+        }
     }
 }
