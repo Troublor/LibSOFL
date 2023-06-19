@@ -1,9 +1,9 @@
-use std::ops::{Bound, RangeBounds};
+use std::ops::RangeBounds;
 use std::sync::Arc;
 
 use ethers::providers::{Middleware, Provider};
 use ethers::types::{
-    Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
+    Block as ethersBlock, BlockId as ethersBlockId,
     Transaction as ethersTransaction,
     TransactionReceipt as ethersTransactionReceipt, TxHash as ethersTxHash,
     H256 as ethersH256,
@@ -17,20 +17,19 @@ use reth_interfaces::Error as rethError;
 use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
-    Account, Address, BlockHash, BlockHashOrNumber, BlockNumber, Bloom,
-    Bytecode, Bytes, ChainInfo, ChainSpec, ChainSpecBuilder, Header,
-    SealedHeader, StorageKey, StorageValue, TransactionMeta, TransactionSigned,
-    TxHash, TxNumber,
+    Account, Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytecode,
+    Bytes, ChainInfo, ChainSpec, ChainSpecBuilder, Header, SealedHeader,
+    StorageKey, StorageValue, TransactionMeta, TransactionSigned, TxHash,
+    TxNumber,
 };
 use reth_provider::{
     AccountProvider, BlockHashProvider, BlockIdProvider, BlockNumProvider,
     EvmEnvProvider, HeaderProvider, PostState, ProviderError, StateProvider,
     StateProviderFactory, StateRootProvider, TransactionsProvider,
 };
-use reth_rlp::Decodable;
 use revm_primitives::{BlockEnv, CfgEnv, B256 as H256, U256};
 
-use crate::utils::conversion::{Convert, FromEthers, ToEthers, ToIterator};
+use crate::utils::conversion::{Convert, ToEthers, ToIterator, ToPrimitive};
 
 use super::BcProviderBuilder;
 
@@ -210,7 +209,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             return Ok(None);
         }
         let tx = tx.unwrap();
-        let tx = FromEthers::cvt(&tx);
+        let tx = ToPrimitive::cvt(&tx);
         Ok(Some(tx))
     }
 
@@ -281,7 +280,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         let txs = block
             .transactions
             .iter()
-            .map(|tx| FromEthers::cvt(tx))
+            .map(|tx| ToPrimitive::cvt(tx))
             .collect();
         Ok(Some(txs))
     }
@@ -319,7 +318,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
             return Ok(None);
         }
         let block = block.unwrap();
-        let header = FromEthers::cvt(block);
+        let header = ToPrimitive::cvt(block);
         Ok(header.map(|h| h.header))
     }
 
@@ -345,7 +344,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         if block.is_none() {
             return Ok(None);
         }
-        Ok(block.map(|b| FromEthers::cvt(b.total_difficulty.unwrap())))
+        Ok(block.map(|b| ToPrimitive::cvt(b.total_difficulty.unwrap())))
     }
 
     #[doc = " Get total difficulty by block number."]
@@ -360,7 +359,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
                     .get_block::<ethersBlockId>(ToEthers::cvt(&number)),
             )
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
-        Ok(block.map(|b| FromEthers::cvt(b.total_difficulty.unwrap())))
+        Ok(block.map(|b| ToPrimitive::cvt(b.total_difficulty.unwrap())))
     }
 
     #[doc = " Get headers in range of block numbers"]
@@ -411,7 +410,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
             return Ok(None);
         }
         let block = block.unwrap();
-        Ok(FromEthers::cvt(block))
+        Ok(ToPrimitive::cvt(block))
     }
 }
 
@@ -758,12 +757,9 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
 
 #[cfg(test)]
 mod tests_with_jsonrpc {
-    use std::ops::Range;
 
     use ethers_providers::Http;
-    use reth_provider::HeaderProvider;
-    use reth_provider::{BlockNumProvider, TransactionsProvider};
-    use revm_primitives::hex;
+    use reth_provider::BlockNumProvider;
 
     use crate::{
         config::flags::SoflConfig, engine::providers::BcProviderBuilder,
@@ -854,6 +850,84 @@ mod tests_with_jsonrpc {
                 block_env.gas_limit,
                 U256::from_str_radix("30058561", 10).unwrap()
             );
+        }
+    }
+
+    mod test_state_provider {
+        use reth_primitives::Address;
+        use reth_provider::StateProviderFactory;
+
+        use crate::utils::conversion::{Convert, ToPrimitive};
+
+        use super::get_bc_provider;
+
+        #[test]
+        fn test_get_latest_state_provider() {
+            let bc_provider = get_bc_provider();
+            let state_provider = bc_provider.latest();
+            assert!(state_provider.is_ok());
+            let state_provider = state_provider.unwrap();
+            let hash = state_provider.block_hash(17450000);
+            assert!(hash.is_ok());
+            assert!(hash.unwrap().is_some());
+        }
+
+        #[test]
+        fn test_historical_state_provider_has_cutoff() {
+            let bc_provider = get_bc_provider();
+            let state_provider =
+                bc_provider.history_by_block_number(16000000).unwrap();
+            let hash = state_provider.block_hash(17450000);
+            assert!(hash.is_ok());
+            assert!(hash.unwrap().is_none());
+        }
+
+        #[test]
+        fn test_state_provider_account_info() {
+            let bc_provider = get_bc_provider();
+            let state_provider =
+                bc_provider.history_by_block_number(17000000).unwrap();
+            let account = state_provider.basic_account(ToPrimitive::cvt(
+                "0x690B9A9E9aa1C9dB991C7721a92d351Db4FaC990",
+            ));
+            assert!(account.is_ok());
+            let account = account.unwrap();
+            assert!(account.is_some());
+            let account = account.unwrap();
+            assert_eq!(account.nonce, 246861);
+
+            // Tether Contract
+            let tether = state_provider.basic_account(ToPrimitive::cvt(
+                "0xdAC17F958D2ee523a2206206994597C13D831ec7",
+            ));
+            assert!(tether.is_ok());
+            let tether = tether.unwrap();
+            assert!(tether.is_some());
+            let tether = tether.unwrap();
+            let code_hash = tether.bytecode_hash;
+            assert!(code_hash.is_some());
+            let code_hash = code_hash.unwrap();
+            assert_eq!(
+                code_hash,
+                ToPrimitive::cvt("0xb44fb4e949d0f78f87f79ee46428f23a2a5713ce6fc6e0beb3dda78c2ac1ea55")
+            );
+        }
+
+        #[test]
+        fn test_state_provider_storage() {
+            let bc_provider = get_bc_provider();
+            let state_provider =
+                bc_provider.history_by_block_number(17000000).unwrap();
+            // Test oracle based on transaction
+            // 0x39cd4f06f5cb93f108bb53c4687e3048da9b38a494c30344f6a1ef3f413644cc
+            let weth =
+                ToPrimitive::cvt("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
+            let slot = ToPrimitive::cvt("0x12231cd4c753cb5530a43a74c45106c24765e6f81dc8927d4f4be7e53315d5a8");
+            let expected = ToPrimitive::cvt("0x000000000000000000000000000000000000000000000003617b7114e5ff3e79");
+            let actual = state_provider.storage(weth, slot).unwrap();
+            assert!(actual.is_some());
+            let actual = actual.unwrap();
+            assert_eq!(actual, expected);
         }
     }
 }

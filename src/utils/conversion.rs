@@ -3,24 +3,30 @@ use std::ops::{Range, RangeBounds, RangeInclusive};
 use ethers::types::{
     Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
     BlockNumber as ethersBlockNumber, Transaction as ethersTransaction,
-    TransactionReceipt as ethersReceipt, TxHash as ethersTxHash,
-    H256 as ethersH256, U256 as ethersU256, U64 as ethersU64,
+    TxHash as ethersTxHash, H256 as ethersH256, U256 as ethersU256,
+    U64 as ethersU64,
 };
 use reth_primitives::{
     Address, BlockHash, BlockHashOrNumber, Bloom, Header, SealedHeader,
-    TransactionMeta, TransactionSigned,
+    TransactionSigned,
 };
+
 use reth_rlp::Decodable;
-use revm_primitives::{B256, B256 as H256, U256};
+use revm_primitives::{hex, B256, B256 as H256, U256};
 
 pub trait Convert<F, T> {
     /// Convert from F to To
     fn cvt(v: F) -> T;
 }
 
-pub struct FromEthers {}
+/// ############################
+/// ToPrimitive
+/// Convert to reth_primitives or revm_primitives types
+/// ############################
 
-impl Convert<ethersU256, U256> for FromEthers {
+pub struct ToPrimitive {}
+
+impl Convert<ethersU256, U256> for ToPrimitive {
     fn cvt(v: ethersU256) -> U256 {
         let mut b: [u8; 32] = [0; 32];
         v.to_big_endian(&mut b);
@@ -28,7 +34,36 @@ impl Convert<ethersU256, U256> for FromEthers {
     }
 }
 
-impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for FromEthers {
+impl Convert<&str, U256> for ToPrimitive {
+    fn cvt(v: &str) -> U256 {
+        let mut b: [u8; 32] = [0; 32];
+        let v = v.trim_start_matches("0x");
+        hex::decode_to_slice(v, &mut b).unwrap();
+        U256::from_be_bytes(b)
+    }
+}
+
+impl Convert<&str, Address> for ToPrimitive {
+    /// Convert hex string to address
+    fn cvt(v: &str) -> Address {
+        let mut b: [u8; 20] = [0; 20];
+        let v = v.trim_start_matches("0x");
+        hex::decode_to_slice(v, &mut b).unwrap();
+        Address::from_slice(&b)
+    }
+}
+
+impl Convert<&str, H256> for ToPrimitive {
+    /// Convert hex string to hash
+    fn cvt(v: &str) -> H256 {
+        let mut b: [u8; 32] = [0; 32];
+        let v = v.trim_start_matches("0x");
+        hex::decode_to_slice(v, &mut b).unwrap();
+        H256::from_slice(&b)
+    }
+}
+
+impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for ToPrimitive {
     fn cvt(block: ethersBlock<ethersTxHash>) -> Option<SealedHeader> {
         if block.author.is_none() {
             // return None if the block is still pending
@@ -63,13 +98,18 @@ impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for FromEthers {
     }
 }
 
-impl Convert<&ethersTransaction, TransactionSigned> for FromEthers {
+impl Convert<&ethersTransaction, TransactionSigned> for ToPrimitive {
     fn cvt(tx: &ethersTransaction) -> TransactionSigned {
         let rlp = tx.rlp();
         let mut rlp = rlp.as_ref();
         TransactionSigned::decode(&mut rlp).unwrap()
     }
 }
+
+/// ############################
+/// ToEthers
+/// Convert to ethers-rsdata types
+/// ############################
 
 pub struct ToEthers {}
 
