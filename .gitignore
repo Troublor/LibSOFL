@@ -1,3 +1,5 @@
 /target
 /blockchain
 config.toml
+.env
+db.sqlite3

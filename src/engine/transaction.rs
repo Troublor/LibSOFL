@@ -279,9 +279,9 @@ pub enum Tx<'a, S> {
     Pseudo(&'a dyn Fn(&S) -> StateChange),
 }
 
-impl<'a, S> From<reth_primitives::TransactionSigned> for Tx<'a, S> {
-    fn from(tx: reth_primitives::TransactionSigned) -> Self {
-        Tx::Signed(tx)
+impl<'a, S> From<&reth_primitives::TransactionSigned> for Tx<'a, S> {
+    fn from(tx: &reth_primitives::TransactionSigned) -> Self {
+        Tx::Signed(tx.clone())
     }
 }
 
@@ -302,7 +302,7 @@ impl<'a, S> Clone for Tx<'a, S> {
         match self {
             Tx::Signed(tx) => Tx::Signed(tx.clone()),
             Tx::Unsigned((sender, tx)) => Tx::Unsigned((*sender, tx.clone())),
-            Tx::Pseudo(tx) => panic!("cannot clone pseudo tx"),
+            Tx::Pseudo(_) => panic!("cannot clone pseudo tx"),
         }
     }
 }

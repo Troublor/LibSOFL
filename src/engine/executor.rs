@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use reth_primitives::{BlockHashOrNumber, BlockId};
 use reth_provider::{
     EvmEnvProvider, StateProviderBox, StateProviderFactory,
@@ -30,13 +32,15 @@ macro_rules! trait_alias {
 
 trait_alias!(BcState = Database + DatabaseCommit +);
 
-type NoInspector = NoOpInspector;
+pub type ClonableForkedState<'a> = CacheDB<Arc<State<StateProviderBox<'a>>>>;
+
+pub type NoInspector = NoOpInspector;
 
 pub struct Executor<S> {
     evm: EVM<S>,
 }
 
-impl<'a> Executor<SubState<StateProviderBox<'a>>> {
+impl<'a> Executor<ClonableForkedState<'a>> {
     /// Create an executor with fork state from a transaction position.
     /// The forked state is the the state after the transaction at the position is executed.
     pub fn fork_from<
@@ -75,7 +79,7 @@ impl<'a> Executor<SubState<StateProviderBox<'a>>> {
         };
         let sp = p.state_by_block_id(BlockId::from(bn - 1)).unwrap();
         let wrapped = State::new(sp);
-        let state = CacheDB::new(wrapped);
+        let state = CacheDB::new(Arc::new(wrapped));
 
         // create evm
         let mut evm = EVM::new();
@@ -138,7 +142,7 @@ impl Executor<CacheDB<EmptyDB>> {
     }
 }
 
-impl<S: BcState + Clone> Clone for Executor<S> {
+impl<'a> Clone for Executor<ClonableForkedState<'a>> {
     fn clone(&self) -> Self {
         Self {
             evm: self.evm.clone(),
