@@ -19,6 +19,7 @@ tracing-subscriber = "0.3"
 config = "0.13.1"
 serde = "1.0.164"
 sea-orm = { version = "^0", features = ["sqlx-postgres", "sqlx-sqlite", "runtime-tokio-rustls", "macros", "mock"] }
+libafl = "0.10.1"
 
 # misc
 eyre = "0.6.8"

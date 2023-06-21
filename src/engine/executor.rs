@@ -12,8 +12,8 @@ use revm::{
     Database, DatabaseCommit, Inspector, EVM,
 };
 use revm_primitives::{
-    BlockEnv, Bytes, CfgEnv, EVMError, Env, Eval, ExecutionResult, Output,
-    ResultAndState, U256,
+    db::DatabaseRef, BlockEnv, Bytes, CfgEnv, EVMError, Env, Eval,
+    ExecutionResult, Output, ResultAndState, U256,
 };
 
 use super::transaction::{Tx, TxPosition, TxPositionOutOfRangeError};
@@ -24,15 +24,25 @@ pub enum ExecutorError<DBERR> {
 }
 
 macro_rules! trait_alias {
-    ($name:ident = $base1:ident + $($base2:ident +)+) => {
-        pub trait $name: $base1 $(+ $base2)+ { }
-        impl<T: $base1 $(+ $base2)+> $name for T { }
+    ($name:ident = $base1:ident + $($base2:ident +)*) => {
+        pub trait $name: $base1 $(+ $base2)* { }
+        impl<T: $base1 $(+ $base2)*> $name for T { }
     };
 }
 
+// Abstraction of blockchain state
 trait_alias!(BcState = Database + DatabaseCommit +);
+// Abstration of the forked state from which the blockchain state is built upon.
+trait_alias!(BcStateGround = DatabaseRef +);
+// Abstraction of the readonly blockchain state
+trait_alias!(ReadonlyBcState = DatabaseRef +);
 
+/// Abstraction of the forked state in revm that can be cloned.
+/// This type implements both BcState and BcStateGround
 pub type ClonableForkedState<'a> = CacheDB<Arc<State<StateProviderBox<'a>>>>;
+
+/// A blockchain state that is empty and complete in memory.
+pub type FreshBcState = CacheDB<EmptyDB>;
 
 pub type NoInspector = NoOpInspector;
 
@@ -109,9 +119,9 @@ impl<'a> Executor<ClonableForkedState<'a>> {
     }
 }
 
-impl Executor<CacheDB<EmptyDB>> {
+impl Executor<FreshBcState> {
     pub fn create(
-        initialize: impl Fn(&mut CacheDB<EmptyDB>) -> (CfgEnv, BlockEnv),
+        initialize: impl Fn(&mut FreshBcState) -> (CfgEnv, BlockEnv),
     ) -> Self {
         let db = EmptyDB {};
         let mut state = CacheDB::new(db);
@@ -129,8 +139,8 @@ impl Executor<CacheDB<EmptyDB>> {
 
     #[cfg(test)]
     pub(crate) fn test_create(
-        initialize: impl Fn(&mut CacheDB<EmptyDB>),
-    ) -> Executor<CacheDB<EmptyDB>> {
+        initialize: impl Fn(&mut FreshBcState),
+    ) -> Executor<FreshBcState> {
         Executor::create(|state| {
             initialize(state);
             let cfg = CfgEnv {
@@ -147,7 +157,7 @@ impl Executor<CacheDB<EmptyDB>> {
     }
 }
 
-impl<'a> Clone for Executor<ClonableForkedState<'a>> {
+impl<'a, S: Clone> Clone for Executor<S> {
     fn clone(&self) -> Self {
         Self {
             evm: self.evm.clone(),
@@ -245,10 +255,11 @@ impl<S: BcState> Executor<S> {
 
 #[cfg(test)]
 mod tests_nodep {
-    use std::path::Path;
+
+    use std::sync::Arc;
 
     use reth_primitives::{Transaction, TransactionKind, TxLegacy};
-    use reth_provider::{ReceiptProvider, TransactionsProvider};
+
     use revm::{
         db::{CacheDB, EmptyDB},
         Database,

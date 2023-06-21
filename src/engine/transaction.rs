@@ -11,6 +11,7 @@ use reth_primitives::{BlockHash, BlockHashOrNumber};
 use reth_provider::{BlockNumProvider, TransactionsProvider};
 use revm::Database;
 use revm_primitives::{Address, B256};
+use serde::{Deserialize, Serialize};
 
 pub type StateChange = revm_primitives::State;
 
@@ -394,6 +395,41 @@ impl<'a, S: Database> AsRef<reth_primitives::Transaction> for Tx<'a, S> {
             Tx::Signed(tx) => tx,
             Tx::Unsigned((_, tx)) => tx,
             Tx::Pseudo(_) => panic!("cannot deref pseudo tx"),
+        }
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone)]
+pub enum PortableTx {
+    Signed(reth_primitives::TransactionSigned),
+    Unsigned((Address, reth_primitives::Transaction)),
+}
+
+impl Deref for PortableTx {
+    type Target = reth_primitives::Transaction;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            PortableTx::Signed(tx) => &tx.transaction,
+            PortableTx::Unsigned((_, tx)) => tx,
+        }
+    }
+}
+
+impl AsRef<reth_primitives::Transaction> for PortableTx {
+    fn as_ref(&self) -> &reth_primitives::Transaction {
+        match self {
+            PortableTx::Signed(tx) => tx,
+            PortableTx::Unsigned((_, tx)) => tx,
+        }
+    }
+}
+
+impl From<PortableTx> for Tx<'_, ()> {
+    fn from(val: PortableTx) -> Self {
+        match val {
+            PortableTx::Signed(tx) => Tx::Signed(tx),
+            PortableTx::Unsigned(tx) => Tx::Unsigned(tx),
         }
     }
 }
