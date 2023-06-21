@@ -8,7 +8,7 @@ use reth_blockchain_tree::{
 use reth_db::mdbx::{Env, WriteMap};
 use reth_interfaces::{consensus::Consensus, Error as rethError};
 use reth_primitives::{ChainSpec, ChainSpecBuilder};
-use reth_provider::{providers::BlockchainProvider, ShareableDatabase};
+use reth_provider::{providers::BlockchainProvider, ProviderFactory};
 use reth_revm::Factory;
 use std::sync::Mutex;
 
@@ -63,7 +63,7 @@ impl BcProviderBuilder {
         )?;
         let shareable_blockchain_tree =
             ShareableBlockchainTree::new(blockchain_tree);
-        let database = ShareableDatabase::new(db, chain_spec);
+        let database = ProviderFactory::new(db, chain_spec);
         BlockchainProvider::new(database, shareable_blockchain_tree)
     }
 }

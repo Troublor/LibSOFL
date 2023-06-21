@@ -20,10 +20,10 @@ use reth_primitives::{
     Account, Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytecode,
     Bytes, ChainInfo, ChainSpec, ChainSpecBuilder, Header, Receipt,
     SealedHeader, StorageKey, StorageValue, TransactionMeta, TransactionSigned,
-    TxHash, TxNumber,
+    TransactionSignedNoHash, TxHash, TxNumber,
 };
 use reth_provider::{
-    AccountProvider, BlockHashProvider, BlockIdProvider, BlockNumProvider,
+    AccountReader, BlockHashProvider, BlockIdProvider, BlockNumProvider,
     EvmEnvProvider, HeaderProvider, PostState, ProviderError, ReceiptProvider,
     StateProvider, StateProviderFactory, StateRootProvider,
     TransactionsProvider,
@@ -303,11 +303,34 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         }
         Ok(bs)
     }
+
+    #[doc = " Get transactions by tx range."]
+    fn transactions_by_tx_range(
+        &self,
+        _range: impl RangeBounds<TxNumber>,
+    ) -> rethResult<Vec<TransactionSignedNoHash>> {
+        todo!()
+    }
+
+    #[doc = " Get Senders from a tx range."]
+    fn senders_by_tx_range(
+        &self,
+        _range: impl RangeBounds<TxNumber>,
+    ) -> rethResult<Vec<Address>> {
+        todo!()
+    }
+
+    #[doc = " Get transaction sender."]
+    #[doc = ""]
+    #[doc = " Returns None if the transaction is not found."]
+    fn transaction_sender(&self, _id: TxNumber) -> rethResult<Option<Address>> {
+        todo!()
+    }
 }
 
 impl<P: JsonRpcClient> ReceiptProvider for JsonRpcBcProvider<P> {
     #[doc = " Get receipt by transaction number"]
-    fn receipt(&self, id: TxNumber) -> rethResult<Option<Receipt>> {
+    fn receipt(&self, _id: TxNumber) -> rethResult<Option<Receipt>> {
         todo!()
     }
 
@@ -666,6 +689,13 @@ impl<P: JsonRpcClient> StateProviderFactory for JsonRpcBcProvider<P> {
     ) -> rethResult<reth_provider::StateProviderBox<'_>> {
         todo!()
     }
+
+    fn pending_state_by_hash(
+        &self,
+        _block_hash: H256,
+    ) -> rethResult<Option<reth_provider::StateProviderBox<'_>>> {
+        todo!()
+    }
 }
 
 /// Global map from code hash to code.
@@ -676,7 +706,7 @@ static CODE_HASH_TO_CODE: Mutex<Option<Arc<Mutex<HashMap<H256, Bytecode>>>>> =
 fn get_code_hash_map() -> Arc<Mutex<HashMap<H256, Bytecode>>> {
     let mut maybe_map = CODE_HASH_TO_CODE.lock().unwrap();
     if maybe_map.is_none() {
-        let mut new_map = Arc::new(Mutex::new(HashMap::new()));
+        let new_map = Arc::new(Mutex::new(HashMap::new()));
         *maybe_map = Some(new_map);
     }
     maybe_map.as_ref().unwrap().clone()
@@ -730,7 +760,7 @@ impl<P: JsonRpcClient> BlockHashProvider for JsonRpcStateProvider<P> {
     }
 }
 
-impl<P: JsonRpcClient> AccountProvider for JsonRpcStateProvider<P> {
+impl<P: JsonRpcClient> AccountReader for JsonRpcStateProvider<P> {
     #[doc = " Get basic account information."]
     #[doc = ""]
     #[doc = " Returns `None` if the account doesn\'t exist."]
