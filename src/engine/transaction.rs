@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use reth_primitives::BlockHashOrNumber;
+use reth_primitives::{BlockHash, BlockHashOrNumber};
 
 use reth_provider::{BlockNumProvider, TransactionsProvider};
 use revm::Database;
@@ -179,6 +179,44 @@ impl SubAssign<u64> for TxPosition {
 }
 
 impl TxPosition {
+    pub fn get_block_number(
+        &self,
+        p: &impl TransactionsProvider,
+    ) -> Result<u64, TxPositionOutOfRangeError> {
+        match self.block {
+            BlockHashOrNumber::Hash(h) => {
+                if let Ok(bn) = p.block_number(h) {
+                    bn.ok_or(TxPositionOutOfRangeError::UnknownHash(h))
+                } else {
+                    Err(TxPositionOutOfRangeError::UnknownHash(h))
+                }
+            }
+            BlockHashOrNumber::Number(n) => Ok(n),
+        }
+    }
+
+    pub fn get_block_hash(
+        &self,
+        p: &impl TransactionsProvider,
+    ) -> Result<B256, TxPositionOutOfRangeError> {
+        match self.block {
+            BlockHashOrNumber::Hash(h) => Ok(h),
+            BlockHashOrNumber::Number(n) => {
+                if let Ok(bh) = p.block_hash(n) {
+                    bh.ok_or(TxPositionOutOfRangeError::BlockOverflow((
+                        p.last_block_number().unwrap(),
+                        n,
+                    )))
+                } else {
+                    Err(TxPositionOutOfRangeError::BlockOverflow((
+                        p.last_block_number().unwrap(),
+                        n,
+                    )))
+                }
+            }
+        }
+    }
+
     // shift the transaction position in history provided by TransactionsProvider by `offset`
     pub fn shift(
         &mut self,
@@ -186,9 +224,8 @@ impl TxPosition {
         offset: i64,
     ) -> Result<(), TxPositionOutOfRangeError> {
         let get_txs_count = |block: BlockHashOrNumber| -> Result<u64, TxPositionOutOfRangeError> {
-            p.transactions_by_block(block)
-                .unwrap()
-                .map(|txs| txs.len() as u64)
+            if let Ok(txs) = p.transactions_by_block(block) {
+                txs.map(|txs| txs.len() as u64)
                 .ok_or(match block {
                     BlockHashOrNumber::Hash(h) => TxPositionOutOfRangeError::UnknownHash(h),
                     BlockHashOrNumber::Number(n) => TxPositionOutOfRangeError::BlockOverflow((
@@ -196,13 +233,21 @@ impl TxPosition {
                         n,
                     )),
                 })
+            } else {
+                match block {
+                    BlockHashOrNumber::Hash(h) => Err(TxPositionOutOfRangeError::UnknownHash(h)),
+                    BlockHashOrNumber::Number(n) => Err(TxPositionOutOfRangeError::BlockOverflow((
+                        p.last_block_number().unwrap(),
+                        n,
+                    ))),
+                }
+            }
         };
         if let BlockHashOrNumber::Hash(h) = self.block {
-            self.block = p
-                .block_number(h)
-                .unwrap()
+            self.block = self
+                .get_block_number(p)
                 .map(BlockHashOrNumber::from)
-                .ok_or(TxPositionOutOfRangeError::UnknownHash(h))?;
+                .map_err(|_| TxPositionOutOfRangeError::UnknownHash(h))?;
         }
         match offset {
             0 => Ok(()),

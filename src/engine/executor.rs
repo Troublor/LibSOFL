@@ -36,8 +36,12 @@ pub type ClonableForkedState<'a> = CacheDB<Arc<State<StateProviderBox<'a>>>>;
 
 pub type NoInspector = NoOpInspector;
 
+// TODO: refactor this
+pub const DEFAULT_TIME_INTERVAL: u64 = 12;
+
 pub struct Executor<S> {
     evm: EVM<S>,
+    block_interval: u64,
 }
 
 impl<'a> Executor<ClonableForkedState<'a>> {
@@ -70,13 +74,7 @@ impl<'a> Executor<ClonableForkedState<'a>> {
             .map_err(|_| TxPositionOutOfRangeError::unknown_block(pos1, p))?;
 
         // create state
-        let bn = match pos.block {
-            BlockHashOrNumber::Hash(h) => p
-                .block_number(h)
-                .unwrap()
-                .ok_or(TxPositionOutOfRangeError::UnknownHash(h))?,
-            BlockHashOrNumber::Number(n) => n,
-        };
+        let bn = pos.get_block_number(p)?;
         let sp = p.state_by_block_id(BlockId::from(bn - 1)).unwrap();
         let wrapped = State::new(sp);
         let state = CacheDB::new(Arc::new(wrapped));
@@ -87,7 +85,10 @@ impl<'a> Executor<ClonableForkedState<'a>> {
         evm.env.block = block_env;
         evm.database(state);
 
-        let mut executor = Self { evm };
+        let mut executor = Self {
+            evm,
+            block_interval: DEFAULT_TIME_INTERVAL,
+        };
         // execute preceeding transactions
         if pos.index > 0 {
             // block must exist because we have checked it in fill_env_at
@@ -120,9 +121,13 @@ impl Executor<CacheDB<EmptyDB>> {
         evm.env.cfg = cfg;
         evm.env.block = block_env;
         evm.database(state);
-        Self { evm }
+        Self {
+            evm,
+            block_interval: DEFAULT_TIME_INTERVAL,
+        }
     }
 
+    #[cfg(test)]
     pub(crate) fn test_create(
         initialize: impl Fn(&mut CacheDB<EmptyDB>),
     ) -> Executor<CacheDB<EmptyDB>> {
@@ -146,6 +151,7 @@ impl<'a> Clone for Executor<ClonableForkedState<'a>> {
     fn clone(&self) -> Self {
         Self {
             evm: self.evm.clone(),
+            block_interval: self.block_interval,
         }
     }
 }
@@ -206,12 +212,16 @@ impl<S: BcState> Executor<S> {
         Ok(result)
     }
 
-    pub fn state(&mut self) -> &mut S {
+    pub fn get_state(&mut self) -> &mut S {
         self.evm.db().unwrap()
     }
 
-    pub fn env(&self) -> &Env {
+    pub fn get_env(&self) -> &Env {
         &self.evm.env
+    }
+
+    pub fn set_block_interval(&mut self, interval: u64) {
+        self.block_interval = interval;
     }
 
     pub fn commit_block(
@@ -227,7 +237,7 @@ impl<S: BcState> Executor<S> {
         } else {
             let mut blk = self.evm.env.block.clone();
             blk.number += U256::from(1);
-            blk.timestamp += U256::from(1);
+            blk.timestamp += U256::from(self.block_interval);
             self.evm.env.block = blk;
         }
     }
@@ -287,7 +297,7 @@ mod tests_nodep {
         // simulate
         let result = exe.simulate::<NoInspector>(tx.clone(), None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let state = exe.state();
+        let state = exe.get_state();
         let spender_info = state.basic(spender).unwrap().unwrap();
         assert_eq!(
             spender_info.balance,
@@ -304,7 +314,7 @@ mod tests_nodep {
         // transact
         let result = exe.transact::<NoInspector>(tx.clone(), None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let state = exe.state();
+        let state = exe.get_state();
         let spender_info = state.basic(spender).unwrap().unwrap();
         assert_eq!(
             spender_info.balance,
@@ -336,7 +346,7 @@ mod tests_nodep {
 
         let result = exe.transact::<NoInspector>(tx, None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let state = exe.state();
+        let state = exe.get_state();
         let account_info = state.basic(account).unwrap().unwrap();
         assert_eq!(
             account_info.balance,
