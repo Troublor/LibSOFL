@@ -285,6 +285,12 @@ impl<'a, S> From<&reth_primitives::TransactionSigned> for Tx<'a, S> {
     }
 }
 
+impl<'a, S> From<reth_primitives::TransactionSigned> for Tx<'a, S> {
+    fn from(tx: reth_primitives::TransactionSigned) -> Self {
+        Tx::Signed(tx.clone())
+    }
+}
+
 impl<'a, S> From<(Address, reth_primitives::Transaction)> for Tx<'a, S> {
     fn from(tx: (Address, reth_primitives::Transaction)) -> Self {
         Tx::Unsigned(tx)
