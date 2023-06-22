@@ -1,7 +1,9 @@
-use ::ethers::types::U256;
+use ethers::types::U256;
 
 mod config;
 mod engine;
+mod error;
+mod fuzzing;
 mod pom;
 mod utils;
 

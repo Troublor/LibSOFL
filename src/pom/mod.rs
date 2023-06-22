@@ -1,13 +1,23 @@
 use std::{ops::RangeBounds, sync::Arc};
 
+use libafl::{
+    prelude::{
+        self, current_nanos, InMemoryCorpus, RomuDuoJrRand, SimpleEventManager,
+        SimpleMonitor, StdRand,
+    },
+    schedulers::QueueScheduler,
+    state::StdState,
+    StdFuzzer,
+};
 use reth_interfaces::Result as rethResult;
 use reth_primitives::{Address, Block, BlockNumber, TransactionSigned};
 
 use crate::{
     engine::{
+        self,
         executor::{Executor, NoInspector},
         providers::BcProvider,
-        transaction::{Tx, TxPosition},
+        transaction::{self, PortableTx, Tx, TxPosition},
     },
     utils::conversion::{Convert, ToIterator},
 };
@@ -27,23 +37,6 @@ impl<P> POMFuzzer<P> {
 impl<P: BcProvider> POMFuzzer<P> {
     /// Entry point of fuzzing one subject contract.
     pub fn fuzz(&self, contract: Address) -> rethResult<()> {
-        let latest = self.provider.last_block_number().unwrap();
-        let txs = self
-            .get_historical_txs(contract, latest - 100..latest)
-            .unwrap();
-        for tx in txs.iter() {
-            let mut exe1 =
-                Executor::fork_at(&self.provider, TxPosition::new(latest, 0))
-                    .unwrap();
-            let mut exe2 = exe1.clone();
-
-            // no price manipulation
-            let _ = exe1.transact::<NoInspector>(tx.into(), None).unwrap();
-
-            // with price manipulation
-            self.manipulate(&exe2, contract).unwrap();
-            let _ = exe2.transact::<NoInspector>(tx.into(), None).unwrap();
-        }
         todo!()
     }
 

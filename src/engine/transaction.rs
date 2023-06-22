@@ -325,6 +325,15 @@ pub enum Tx<'a, S> {
     Pseudo(&'a dyn Fn(&S) -> StateChange),
 }
 
+impl<S> Tx<'_, S> {
+    pub fn is_pseudo(&self) -> bool {
+        match self {
+            Tx::Pseudo(_) => true,
+            _ => false,
+        }
+    }
+}
+
 impl<'a, S> From<&reth_primitives::TransactionSigned> for Tx<'a, S> {
     fn from(tx: &reth_primitives::TransactionSigned) -> Self {
         Tx::Signed(tx.clone())

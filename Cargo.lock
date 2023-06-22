@@ -3521,6 +3521,7 @@ dependencies = [
  "ethers-providers",
  "eyre",
  "futures",
+ "hashbrown 0.14.0",
  "libafl",
  "reqwest",
  "reth-auto-seal-consensus",
