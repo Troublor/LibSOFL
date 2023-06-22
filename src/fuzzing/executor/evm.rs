@@ -1,30 +1,37 @@
-use libafl::{prelude::Executor, state::UsesState};
+use libafl::{
+    prelude::{Executor, StdRand, UsesInput},
+    state::{StdState, UsesState},
+};
+
+use crate::fuzzing::corpus::tx::{TxCorpus, TxInput};
 
 #[derive(Debug)]
-pub struct EvmExecutor {}
+pub struct TxExecutor {}
 
-impl EvmExecutor {
+/// TxExecutor execute a single transaction.
+/// That is to say, the input of TxExecutor during fuzzing is a single transaction.
+impl TxExecutor {
     pub fn new() -> Self {
-        EvmExecutor {}
+        TxExecutor {}
     }
 }
 
-// impl UsesState for EvmExecutor {
-//     type State = PomFuzzState;
-// }
+impl UsesState for TxExecutor {
+    type State = StdState<TxInput, TxCorpus, StdRand, TxCorpus>;
+}
 
-// impl Executor<EM, Z> for EvmExecutor
-// where
-//     EM: UsesState<State = Self::State>,
-//     Z: UsesState<State = Self::State>,
-// {
-//     fn run_target(
-//         &mut self,
-//         fuzzer: &mut Z,
-//         state: &mut Self::State,
-//         mgr: &mut EM,
-//         input: &Self::Input,
-//     ) -> Result<libafl::prelude::ExitKind, libafl::Error> {
-//         Ok(libafl::prelude::ExitKind::Ok)
-//     }
-// }
+impl<EM, Z> Executor<EM, Z> for TxExecutor
+where
+    EM: UsesState<State = Self::State>,
+    Z: UsesState<State = Self::State>,
+{
+    fn run_target(
+        &mut self,
+        fuzzer: &mut Z,
+        state: &mut Self::State,
+        mgr: &mut EM,
+        input: &Self::Input,
+    ) -> Result<libafl::prelude::ExitKind, libafl::Error> {
+        Ok(libafl::prelude::ExitKind::Ok)
+    }
+}

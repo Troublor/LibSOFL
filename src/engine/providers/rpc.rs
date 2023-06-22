@@ -30,6 +30,7 @@ use reth_provider::{
 };
 use revm_primitives::{BlockEnv, CfgEnv, HashMap, B256 as H256, U256};
 
+use crate::config::flags::SoflConfig;
 use crate::utils::conversion::{Convert, ToEthers, ToIterator, ToPrimitive};
 
 use super::BcProviderBuilder;
@@ -87,6 +88,15 @@ impl BcProviderBuilder {
 pub struct JsonRpcBcProvider<P: JsonRpcClient> {
     pub(crate) provider: Arc<Provider<P>>,
     runtime: tokio::runtime::Runtime,
+}
+
+impl Default for JsonRpcBcProvider<Http> {
+    fn default() -> Self {
+        let cfg = SoflConfig::load().expect("failed to load config");
+        let url = cfg.jsonrpc.endpoint.clone();
+        BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, cfg.jsonrpc)
+            .expect("failed to create json-rpc provider from config")
+    }
 }
 
 impl<P: JsonRpcClient> BlockHashProvider for JsonRpcBcProvider<P> {

@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use reth_primitives::{BlockHash, BlockHashOrNumber};
+use reth_primitives::{BlockHash, BlockHashOrNumber, TxHash};
 
 use reth_provider::{BlockNumProvider, TransactionsProvider};
 use revm::Database;
@@ -439,6 +439,45 @@ impl From<PortableTx> for Tx<'_, ()> {
         match val {
             PortableTx::Signed(tx) => Tx::Signed(tx),
             PortableTx::Unsigned(tx) => Tx::Unsigned(tx),
+        }
+    }
+}
+
+impl From<Tx<'_, ()>> for PortableTx {
+    fn from(val: Tx<'_, ()>) -> Self {
+        match val {
+            Tx::Signed(tx) => PortableTx::Signed(tx),
+            Tx::Unsigned(tx) => PortableTx::Unsigned(tx),
+            Tx::Pseudo(_) => panic!("cannot convert pseudo tx to portable"),
+        }
+    }
+}
+
+impl From<reth_primitives::TransactionSigned> for PortableTx {
+    fn from(val: reth_primitives::TransactionSigned) -> Self {
+        PortableTx::Signed(val)
+    }
+}
+
+impl PortableTx {
+    pub fn sender(&self) -> Address {
+        match self {
+            PortableTx::Signed(tx) => tx.recover_signer().unwrap(),
+            PortableTx::Unsigned((sender, _)) => *sender,
+        }
+    }
+
+    pub fn to(&self) -> Option<Address> {
+        match self {
+            PortableTx::Signed(tx) => tx.to(),
+            PortableTx::Unsigned((_, tx)) => tx.to(),
+        }
+    }
+
+    pub fn hash(&self) -> TxHash {
+        match self {
+            PortableTx::Signed(tx) => tx.hash(),
+            _ => panic!("cannot hash unsigned tx"),
         }
     }
 }
