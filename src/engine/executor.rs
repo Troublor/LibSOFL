@@ -1,3 +1,4 @@
+/*
 use std::sync::Arc;
 
 use reth_primitives::{BlockHashOrNumber, BlockId};
@@ -469,3 +470,4 @@ mod tests_with_jsonrpc {
         println!("again");
     }
 }
+*/
