@@ -12,8 +12,8 @@ use revm::{
     Database, DatabaseCommit, Inspector, EVM,
 };
 use revm_primitives::{
-    db::DatabaseRef, BlockEnv, Bytes, CfgEnv, EVMError, Env, Eval,
-    ExecutionResult, Output, ResultAndState, U256,
+    BlockEnv, Bytes, CfgEnv, EVMError, Env, Eval, ExecutionResult, Output,
+    ResultAndState, U256,
 };
 
 use super::transaction::{Tx, TxPosition, TxPositionOutOfRangeError};

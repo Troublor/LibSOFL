@@ -50,9 +50,5 @@ pub fn get_token_balance<S: DatabaseRef>(
     token: Address,
     address: Address,
 ) -> Result<U256, CheatCodeError<S::Error>> {
-    executor
-        .get_state()
-        .erc20(token)?
-        .map(|info| info.balance(address))
-        .ok_or(CheatCodeError::AccountNotFound(address))
+    Err(CheatCodeError::AccountNotFound(address))
 }
