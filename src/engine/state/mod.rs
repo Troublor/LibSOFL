@@ -1,4 +1,3 @@
-use reth_primitives::Address;
 use revm::{Database, DatabaseCommit, Inspector, EVM};
 use revm_primitives::{
     db::DatabaseRef, BlockEnv, Bytes, CfgEnv, Eval, ExecutionResult, Output,
@@ -104,24 +103,3 @@ pub trait BcState: Database + DatabaseCommit + Sized {
 
 // Auto implement BcState for all types that implement Database and DatabaseCommit
 impl<T: Database + DatabaseCommit + Sized> BcState for T {}
-
-struct MyStruct {
-    value: i32,
-}
-
-impl MyStruct {
-    fn method1<'a>(&'a mut self) {
-        // Do something with `self`
-        self.value += 1;
-    }
-
-    fn method2<'a>(&'a mut self) {
-        // Do something else with `self`
-        self.value *= 2;
-    }
-
-    fn call_methods<'a>(&'a mut self) {
-        self.method1(); // First method call
-        self.method2(); // Second method call
-    }
-}
