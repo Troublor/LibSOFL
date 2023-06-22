@@ -7,7 +7,7 @@ use reth_provider::{
 };
 use reth_revm::database::{State, SubState};
 use revm::{
-    db::{CacheDB, EmptyDB},
+    db::{CacheDB, DatabaseRef, EmptyDB},
     inspectors::NoOpInspector,
     Database, DatabaseCommit, Inspector, EVM,
 };
@@ -222,12 +222,12 @@ impl<S: BcState> Executor<S> {
         Ok(result)
     }
 
-    pub fn get_state(&mut self) -> &mut S {
+    pub fn get_state_mut(&mut self) -> &mut S {
         self.evm.db().unwrap()
     }
 
-    pub fn get_env(&self) -> &Env {
-        &self.evm.env
+    pub fn get_env_mut(&mut self) -> &mut Env {
+        &mut self.evm.env
     }
 
     pub fn set_block_interval(&mut self, interval: u64) {
@@ -253,6 +253,16 @@ impl<S: BcState> Executor<S> {
     }
 }
 
+impl<S: DatabaseRef> Executor<S> {
+    pub fn get_state(&self) -> &S {
+        self.evm.db.as_ref().unwrap()
+    }
+
+    pub fn get_env(&self) -> &Env {
+        &self.evm.env
+    }
+}
+
 #[cfg(test)]
 mod tests_nodep {
 
@@ -275,6 +285,7 @@ mod tests_nodep {
             providers::BcProviderBuilder,
             transaction::{StateChange, Tx, TxPosition},
         },
+        utils::cheatcodes,
     };
 
     use super::{Executor, NoInspector};
@@ -303,21 +314,22 @@ mod tests_nodep {
             gas_limit: 100000,
             ..Default::default()
         });
-        let tx = Tx::Unsigned((spender, tx));
+        let tx: Tx<'_, CacheDB<EmptyDB>> = Tx::Unsigned((spender, tx));
 
         // simulate
         let result = exe.simulate::<NoInspector>(tx.clone(), None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let state = exe.get_state();
-        let spender_info = state.basic(spender).unwrap().unwrap();
+        let spender_balance =
+            cheatcodes::get_ether_balance(&exe, spender).unwrap();
         assert_eq!(
-            spender_info.balance,
+            spender_balance,
             U256::from(1000),
             "spender balance should be unchanged in simulation"
         );
-        let receiver_info = state.basic(receiver).unwrap().unwrap();
+        let receiver_balance =
+            cheatcodes::get_ether_balance(&exe, receiver).unwrap();
         assert_eq!(
-            receiver_info.balance,
+            receiver_balance,
             U256::from(0),
             "receiver balance should be unchanged in simulation"
         );
@@ -325,16 +337,17 @@ mod tests_nodep {
         // transact
         let result = exe.transact::<NoInspector>(tx.clone(), None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let state = exe.get_state();
-        let spender_info = state.basic(spender).unwrap().unwrap();
+        let spender_balance =
+            cheatcodes::get_ether_balance(&exe, spender).unwrap();
         assert_eq!(
-            spender_info.balance,
+            spender_balance,
             U256::from(500),
             "spender balance should be decreased by 500"
         );
-        let receiver_info = state.basic(receiver).unwrap().unwrap();
+        let receiver_balance =
+            cheatcodes::get_ether_balance(&exe, receiver).unwrap();
         assert_eq!(
-            receiver_info.balance,
+            receiver_balance,
             U256::from(500),
             "receiver balance should be increased by 500"
         );
@@ -357,15 +370,11 @@ mod tests_nodep {
 
         let result = exe.transact::<NoInspector>(tx, None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let state = exe.get_state();
-        let account_info = state.basic(account).unwrap().unwrap();
+        let balance = cheatcodes::get_ether_balance(&exe, account).unwrap();
+        let code = cheatcodes::get_code(&exe, account).unwrap();
+        assert_eq!(balance, U256::from(1000), "account balance should be 1000");
         assert_eq!(
-            account_info.balance,
-            U256::from(1000),
-            "account balance should be 1000"
-        );
-        assert_eq!(
-            account_info.code,
+            code,
             Some(Bytecode::new_raw(Bytes::from("0x1234"))),
             "account code should be 0x1234"
         );
