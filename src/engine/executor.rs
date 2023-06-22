@@ -319,15 +319,13 @@ mod tests_nodep {
         // simulate
         let result = exe.simulate::<NoInspector>(tx.clone(), None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let spender_balance =
-            cheatcodes::get_ether_balance(&exe, spender).unwrap();
+        let spender_balance = cheatcodes::get_balance(&exe, spender).unwrap();
         assert_eq!(
             spender_balance,
             U256::from(1000),
             "spender balance should be unchanged in simulation"
         );
-        let receiver_balance =
-            cheatcodes::get_ether_balance(&exe, receiver).unwrap();
+        let receiver_balance = cheatcodes::get_balance(&exe, receiver).unwrap();
         assert_eq!(
             receiver_balance,
             U256::from(0),
@@ -337,15 +335,13 @@ mod tests_nodep {
         // transact
         let result = exe.transact::<NoInspector>(tx.clone(), None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let spender_balance =
-            cheatcodes::get_ether_balance(&exe, spender).unwrap();
+        let spender_balance = cheatcodes::get_balance(&exe, spender).unwrap();
         assert_eq!(
             spender_balance,
             U256::from(500),
             "spender balance should be decreased by 500"
         );
-        let receiver_balance =
-            cheatcodes::get_ether_balance(&exe, receiver).unwrap();
+        let receiver_balance = cheatcodes::get_balance(&exe, receiver).unwrap();
         assert_eq!(
             receiver_balance,
             U256::from(500),
@@ -370,7 +366,7 @@ mod tests_nodep {
 
         let result = exe.transact::<NoInspector>(tx, None).unwrap();
         assert!(matches!(result, ExecutionResult::Success { .. }));
-        let balance = cheatcodes::get_ether_balance(&exe, account).unwrap();
+        let balance = cheatcodes::get_balance(&exe, account).unwrap();
         let code = cheatcodes::get_code(&exe, account).unwrap();
         assert_eq!(balance, U256::from(1000), "account balance should be 1000");
         assert_eq!(

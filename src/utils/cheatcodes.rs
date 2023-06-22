@@ -23,7 +23,7 @@ impl<DBERR> From<DBERR> for CheatCodeError<DBERR> {
     }
 }
 
-pub fn get_ether_balance<S: DatabaseRef>(
+pub fn get_balance<S: DatabaseRef>(
     executor: &Executor<S>,
     address: Address,
 ) -> Result<U256, CheatCodeError<S::Error>> {
@@ -42,5 +42,17 @@ pub fn get_code<S: DatabaseRef>(
         .get_state()
         .basic(address)?
         .map(|info| info.code)
+        .ok_or(CheatCodeError::AccountNotFound(address))
+}
+
+pub fn get_token_balance<S: DatabaseRef>(
+    executor: &Executor<S>,
+    token: Address,
+    address: Address,
+) -> Result<U256, CheatCodeError<S::Error>> {
+    executor
+        .get_state()
+        .erc20(token)?
+        .map(|info| info.balance(address))
         .ok_or(CheatCodeError::AccountNotFound(address))
 }
