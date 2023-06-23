@@ -1,9 +1,6 @@
 use std::fmt::Debug;
 
-use libafl::{
-    prelude::{Executor, UsesInput},
-    state::UsesState,
-};
+use libafl::{prelude::Executor, state::UsesState};
 
 use crate::fuzzing::state::fixed::FixedState;
 use crate::{engine::state::BcState, fuzzing::corpus::tx::TxInput};

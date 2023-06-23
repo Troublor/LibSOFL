@@ -197,7 +197,7 @@ mod tests_nodep {
         );
 
         // transact
-        let tx = Tx::Unsigned((spender, tx_inner.clone()));
+        let tx = Tx::Unsigned((spender, tx_inner));
         let (mut state, result) = state
             .transit_one::<NoInspector>(cfg, block_env, tx, None)
             .unwrap();
