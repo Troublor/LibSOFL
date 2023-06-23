@@ -288,11 +288,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             return Ok(None);
         }
         let block = block.unwrap();
-        let txs = block
-            .transactions
-            .iter()
-            .map(|tx| ToPrimitive::cvt(tx))
-            .collect();
+        let txs = block.transactions.iter().map(ToPrimitive::cvt).collect();
         Ok(Some(txs))
     }
 
@@ -380,7 +376,7 @@ impl<P: JsonRpcClient> ReceiptProvider for JsonRpcBcProvider<P> {
         let receipts = block
             .transactions
             .iter()
-            .map(|t| ToPrimitive::cvt(t))
+            .map(ToPrimitive::cvt)
             .map(|t| self.receipt_by_hash(t).unwrap().unwrap())
             .collect();
         Ok(Some(receipts))
@@ -531,8 +527,8 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         block_env: &mut BlockEnv,
         header: &Header,
     ) -> rethResult<()> {
-        let _ = self.fill_cfg_env_with_header(cfg, header)?;
-        let _ = self.fill_block_env_with_header(block_env, header)?;
+        self.fill_cfg_env_with_header(cfg, header)?;
+        self.fill_block_env_with_header(block_env, header)?;
         Ok(())
     }
 
@@ -565,13 +561,13 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?
             .as_u64();
         let chain_spec = chain_id_to_chain_spec(chain_id);
-        let after_merge;
-        if chain_spec.paris_block_and_final_difficulty.is_none() {
-            after_merge = false;
-        } else {
-            after_merge = header.number
-                >= chain_spec.paris_block_and_final_difficulty.unwrap().0;
-        }
+        let after_merge =
+            if chain_spec.paris_block_and_final_difficulty.is_none() {
+                false
+            } else {
+                header.number
+                    >= chain_spec.paris_block_and_final_difficulty.unwrap().0
+            };
         reth_revm::env::fill_block_env(
             block_env,
             &chain_spec,
@@ -615,7 +611,7 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         reth_revm::env::fill_cfg_env(
             cfg,
             &chain_spec,
-            &header,
+            header,
             header.difficulty,
         );
         Ok(())
@@ -800,7 +796,7 @@ impl<P: JsonRpcClient> AccountReader for JsonRpcStateProvider<P> {
         if code.len() == 0 {
             code_hash = None;
         } else {
-            let code: &[u8] = &code.0.as_ref();
+            let code: &[u8] = code.0.as_ref();
             let hash = reth_primitives::keccak256(code);
             code_hash = Some(hash);
             let code_hash_map = get_code_hash_map();
@@ -858,7 +854,7 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
         let code_hash_map = get_code_hash_map();
         let binding = code_hash_map.lock().unwrap();
         let code = binding.get(&code_hash);
-        let code = code.map(|c| c.clone());
+        let code = code.cloned();
         Ok(code)
     }
 
@@ -973,7 +969,6 @@ mod tests_with_jsonrpc {
     }
 
     mod test_state_provider {
-        use reth_primitives::Address;
         use reth_provider::StateProviderFactory;
 
         use crate::utils::conversion::{Convert, ToPrimitive};

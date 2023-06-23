@@ -6,7 +6,7 @@ use std::{
     },
 };
 
-use reth_primitives::{BlockHash, BlockHashOrNumber, TxHash};
+use reth_primitives::{BlockHashOrNumber, TxHash};
 
 use reth_provider::{BlockNumProvider, TransactionsProvider};
 use revm::Database;
@@ -340,10 +340,7 @@ pub enum Tx<'a, S> {
 
 impl<S> Tx<'_, S> {
     pub fn is_pseudo(&self) -> bool {
-        match self {
-            Tx::Pseudo(_) => true,
-            _ => false,
-        }
+        matches!(self, Tx::Pseudo(_))
     }
 }
 
@@ -355,7 +352,7 @@ impl<'a, S> From<&reth_primitives::TransactionSigned> for Tx<'a, S> {
 
 impl<'a, S> From<reth_primitives::TransactionSigned> for Tx<'a, S> {
     fn from(tx: reth_primitives::TransactionSigned) -> Self {
-        Tx::Signed(tx.clone())
+        Tx::Signed(tx)
     }
 }
 

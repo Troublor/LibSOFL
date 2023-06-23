@@ -1,4 +1,4 @@
-use std::ops::{Range, RangeBounds, RangeInclusive};
+use std::ops::{RangeBounds, RangeInclusive};
 
 use ethers::types::{
     Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
@@ -99,10 +99,7 @@ impl Convert<&str, Bytes> for ToPrimitive {
 
 impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for ToPrimitive {
     fn cvt(block: ethersBlock<ethersTxHash>) -> Option<SealedHeader> {
-        if block.author.is_none() {
-            // return None if the block is still pending
-            return None;
-        }
+        block.author?;
         let header = Header {
             parent_hash: H256::from_slice(block.parent_hash.as_bytes()),
             ommers_hash: H256::from_slice(block.uncles_hash.as_bytes()),
@@ -136,7 +133,7 @@ impl Convert<&ethersLog, Log> for ToPrimitive {
     fn cvt(v: &ethersLog) -> Log {
         Log {
             address: ToPrimitive::cvt(&v.address),
-            topics: v.topics.iter().map(|t| ToPrimitive::cvt(t)).collect(),
+            topics: v.topics.iter().map(ToPrimitive::cvt).collect(),
             data: ToPrimitive::cvt(&v.data),
         }
     }
@@ -160,7 +157,7 @@ impl Convert<&ethersReceipt, Receipt> for ToPrimitive {
             tx_type,
             success,
             cumulative_gas_used: v.cumulative_gas_used.as_u64(),
-            logs: v.logs.iter().map(|l| ToPrimitive::cvt(l)).collect(),
+            logs: v.logs.iter().map(ToPrimitive::cvt).collect(),
         }
     }
 }

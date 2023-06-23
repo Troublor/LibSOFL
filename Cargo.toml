@@ -5,6 +5,13 @@ edition = "2021"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "play"
+path = "bin/play/main.rs"
+
 [patch.crates-io]
 revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
 revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
