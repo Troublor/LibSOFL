@@ -62,9 +62,11 @@ pub trait BcState:
         tx: Tx<'_, Self>,
         inspector: Option<I>,
     ) -> Result<ResultAndState, SoflError<Self::Error>> {
+        evm.database(self);
         if let Tx::Pseudo(tx) = tx {
             // execute pseudo transaction
-            let changes = tx(self);
+            let db = evm.db.as_mut().unwrap();
+            let changes = tx(db);
             Ok(ResultAndState {
                 result: ExecutionResult::Success {
                     reason: Eval::Return,
@@ -76,7 +78,6 @@ pub trait BcState:
                 state: changes,
             })
         } else {
-            evm.database(self);
             let sender = tx.sender();
             reth_revm::env::fill_tx_env(&mut evm.env.tx, tx, sender);
             let result;
