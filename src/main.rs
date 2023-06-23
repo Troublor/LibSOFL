@@ -4,7 +4,6 @@ mod config;
 mod engine;
 mod error;
 mod fuzzing;
-mod pom;
 mod utils;
 
 fn main() {

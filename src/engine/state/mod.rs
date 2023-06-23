@@ -18,6 +18,9 @@ use super::transaction::Tx;
 pub mod fork;
 pub mod fresh;
 
+/// NoInspector is used as a placeholder for type parameters when no inspector is needed.
+pub type NoInspector = NoOpInspector;
+
 // Abstration of the forked state from which the blockchain state is built upon.
 pub trait BcStateGround:
     DatabaseRef<Error = reth_interfaces::Error> + Sized
@@ -58,10 +61,10 @@ pub trait BcState:
             evm.env.cfg = evm_cfg;
             evm.env.block = block_env;
         }
-        self.transact_with_env(&mut evm, tx, inspector)
+        self.transact_with_evm(&mut evm, tx, inspector)
     }
 
-    fn transact_with_env<'a, 'b: 'a, I: Inspector<&'a mut Self>>(
+    fn transact_with_evm<'a, 'b: 'a, I: Inspector<&'a mut Self>>(
         &'b mut self,
         evm: &mut EVM<&'a mut Self>,
         tx: Tx<'_, Self>,
@@ -70,8 +73,8 @@ pub trait BcState:
         evm.database(self);
         if let Tx::Pseudo(tx) = tx {
             // execute pseudo transaction
-            let db = evm.db.as_mut().unwrap();
-            let changes = tx(db);
+            let changes = tx(self);
+            evm.database(self);
             Ok(ResultAndState {
                 result: ExecutionResult::Success {
                     reason: Eval::Return,
@@ -106,7 +109,7 @@ pub trait BcState:
         let mut evm = EVM::new();
         evm.env.cfg = evm_cfg;
         evm.env.block = block_env;
-        result = self.transact_with_env(&mut evm, tx, inspector)?;
+        result = self.transact_with_evm(&mut evm, tx, inspector)?;
         evm.db.as_mut().unwrap().commit(result.state);
         Ok(result.result)
     }
@@ -117,7 +120,7 @@ pub trait BcState:
         tx: Tx<'_, Self>,
         inspector: Option<I>,
     ) -> Result<ExecutionResult, SoflError<Self::Error>> {
-        let result = self.transact_with_env(evm, tx, inspector)?;
+        let result = self.transact_with_evm(evm, tx, inspector)?;
         evm.db.as_mut().unwrap().commit(result.state);
         Ok(result.result)
     }

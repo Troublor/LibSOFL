@@ -5,7 +5,7 @@ use reth_provider::{
     TransactionsProvider,
 };
 use reth_revm::database::State as WrappedDB;
-use revm::{db::CacheDB, inspectors::NoOpInspector, Database, DatabaseCommit};
+use revm::{db::CacheDB, Database, DatabaseCommit};
 use revm_primitives::{
     db::DatabaseRef, Account, AccountInfo, Address, BlockEnv, Bytecode, CfgEnv,
     HashMap, B160, B256, B256 as H256, U256,
@@ -13,7 +13,7 @@ use revm_primitives::{
 
 use crate::{engine::transaction::TxPosition, error::SoflError};
 
-use super::BcState;
+use super::{BcState, NoInspector};
 
 /// Abstraction of the forked state in revm that can be cloned.
 /// This type implements both BcState and BcStateGround
@@ -56,9 +56,21 @@ impl<'a> AsMut<InnerForkedBcState<'a>> for ForkedBcState<'a> {
     }
 }
 
+impl<'a> From<InnerForkedBcState<'a>> for ForkedBcState<'a> {
+    fn from(st: InnerForkedBcState<'a>) -> Self {
+        Self(st)
+    }
+}
+
+impl<'a> From<ForkedBcState<'a>> for InnerForkedBcState<'a> {
+    fn from(st: ForkedBcState<'a>) -> Self {
+        st.0
+    }
+}
+
 impl<'a> ForkedBcState<'a> {
     pub fn new(st: CacheDB<Arc<WrappedDB<StateProviderBox<'a>>>>) -> Self {
-        Self { 0: st }
+        Self(st)
     }
 
     /// fork from the current latest blockchain state
@@ -190,5 +202,139 @@ impl<'a> DatabaseRef for ForkedBcState<'a> {
 
     fn block_hash(&self, number: U256) -> Result<B256, Self::Error> {
         self.0.block_hash(number)
+    }
+}
+
+#[cfg(test)]
+mod tests_with_db {
+    use std::path::Path;
+
+    use reth_provider::{
+        EvmEnvProvider, ReceiptProvider, TransactionsProvider,
+    };
+    use revm::EVM;
+    use revm_primitives::{BlockEnv, CfgEnv, ExecutionResult};
+
+    use crate::{
+        config::flags::SoflConfig,
+        engine::{
+            providers::BcProviderBuilder, state::BcState,
+            transaction::TxPosition,
+        },
+    };
+
+    use super::{ForkedBcState, NoInspector};
+
+    #[test]
+    fn test_reproduce_block() {
+        let datadir = SoflConfig::load().unwrap().reth.datadir;
+        let datadir = Path::new(&datadir);
+        let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
+        let fork_at = TxPosition::new(17000000, 0);
+        let txs = bp.transactions_by_block(fork_at.block).unwrap().unwrap();
+        let receipts = bp.receipts_by_block(fork_at.block).unwrap().unwrap();
+
+        // prepare state
+        let mut state = ForkedBcState::fork_at(&bp, fork_at.clone()).unwrap();
+
+        // prepare cfg and env
+        let mut cfg = CfgEnv::default();
+        let mut block_env = BlockEnv::default();
+        bp.fill_env_at(&mut cfg, &mut block_env, fork_at.block)
+            .unwrap();
+
+        // execute
+        let mut results = Vec::new();
+        for tx in txs {
+            let mut evm = EVM::new();
+            evm.env.cfg = cfg.clone();
+            evm.env.block = block_env.clone();
+
+            let result = state
+                .transit_with_evm::<NoInspector>(
+                    &mut evm,
+                    tx.clone().into(),
+                    None,
+                )
+                .unwrap();
+            results.push(result);
+        }
+
+        assert_eq!(results.len(), receipts.len());
+
+        for (result, receipt) in results.iter().zip(receipts.iter()) {
+            match result {
+                ExecutionResult::Success { logs, .. } => {
+                    assert!(receipt.success);
+                    assert_eq!(receipt.logs.len(), logs.len());
+                    for (log, receipt_log) in
+                        logs.iter().zip(receipt.logs.iter())
+                    {
+                        assert_eq!(log.address, receipt_log.address);
+                        assert_eq!(log.topics, receipt_log.topics);
+                        assert_eq!(*log.data, *receipt_log.data);
+                    }
+                }
+                _ => assert!(!receipt.success),
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests_with_jsonrpc {
+    use reth_provider::{
+        EvmEnvProvider, ReceiptProvider, TransactionsProvider,
+    };
+    use revm_primitives::{BlockEnv, CfgEnv};
+
+    use crate::{
+        config::flags::SoflConfig,
+        engine::{
+            providers::BcProviderBuilder,
+            state::{fork::ForkedBcState, BcState, NoInspector},
+            transaction::TxPosition,
+        },
+        utils::conversion::{Convert, ToPrimitive},
+    };
+
+    #[test]
+    fn test_reproduce_tx() {
+        let cfg = SoflConfig::load().unwrap();
+        let url = cfg.jsonrpc.endpoint.clone();
+        let bp = BcProviderBuilder::with_jsonrpc_via_http_with_auth(
+            url,
+            cfg.jsonrpc,
+        )
+        .unwrap();
+        let fork_at = TxPosition::new(17000000, 0);
+
+        // prepare state
+        let mut state = ForkedBcState::fork_at(&bp, fork_at.clone()).unwrap();
+
+        // prepare env and state
+        let mut cfg = CfgEnv::default();
+        let mut block_env = BlockEnv::default();
+        bp.fill_env_at(&mut cfg, &mut block_env, fork_at.block)
+            .unwrap();
+
+        // collect the tx
+        let tx_hash = ToPrimitive::cvt("0xa278205118a242c87943b9ed83aacafe9906002627612ac3672d8ea224e38181");
+        let tx = bp.transaction_by_hash(tx_hash).unwrap().unwrap();
+
+        // simulate
+        let r = state
+            .transact::<NoInspector>(cfg, block_env, tx.into(), None)
+            .unwrap()
+            .result;
+        assert!(r.is_success());
+        let receipt = bp.receipt_by_hash(tx_hash).unwrap().unwrap();
+        assert_eq!(receipt.success, r.is_success());
+        assert_eq!(receipt.logs.len(), r.logs().len());
+        for (log, receipt_log) in r.logs().iter().zip(receipt.logs.iter()) {
+            assert_eq!(log.address, receipt_log.address);
+            assert_eq!(log.topics, receipt_log.topics);
+            assert_eq!(*log.data, *receipt_log.data);
+        }
     }
 }

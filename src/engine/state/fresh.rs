@@ -1,4 +1,7 @@
-use std::convert::Infallible;
+use std::{
+    convert::Infallible,
+    ops::{Deref, DerefMut},
+};
 
 use reth_primitives::Address;
 use revm::{
@@ -17,6 +20,32 @@ impl FreshBcState {
     /// Create a new empty blockchain state.
     pub fn new() -> Self {
         Self(CacheDB::new(EmptyDB::default()))
+    }
+}
+
+impl Deref for FreshBcState {
+    type Target = CacheDB<EmptyDB>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl DerefMut for FreshBcState {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
+    }
+}
+
+impl AsRef<CacheDB<EmptyDB>> for FreshBcState {
+    fn as_ref(&self) -> &CacheDB<EmptyDB> {
+        &self.0
+    }
+}
+
+impl AsMut<CacheDB<EmptyDB>> for FreshBcState {
+    fn as_mut(&mut self) -> &mut CacheDB<EmptyDB> {
+        todo!()
     }
 }
 
@@ -80,5 +109,156 @@ impl DatabaseRef for FreshBcState {
 
     fn block_hash(&self, number: U256) -> Result<B256, Self::Error> {
         self.0.block_hash(number)
+    }
+}
+
+#[cfg(test)]
+mod tests_nodep {
+
+    use std::sync::Arc;
+
+    use ethers::prelude::k256::elliptic_curve::consts::U2;
+    use reth_primitives::{Transaction, TransactionKind, TxLegacy};
+
+    use revm::{
+        db::{CacheDB, EmptyDB},
+        Database, EVM,
+    };
+    use revm_primitives::{
+        Account, AccountInfo, Address, BlockEnv, Bytecode, Bytes, CfgEnv,
+        ExecutionResult, B160, U256,
+    };
+
+    use crate::{
+        config::flags::SoflConfig,
+        engine::{
+            providers::BcProviderBuilder,
+            state::{BcState, NoInspector},
+            transaction::{StateChange, Tx, TxPosition},
+        },
+        utils::cheatcodes,
+    };
+
+    use super::FreshBcState;
+
+    #[test]
+    fn test_fresh_state_with_plain_transfer() {
+        let spender = Address::from(0);
+        let receiver = Address::from(1);
+
+        // set cfg and env
+        let cfg = CfgEnv {
+            disable_block_gas_limit: true,
+            disable_base_fee: true,
+            ..Default::default()
+        };
+        let block_env = BlockEnv {
+            gas_limit: U256::from(1000000),
+            ..Default::default()
+        };
+
+        // create state
+        let mut state = FreshBcState::new();
+        {
+            let acc = AccountInfo::new(
+                U256::from(1000),
+                Default::default(),
+                Bytecode::new(),
+            );
+            state.insert_account_info(spender, acc);
+            let acc = AccountInfo::new(
+                U256::from(0),
+                Default::default(),
+                Bytecode::new(),
+            );
+            state.insert_account_info(receiver, acc);
+        }
+
+        let tx = Transaction::Legacy(TxLegacy {
+            to: TransactionKind::Call(receiver),
+            value: 500,
+            gas_limit: 100000,
+            ..Default::default()
+        });
+        let tx: Tx<'_, FreshBcState> = Tx::Unsigned((spender, tx));
+
+        // simulate
+        let result = state
+            .transact::<NoInspector>(
+                cfg.clone(),
+                block_env.clone(),
+                tx.clone(),
+                None,
+            )
+            .unwrap()
+            .result;
+
+        assert!(matches!(result, ExecutionResult::Success { .. }));
+        let spender_balance = state.basic(spender).unwrap().unwrap().balance;
+        assert_eq!(
+            spender_balance,
+            U256::from(1000),
+            "spender balance should be unchanged in simulation"
+        );
+        let receiver_balance = state.basic(receiver).unwrap().unwrap().balance;
+        assert_eq!(
+            receiver_balance,
+            U256::from(0),
+            "receiver balance should be unchanged in simulation"
+        );
+
+        // transact
+        let result = state
+            .transit::<NoInspector>(cfg, block_env, tx, None)
+            .unwrap();
+
+        assert!(matches!(result, ExecutionResult::Success { .. }));
+        let spender_balance = state.basic(spender).unwrap().unwrap().balance;
+        assert_eq!(
+            spender_balance,
+            U256::from(500),
+            "spender balance should be decreased by 500"
+        );
+        let receiver_balance = state.basic(receiver).unwrap().unwrap().balance;
+        assert_eq!(
+            receiver_balance,
+            U256::from(500),
+            "receiver balance should be increased by 500"
+        );
+    }
+
+    #[test]
+    fn test_pseudo_tx() {
+        let account = Address::from(0);
+        let tx_lambda = |_state: &FreshBcState| {
+            let mut changes = StateChange::default();
+            let mut change = Account::new_not_existing();
+            change.is_not_existing = false;
+            change.info.balance = U256::from(1000);
+            change.info.code = Some(Bytecode::new_raw(Bytes::from("0x1234")));
+            changes.insert(account, change);
+            changes
+        };
+        let tx = Tx::Pseudo(&tx_lambda);
+
+        let mut state = FreshBcState::new();
+        let result = state
+            .transit::<NoInspector>(
+                CfgEnv::default(),
+                BlockEnv::default(),
+                tx,
+                None,
+            )
+            .unwrap();
+
+        assert!(matches!(result, ExecutionResult::Success { .. }));
+        let balance = state.basic(account).unwrap().unwrap().balance;
+        let code = state.basic(account).unwrap().unwrap().code;
+        assert_eq!(balance, U256::from(1000), "account balance should be 1000");
+        assert_eq!(
+            code,
+            Some(Bytecode::new_raw(Bytes::from("0x1234"))),
+            "account code should be 0x1234"
+        );
     }
 }

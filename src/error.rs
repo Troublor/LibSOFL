@@ -1,5 +1,6 @@
 use crate::engine::transaction::TxPosition;
 
+#[derive(Debug)]
 pub enum SoflError<DBERR = reth_interfaces::Error> {
     /// Wrapper of reth error
     Reth(reth_interfaces::Error),
