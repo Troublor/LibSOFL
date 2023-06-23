@@ -21,9 +21,6 @@ pub struct ForkedBcState<'a>(InnerForkedBcState<'a>);
 
 pub type InnerForkedBcState<'a> = CacheDB<Arc<WrappedDB<StateProviderBox<'a>>>>;
 
-/// NoInspector is used as a placeholder for type parameters when no inspector is needed.
-pub type NoInspector = NoOpInspector;
-
 impl Debug for ForkedBcState<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("ForkedBcState").finish()
@@ -212,7 +209,6 @@ mod tests_with_db {
     use reth_provider::{
         EvmEnvProvider, ReceiptProvider, TransactionsProvider,
     };
-    use revm::EVM;
     use revm_primitives::{BlockEnv, CfgEnv, ExecutionResult};
 
     use crate::{
@@ -232,10 +228,11 @@ mod tests_with_db {
         let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
         let fork_at = TxPosition::new(17000000, 0);
         let txs = bp.transactions_by_block(fork_at.block).unwrap().unwrap();
+        let txs = txs.iter().map(|tx| tx.into()).collect::<Vec<_>>();
         let receipts = bp.receipts_by_block(fork_at.block).unwrap().unwrap();
 
         // prepare state
-        let mut state = ForkedBcState::fork_at(&bp, fork_at.clone()).unwrap();
+        let state = ForkedBcState::fork_at(&bp, fork_at.clone()).unwrap();
 
         // prepare cfg and env
         let mut cfg = CfgEnv::default();
@@ -244,21 +241,9 @@ mod tests_with_db {
             .unwrap();
 
         // execute
-        let mut results = Vec::new();
-        for tx in txs {
-            let mut evm = EVM::new();
-            evm.env.cfg = cfg.clone();
-            evm.env.block = block_env.clone();
-
-            let result = state
-                .transit_with_evm::<NoInspector>(
-                    &mut evm,
-                    tx.clone().into(),
-                    None,
-                )
-                .unwrap();
-            results.push(result);
-        }
+        let (_, results) = state
+            .transit::<NoInspector>(cfg, block_env, txs, None)
+            .unwrap();
 
         assert_eq!(results.len(), receipts.len());
 

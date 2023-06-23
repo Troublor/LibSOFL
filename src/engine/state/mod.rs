@@ -1,17 +1,14 @@
-use std::{fmt::Debug, rc::Rc, sync::Arc};
+use std::fmt::Debug;
 
 use revm::{
-    inspectors::{self, NoOpInspector},
-    Database, DatabaseCommit, Inspector, EVM,
+    inspectors::NoOpInspector, Database, DatabaseCommit, Inspector, EVM,
 };
 use revm_primitives::{
     db::DatabaseRef, BlockEnv, Bytes, CfgEnv, Eval, ExecutionResult, Output,
     ResultAndState,
 };
 
-use crate::{error::SoflError, fuzzing::corpus::tx};
-
-use self::fork::ForkedBcState;
+use crate::error::SoflError;
 
 use super::transaction::Tx;
 
@@ -22,32 +19,26 @@ pub mod fresh;
 pub type NoInspector = NoOpInspector;
 
 // Abstration of the forked state from which the blockchain state is built upon.
-pub trait BcStateGround:
-    DatabaseRef<Error = reth_interfaces::Error> + Sized
+pub trait BcStateGround<E = reth_interfaces::Error>:
+    DatabaseRef<Error = E> + Sized
 {
 }
 
 // Auto implement BcStateGround for all types that implement DatabaseRef
-impl<T: DatabaseRef<Error = reth_interfaces::Error> + Sized> BcStateGround
-    for T
-{
-}
+impl<E, T: DatabaseRef<Error = E> + Sized> BcStateGround<E> for T {}
 
 // Abstraction of the readonly blockchain state
-pub trait ReadonlyBcState:
-    Database<Error = reth_interfaces::Error> + Sized
+pub trait ReadonlyBcState<E = reth_interfaces::Error>:
+    Database<Error = E> + Sized
 {
 }
 
 // Auto implement ReadonlyBcState for all types that implement Database
-impl<T: Database<Error = reth_interfaces::Error> + Sized> ReadonlyBcState
-    for T
-{
-}
+impl<E, T: Database<Error = E> + Sized> ReadonlyBcState<E> for T {}
 
 // Abstraction of blockchain state
-pub trait BcState:
-    Database<Error = reth_interfaces::Error> + DatabaseCommit + Sized + Debug
+pub trait BcState<E = reth_interfaces::Error>:
+    Database<Error = E> + DatabaseCommit + Sized + Debug
 {
     fn transact<'a, 'b: 'a, I: Inspector<&'a mut Self>>(
         &'b mut self,
@@ -73,8 +64,8 @@ pub trait BcState:
         evm.database(self);
         if let Tx::Pseudo(tx) = tx {
             // execute pseudo transaction
-            let changes = tx(self);
-            evm.database(self);
+            let db = evm.db.as_ref().unwrap();
+            let changes = tx(db);
             Ok(ResultAndState {
                 result: ExecutionResult::Success {
                     reason: Eval::Return,
@@ -98,34 +89,7 @@ pub trait BcState:
         }
     }
 
-    fn transit<'a, 'b: 'a, I: Inspector<&'a mut Self>>(
-        &'b mut self,
-        evm_cfg: CfgEnv,
-        block_env: BlockEnv,
-        tx: Tx<'_, Self>,
-        inspector: Option<I>,
-    ) -> Result<ExecutionResult, SoflError<Self::Error>> {
-        let result;
-        let mut evm = EVM::new();
-        evm.env.cfg = evm_cfg;
-        evm.env.block = block_env;
-        result = self.transact_with_evm(&mut evm, tx, inspector)?;
-        evm.db.as_mut().unwrap().commit(result.state);
-        Ok(result.result)
-    }
-
-    fn transit_with_evm<'a, 'b: 'a, I: Inspector<&'a mut Self>>(
-        &'b mut self,
-        evm: &mut EVM<&'a mut Self>,
-        tx: Tx<'_, Self>,
-        inspector: Option<I>,
-    ) -> Result<ExecutionResult, SoflError<Self::Error>> {
-        let result = self.transact_with_evm(evm, tx, inspector)?;
-        evm.db.as_mut().unwrap().commit(result.state);
-        Ok(result.result)
-    }
-
-    fn transit_fn<I: Inspector<Self>>(
+    fn transit<I: Inspector<Self>>(
         self,
         evm_cfg: CfgEnv,
         block_env: BlockEnv,
@@ -163,14 +127,22 @@ pub trait BcState:
         let db = evm.db.unwrap();
         Ok((db, results))
     }
+
+    fn transit_one<I: Inspector<Self>>(
+        self,
+        evm_cfg: CfgEnv,
+        block_env: BlockEnv,
+        tx: Tx<'_, Self>,
+        inspector: Option<&mut I>,
+    ) -> Result<(Self, ExecutionResult), SoflError<Self::Error>> {
+        let (this, mut results) =
+            self.transit(evm_cfg, block_env, vec![tx], inspector)?;
+        Ok((this, results.remove(0)))
+    }
 }
 
 // Auto implement BcState for all types that implement Database and DatabaseCommit
-impl<
-        T: Database<Error = reth_interfaces::Error>
-            + DatabaseCommit
-            + Sized
-            + Debug,
-    > BcState for T
+impl<E, T: Database<Error = E> + DatabaseCommit + Sized + Debug> BcState<E>
+    for T
 {
 }

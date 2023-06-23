@@ -115,28 +115,17 @@ impl DatabaseRef for FreshBcState {
 #[cfg(test)]
 mod tests_nodep {
 
-    use std::sync::Arc;
-
-    use ethers::prelude::k256::elliptic_curve::consts::U2;
     use reth_primitives::{Transaction, TransactionKind, TxLegacy};
 
-    use revm::{
-        db::{CacheDB, EmptyDB},
-        Database, EVM,
-    };
+    use revm::Database;
     use revm_primitives::{
         Account, AccountInfo, Address, BlockEnv, Bytecode, Bytes, CfgEnv,
-        ExecutionResult, B160, U256,
+        ExecutionResult, U256,
     };
 
-    use crate::{
-        config::flags::SoflConfig,
-        engine::{
-            providers::BcProviderBuilder,
-            state::{BcState, NoInspector},
-            transaction::{StateChange, Tx, TxPosition},
-        },
-        utils::cheatcodes,
+    use crate::engine::{
+        state::{BcState, NoInspector},
+        transaction::{StateChange, Tx},
     };
 
     use super::FreshBcState;
@@ -208,8 +197,8 @@ mod tests_nodep {
         );
 
         // transact
-        let result = state
-            .transit::<NoInspector>(cfg, block_env, tx, None)
+        let (mut state, result) = state
+            .transit_one::<NoInspector>(cfg, block_env, tx, None)
             .unwrap();
 
         assert!(matches!(result, ExecutionResult::Success { .. }));
@@ -241,9 +230,9 @@ mod tests_nodep {
         };
         let tx = Tx::Pseudo(&tx_lambda);
 
-        let mut state = FreshBcState::new();
-        let result = state
-            .transit::<NoInspector>(
+        let state = FreshBcState::new();
+        let (mut state, result) = state
+            .transit_one::<NoInspector>(
                 CfgEnv::default(),
                 BlockEnv::default(),
                 tx,
