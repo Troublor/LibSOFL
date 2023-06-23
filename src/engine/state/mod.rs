@@ -1,12 +1,17 @@
-use std::fmt::Debug;
+use std::{fmt::Debug, rc::Rc, sync::Arc};
 
-use revm::{Database, DatabaseCommit, Inspector, EVM};
+use revm::{
+    inspectors::{self, NoOpInspector},
+    Database, DatabaseCommit, Inspector, EVM,
+};
 use revm_primitives::{
     db::DatabaseRef, BlockEnv, Bytes, CfgEnv, Eval, ExecutionResult, Output,
     ResultAndState,
 };
 
-use crate::error::SoflError;
+use crate::{error::SoflError, fuzzing::corpus::tx};
+
+use self::fork::ForkedBcState;
 
 use super::transaction::Tx;
 
@@ -115,6 +120,45 @@ pub trait BcState:
         let result = self.transact_with_env(evm, tx, inspector)?;
         evm.db.as_mut().unwrap().commit(result.state);
         Ok(result.result)
+    }
+
+    fn transit_fn<I: Inspector<Self>>(
+        self,
+        evm_cfg: CfgEnv,
+        block_env: BlockEnv,
+        txs: Vec<Tx<'_, Self>>,
+        inspector: Option<&mut I>,
+    ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self::Error>> {
+        let mut results = Vec::new();
+        let mut evm = EVM::new();
+        evm.env.cfg = evm_cfg;
+        evm.env.block = block_env;
+        evm.database(self);
+        if let Some(mut inspector) = inspector {
+            for tx in txs {
+                let sender = tx.sender();
+                reth_revm::env::fill_tx_env(&mut evm.env.tx, tx, sender);
+                let inspector = &mut inspector;
+                let result = evm.inspect(inspector).map_err(SoflError::Evm)?;
+                // evm.db must exist since we called evm.database(state) above
+                let db = evm.db.as_mut().unwrap();
+                db.commit(result.state);
+                results.push(result.result);
+            }
+        } else {
+            for tx in txs {
+                let sender = tx.sender();
+                reth_revm::env::fill_tx_env(&mut evm.env.tx, tx, sender);
+                let result = evm.transact().map_err(SoflError::Evm)?;
+                // evm.db must exist since we called evm.database(state) above
+                let db = evm.db.as_mut().unwrap();
+                db.commit(result.state);
+                results.push(result.result);
+            }
+        }
+        // evm.db must exist since we called evm.database(state) above
+        let db = evm.db.unwrap();
+        Ok((db, results))
     }
 }
 
