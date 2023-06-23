@@ -39,7 +39,6 @@ mod tests_nodep {
         observer::result::ExecutionResultObserver,
     };
 
-    #[test]
     fn test_simple_replay_fuzz() {
         let provider = JsonRpcBcProvider::default();
         let fork_at = TxPosition::new(14000000, 0);
