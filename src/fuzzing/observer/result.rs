@@ -1,10 +1,11 @@
 use libafl::{
-    prelude::{Named, Observer},
+    prelude::{Named, Observer, UsesInput},
     state::UsesState,
 };
 use revm_primitives::{ExecutionResult, Halt};
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug)]
+#[derive(Debug, Serialize, Deserialize)]
 pub struct ExecutionResultObserver {
     result: ExecutionResult,
 }
@@ -30,7 +31,7 @@ impl ExecutionResultObserver {
     }
 }
 
-impl<S: UsesState> Observer<S> for ExecutionResultObserver {}
+impl<S: UsesInput> Observer<S> for ExecutionResultObserver {}
 
 impl Named for ExecutionResultObserver {
     fn name(&self) -> &str {

@@ -1,7 +1,10 @@
 use std::fmt::Debug;
 
 use libafl::{
-    prelude::{Executor, ObserversTuple, UsesInput},
+    prelude::{
+        Executor, HasObservers, ObserversTuple, UsesInput, UsesObserver,
+        UsesObservers,
+    },
     state::UsesState,
 };
 use revm_primitives::{BlockEnv, CfgEnv, ExecutionResult};
@@ -41,6 +44,7 @@ where
         block_env: BlockEnv,
         bc_state: BS,
         observers: OT,
+        _state: &S,
     ) -> Self {
         Self {
             evm_cfg,
@@ -110,5 +114,31 @@ where
         let exit_kind = libafl::prelude::ExitKind::Ok;
         self.observers.post_exec_all(state, input, &exit_kind)?;
         Ok(exit_kind)
+    }
+}
+
+impl<E, BS, OT, S> UsesObservers for TxExecutor<E, BS, OT, S>
+where
+    E: Debug,
+    BS: BcState<E>,
+    OT: ObserversTuple<S>,
+    S: UsesInput<Input = TxInput>,
+{
+    type Observers = OT;
+}
+
+impl<E, BS, OT, S> HasObservers for TxExecutor<E, BS, OT, S>
+where
+    E: Debug,
+    BS: BcState<E>,
+    OT: ObserversTuple<S>,
+    S: UsesInput<Input = TxInput>,
+{
+    fn observers(&self) -> &Self::Observers {
+        &self.observers
+    }
+
+    fn observers_mut(&mut self) -> &mut Self::Observers {
+        &mut self.observers
     }
 }
