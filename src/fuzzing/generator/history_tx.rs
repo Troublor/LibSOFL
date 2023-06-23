@@ -3,10 +3,7 @@ use reth_primitives::{Address, BlockNumber};
 use reth_provider::TransactionsProvider;
 
 use crate::{
-    engine::{
-        providers::BcProvider,
-        transaction::{PortableTx, Tx},
-    },
+    engine::transaction::{PortableTx, Tx},
     fuzzing::corpus::tx::TxInput,
 };
 
@@ -41,7 +38,7 @@ impl<S, P: TransactionsProvider> Generator<TxInput, S>
         loop {
             if let Some(tx) = self.txs.pop() {
                 if tx.to() == Some(self.contract) {
-                    return Ok(TxInput::from(Tx::from(tx)));
+                    return Ok(TxInput::from(Tx::<S>::from(tx)));
                 }
             } else {
                 // fetch previous block

@@ -143,6 +143,53 @@ pub trait BcState<E = reth_interfaces::Error>:
             self.transit(evm_cfg, block_env, vec![tx], inspector)?;
         Ok((this, results.remove(0)))
     }
+
+    fn transit_inplace<'a, I: Inspector<&'a mut Self>>(
+        &'a mut self,
+        evm_cfg: CfgEnv,
+        block_env: BlockEnv,
+        txs: Vec<Tx<'_, &'a mut Self>>,
+        inspector: Option<&mut I>,
+    ) -> Result<Vec<ExecutionResult>, SoflError<Self::Error>> {
+        let mut results = Vec::new();
+        let mut evm = EVM::new();
+        evm.env.cfg = evm_cfg;
+        evm.env.block = block_env;
+        evm.database(self);
+        if let Some(mut inspector) = inspector {
+            for tx in txs {
+                let inspector = &mut inspector;
+                let result;
+                (evm, result) =
+                    Self::transact_with_evm(evm, tx, Some(inspector))?;
+                // evm.db must exist since we called evm.database(state) above
+                evm.db.as_mut().unwrap().commit(result.state);
+                results.push(result.result);
+            }
+        } else {
+            for tx in txs {
+                let result;
+                (evm, result) =
+                    Self::transact_with_evm::<&'a mut Self, I>(evm, tx, None)?;
+                // evm.db must exist since we called evm.database(state) above
+                evm.db.as_mut().unwrap().commit(result.state);
+                results.push(result.result);
+            }
+        }
+        // evm.db must exist since we called evm.database(state) above
+        Ok(results)
+    }
+    fn transit_one_inplace<'a, I: Inspector<&'a mut Self>>(
+        &'a mut self,
+        evm_cfg: CfgEnv,
+        block_env: BlockEnv,
+        tx: Tx<'_, &'a mut Self>,
+        inspector: Option<&mut I>,
+    ) -> Result<ExecutionResult, SoflError<Self::Error>> {
+        let mut results =
+            self.transit_inplace(evm_cfg, block_env, vec![tx], inspector)?;
+        Ok(results.remove(0))
+    }
 }
 
 // Auto implement BcState for all types that implement Database and DatabaseCommit

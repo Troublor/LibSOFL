@@ -4,11 +4,8 @@ pub mod corpus;
 pub mod executor;
 pub mod feedback;
 pub mod generator;
+pub mod mutator;
 pub mod observer;
-pub mod state;
 
-// Some common traits
-
-pub trait OffersBcState<S: BcState> {
-    fn offer_bc_state(&self) -> &S;
-}
+#[cfg(test)]
+mod tests_nodep {}
