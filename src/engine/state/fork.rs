@@ -11,7 +11,10 @@ use revm_primitives::{
     HashMap, B160, B256, B256 as H256, U256,
 };
 
-use crate::{engine::transaction::TxPosition, error::SoflError};
+use crate::{
+    engine::transaction::{Tx, TxOrPseudo, TxPosition},
+    error::SoflError,
+};
 
 use super::{BcState, NoInspector};
 
@@ -113,12 +116,12 @@ impl<'a> ForkedBcState<'a> {
             // fork error if the fork position block does not exist
             let pos_cp = pos.clone();
             let txs = txs.ok_or(SoflError::Fork(pos_cp))?;
-            for tx in txs.iter().take(pos.index as usize) {
-                let r = this.transact::<NoInspector>(
+            for tx in txs.into_iter().take(pos.index as usize) {
+                let r = this.transact(
                     evm_cfg.clone(),
                     block_env.clone(),
-                    tx.into(),
-                    None,
+                    tx,
+                    NoInspector {},
                 )?;
                 this.commit(r.state);
             }
@@ -214,12 +217,13 @@ mod tests_with_db {
     use crate::{
         config::flags::SoflConfig,
         engine::{
-            providers::BcProviderBuilder, state::BcState,
+            providers::BcProviderBuilder,
+            state::{no_inspector, BcState},
             transaction::TxPosition,
         },
     };
 
-    use super::{ForkedBcState, NoInspector};
+    use super::ForkedBcState;
 
     #[test]
     fn test_reproduce_block() {
@@ -228,7 +232,6 @@ mod tests_with_db {
         let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
         let fork_at = TxPosition::new(17000000, 0);
         let txs = bp.transactions_by_block(fork_at.block).unwrap().unwrap();
-        let txs = txs.iter().map(|tx| tx.into()).collect::<Vec<_>>();
         let receipts = bp.receipts_by_block(fork_at.block).unwrap().unwrap();
 
         // prepare state
@@ -241,9 +244,8 @@ mod tests_with_db {
             .unwrap();
 
         // execute
-        let (_, results) = state
-            .transit::<NoInspector>(cfg, block_env, txs, None)
-            .unwrap();
+        let (_, results) =
+            state.transit(cfg, block_env, txs, no_inspector()).unwrap();
 
         assert_eq!(results.len(), receipts.len());
 
@@ -277,7 +279,7 @@ mod tests_with_jsonrpc {
         config::flags::SoflConfig,
         engine::{
             providers::BcProviderBuilder,
-            state::{fork::ForkedBcState, BcState, NoInspector},
+            state::{fork::ForkedBcState, no_inspector, BcState},
             transaction::TxPosition,
         },
         utils::conversion::{Convert, ToPrimitive},
@@ -309,7 +311,7 @@ mod tests_with_jsonrpc {
 
         // simulate
         let r = state
-            .transact::<NoInspector>(cfg, block_env, tx.into(), None)
+            .transact(cfg, block_env, tx, no_inspector())
             .unwrap()
             .result;
         assert!(r.is_success());

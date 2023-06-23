@@ -2,10 +2,7 @@ use libafl::prelude::Generator;
 use reth_primitives::{Address, BlockNumber};
 use reth_provider::TransactionsProvider;
 
-use crate::{
-    engine::transaction::{PortableTx, Tx},
-    fuzzing::corpus::tx::TxInput,
-};
+use crate::{engine::transaction::Tx, fuzzing::corpus::tx::TxInput};
 
 /// Generate tx inputs from historical txs
 /// Given a contract address, the generator will search back from the latest
@@ -17,7 +14,7 @@ pub struct HistoricalTxGenerator<P> {
 
     // cache
     bn: BlockNumber,
-    txs: Vec<PortableTx>,
+    txs: Vec<Tx>,
 }
 
 impl<P> HistoricalTxGenerator<P> {
@@ -38,7 +35,7 @@ impl<S, P: TransactionsProvider> Generator<TxInput, S>
         loop {
             if let Some(tx) = self.txs.pop() {
                 if tx.to() == Some(self.contract) {
-                    return Ok(TxInput::from(Tx::<S>::from(tx)));
+                    return Ok(tx);
                 }
             } else {
                 // fetch previous block
