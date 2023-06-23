@@ -163,13 +163,13 @@ mod tests_nodep {
             state.insert_account_info(receiver, acc);
         }
 
-        let tx = Transaction::Legacy(TxLegacy {
+        let tx_inner = Transaction::Legacy(TxLegacy {
             to: TransactionKind::Call(receiver),
             value: 500,
             gas_limit: 100000,
             ..Default::default()
         });
-        let tx: Tx<'_, FreshBcState> = Tx::Unsigned((spender, tx));
+        let tx = Tx::Unsigned((spender, tx_inner.clone()));
 
         // simulate
         let result = state
@@ -197,6 +197,7 @@ mod tests_nodep {
         );
 
         // transact
+        let tx = Tx::Unsigned((spender, tx_inner.clone()));
         let (mut state, result) = state
             .transit_one::<NoInspector>(cfg, block_env, tx, None)
             .unwrap();
