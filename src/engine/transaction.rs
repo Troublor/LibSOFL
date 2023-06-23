@@ -80,6 +80,19 @@ impl TxPosition {
     }
 }
 
+impl Display for TxPosition {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self.block {
+            BlockHashOrNumber::Hash(hash) => {
+                write!(f, "{}-{}", hash, self.index)
+            }
+            BlockHashOrNumber::Number(block) => {
+                write!(f, "{}-{}", block, self.index)
+            }
+        }
+    }
+}
+
 impl Add<u64> for TxPosition {
     type Output = Self;
 
@@ -431,7 +444,7 @@ impl AsRef<reth_primitives::Transaction> for PortableTx {
     }
 }
 
-impl From<PortableTx> for Tx<'_, ()> {
+impl<S> From<PortableTx> for Tx<'_, S> {
     fn from(val: PortableTx) -> Self {
         match val {
             PortableTx::Signed(tx) => Tx::Signed(tx),
@@ -440,8 +453,8 @@ impl From<PortableTx> for Tx<'_, ()> {
     }
 }
 
-impl From<Tx<'_, ()>> for PortableTx {
-    fn from(val: Tx<'_, ()>) -> Self {
+impl<S> From<Tx<'_, S>> for PortableTx {
+    fn from(val: Tx<'_, S>) -> Self {
         match val {
             Tx::Signed(tx) => PortableTx::Signed(tx),
             Tx::Unsigned(tx) => PortableTx::Unsigned(tx),
