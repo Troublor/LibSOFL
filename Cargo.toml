@@ -19,8 +19,10 @@ revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "releas
 [dependencies]
 ethers = "2.0.7"
 ethers-providers = {version = "2.0.7", features = ["ws"]}
-svm-rs = "0.2.23"
-semver = { version = "1.0", features = ["serde"] }
+ethers-solc = {version = "2.0.7", features = ["svm-solc"]}
+svm-rs = {version = "0.2.23", features = ["blocking"]}
+tempfile = "3.6"
+derive_more = "0.99.17"
 futures = "0.3.28"
 tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
@@ -39,6 +41,8 @@ eyre = "0.6.8"
 # lift dependencies of dependencies
 reqwest = "0.11.18"
 hashbrown = "0.14"
+dirs = "5.0" # from svm-rs
+semver = { version = "1.0", features = ["serde"] } # from svm-rs
 
 # reth
 revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }

@@ -1,3 +1,4 @@
+use derive_more::{AsRef, Deref, From};
 use std::{
     error::Error,
     fmt::Display,
@@ -332,162 +333,100 @@ mod tests_with_db {
     }
 }
 
-pub enum Tx<'a, S> {
-    Signed(reth_primitives::TransactionSigned),
-    Unsigned((Address, reth_primitives::Transaction)),
+#[derive(From)]
+pub enum TxOrPseudo<'a, S> {
+    Tx(Tx),
     Pseudo(&'a dyn Fn(&S) -> StateChange),
 }
 
-impl<S> Tx<'_, S> {
+impl<S> TxOrPseudo<'_, S> {
     pub fn is_pseudo(&self) -> bool {
-        matches!(self, Tx::Pseudo(_))
+        matches!(self, TxOrPseudo::Pseudo(_))
     }
 }
 
-impl<'a, S> From<&reth_primitives::TransactionSigned> for Tx<'a, S> {
-    fn from(tx: &reth_primitives::TransactionSigned) -> Self {
-        Tx::Signed(tx.clone())
-    }
-}
-
-impl<'a, S> From<reth_primitives::TransactionSigned> for Tx<'a, S> {
-    fn from(tx: reth_primitives::TransactionSigned) -> Self {
-        Tx::Signed(tx)
-    }
-}
-
-impl<'a, S> From<(Address, reth_primitives::Transaction)> for Tx<'a, S> {
-    fn from(tx: (Address, reth_primitives::Transaction)) -> Self {
-        Tx::Unsigned(tx)
-    }
-}
-
-impl<'a, S> From<&'a dyn Fn(&S) -> StateChange> for Tx<'a, S> {
-    fn from(tx: &'a dyn Fn(&S) -> StateChange) -> Self {
-        Tx::Pseudo(tx)
-    }
-}
-
-impl<'a, S> Clone for Tx<'a, S> {
+impl<'a, S> Clone for TxOrPseudo<'a, S> {
     fn clone(&self) -> Self {
         match self {
-            Tx::Signed(tx) => Tx::Signed(tx.clone()),
-            Tx::Unsigned((sender, tx)) => Tx::Unsigned((*sender, tx.clone())),
-            Tx::Pseudo(_) => panic!("cannot clone pseudo tx"),
+            TxOrPseudo::Tx(tx) => TxOrPseudo::Tx(tx.clone()),
+            TxOrPseudo::Pseudo(_) => panic!("cannot clone pseudo tx"),
         }
     }
 }
 
-impl<'a, S: Database> Tx<'a, S> {
-    pub fn valid(&self) -> bool {
-        match self {
-            Tx::Signed(tx) => tx.recover_signer().is_some(),
-            Tx::Unsigned(_) => true,
-            Tx::Pseudo(_) => true,
-        }
-    }
+impl<'a, S: Database> Deref for TxOrPseudo<'a, S> {
+    type Target = Tx;
 
-    pub fn sender(&self) -> Address {
+    fn deref(&self) -> &Self::Target {
         match self {
-            Tx::Signed(tx) => tx.recover_signer().unwrap(),
-            Tx::Unsigned((sender, _)) => *sender,
-            Tx::Pseudo(_) => Address::zero(),
+            TxOrPseudo::Tx(tx) => tx,
+            TxOrPseudo::Pseudo(_) => panic!("cannot deref pseudo tx"),
         }
     }
 }
 
-impl<'a, S: Database> Deref for Tx<'a, S> {
+impl<'a, S: Database> AsRef<Tx> for TxOrPseudo<'a, S> {
+    fn as_ref(&self) -> &Tx {
+        match self {
+            TxOrPseudo::Tx(tx) => tx,
+            TxOrPseudo::Pseudo(_) => panic!("cannot deref pseudo tx"),
+        }
+    }
+}
+
+impl<'a, S: Database> From<reth_primitives::TransactionSigned>
+    for TxOrPseudo<'a, S>
+{
+    fn from(tx: reth_primitives::TransactionSigned) -> Self {
+        Tx::Signed(tx).into()
+    }
+}
+
+#[derive(Serialize, Deserialize, Debug, Clone, From)]
+pub enum Tx {
+    Signed(reth_primitives::TransactionSigned),
+    Unsigned((Address, reth_primitives::Transaction)),
+}
+
+impl Deref for Tx {
     type Target = reth_primitives::Transaction;
 
     fn deref(&self) -> &Self::Target {
         match self {
-            Tx::Signed(tx) => &tx.transaction,
+            Tx::Signed(tx) => tx,
             Tx::Unsigned((_, tx)) => tx,
-            Tx::Pseudo(_) => panic!("cannot deref pseudo tx"),
         }
     }
 }
 
-impl<'a, S: Database> AsRef<reth_primitives::Transaction> for Tx<'a, S> {
+impl AsRef<reth_primitives::Transaction> for Tx {
     fn as_ref(&self) -> &reth_primitives::Transaction {
         match self {
             Tx::Signed(tx) => tx,
             Tx::Unsigned((_, tx)) => tx,
-            Tx::Pseudo(_) => panic!("cannot deref pseudo tx"),
         }
     }
 }
 
-#[derive(Serialize, Deserialize, Debug, Clone)]
-pub enum PortableTx {
-    Signed(reth_primitives::TransactionSigned),
-    Unsigned((Address, reth_primitives::Transaction)),
-}
-
-impl Deref for PortableTx {
-    type Target = reth_primitives::Transaction;
-
-    fn deref(&self) -> &Self::Target {
+impl Tx {
+    pub fn from(&self) -> Address {
         match self {
-            PortableTx::Signed(tx) => &tx.transaction,
-            PortableTx::Unsigned((_, tx)) => tx,
-        }
-    }
-}
-
-impl AsRef<reth_primitives::Transaction> for PortableTx {
-    fn as_ref(&self) -> &reth_primitives::Transaction {
-        match self {
-            PortableTx::Signed(tx) => tx,
-            PortableTx::Unsigned((_, tx)) => tx,
-        }
-    }
-}
-
-impl<S> From<PortableTx> for Tx<'_, S> {
-    fn from(val: PortableTx) -> Self {
-        match val {
-            PortableTx::Signed(tx) => Tx::Signed(tx),
-            PortableTx::Unsigned(tx) => Tx::Unsigned(tx),
-        }
-    }
-}
-
-impl<S> From<Tx<'_, S>> for PortableTx {
-    fn from(val: Tx<'_, S>) -> Self {
-        match val {
-            Tx::Signed(tx) => PortableTx::Signed(tx),
-            Tx::Unsigned(tx) => PortableTx::Unsigned(tx),
-            Tx::Pseudo(_) => panic!("cannot convert pseudo tx to portable"),
-        }
-    }
-}
-
-impl From<reth_primitives::TransactionSigned> for PortableTx {
-    fn from(val: reth_primitives::TransactionSigned) -> Self {
-        PortableTx::Signed(val)
-    }
-}
-
-impl PortableTx {
-    pub fn sender(&self) -> Address {
-        match self {
-            PortableTx::Signed(tx) => tx.recover_signer().unwrap(),
-            PortableTx::Unsigned((sender, _)) => *sender,
+            Tx::Signed(tx) => tx.recover_signer().unwrap(),
+            Tx::Unsigned((sender, _)) => *sender,
         }
     }
 
     pub fn to(&self) -> Option<Address> {
         match self {
-            PortableTx::Signed(tx) => tx.to(),
-            PortableTx::Unsigned((_, tx)) => tx.to(),
+            Tx::Signed(tx) => tx.to(),
+            Tx::Unsigned((_, tx)) => tx.to(),
         }
     }
 
     pub fn hash(&self) -> TxHash {
         match self {
-            PortableTx::Signed(tx) => tx.hash(),
-            _ => panic!("cannot hash unsigned tx"),
+            Tx::Signed(tx) => tx.hash(),
+            _ => TxHash::zero(),
         }
     }
 }

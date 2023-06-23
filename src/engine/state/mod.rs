@@ -10,13 +10,19 @@ use revm_primitives::{
 
 use crate::error::SoflError;
 
-use super::transaction::Tx;
+use super::transaction::TxOrPseudo;
 
 pub mod fork;
 pub mod fresh;
 
 /// NoInspector is used as a placeholder for type parameters when no inspector is needed.
 pub type NoInspector = NoOpInspector;
+
+pub static mut NO_INSPECTOR: NoInspector = NoInspector {};
+pub fn no_inspector() -> &'static mut NoInspector {
+    // unsafe is ok here since NoInspector is essential a no-op inspector
+    unsafe { &mut NO_INSPECTOR }
+}
 
 // Abstration of the forked state from which the blockchain state is built upon.
 pub trait BcStateGround<E = reth_interfaces::Error>:
@@ -40,51 +46,60 @@ impl<E, T: Database<Error = E> + Sized> ReadonlyBcState<E> for T {}
 pub trait BcState<E = reth_interfaces::Error>:
     Database<Error = E> + DatabaseCommit + Sized + Debug
 {
-    fn transact_with_evm<S: BcState<E>, I: Inspector<S>>(
+    fn transact_with_evm<'a, S, I, T>(
         mut evm: EVM<S>,
-        tx: Tx<'_, S>,
-        inspector: Option<I>,
-    ) -> Result<(EVM<S>, ResultAndState), SoflError<S::Error>> {
+        tx: T,
+        inspector: I,
+    ) -> Result<(EVM<S>, ResultAndState), SoflError<S::Error>>
+    where
+        S: BcState<E> + 'a,
+        I: Inspector<S>,
+        T: Into<TxOrPseudo<'a, S>>,
+    {
+        let tx = tx.into();
         let db = evm
             .db
             .as_ref()
             .expect("EVM must have a database already set");
-        if let Tx::Pseudo(tx) = tx {
-            // execute pseudo transaction
-            let changes = tx(db);
-            Ok((
-                evm,
-                ResultAndState {
-                    result: ExecutionResult::Success {
-                        reason: Eval::Return,
-                        gas_used: 0,
-                        gas_refunded: 0,
-                        logs: Vec::new(),
-                        output: Output::Call(Bytes::new()),
+        match tx {
+            TxOrPseudo::Pseudo(tx) => {
+                // execute pseudo transaction
+                let changes = tx(db);
+                Ok((
+                    evm,
+                    ResultAndState {
+                        result: ExecutionResult::Success {
+                            reason: Eval::Return,
+                            gas_used: 0,
+                            gas_refunded: 0,
+                            logs: Vec::new(),
+                            output: Output::Call(Bytes::new()),
+                        },
+                        state: changes,
                     },
-                    state: changes,
-                },
-            ))
-        } else {
-            let sender = tx.sender();
-            reth_revm::env::fill_tx_env(&mut evm.env.tx, tx, sender);
-            let result;
-            if let Some(inspector) = inspector {
-                result = evm.inspect(inspector).map_err(SoflError::Evm)?;
-            } else {
-                result = evm.transact().map_err(SoflError::Evm)?;
+                ))
             }
-            Ok((evm, result))
+            TxOrPseudo::Tx(tx) => {
+                let sender = tx.from();
+                reth_revm::env::fill_tx_env(&mut evm.env.tx, &tx, sender);
+                let result = evm.inspect(inspector).map_err(SoflError::Evm)?;
+                Ok((evm, result))
+            }
         }
     }
 
-    fn transact<'a, 'b: 'a, I: Inspector<&'a mut Self>>(
+    fn transact<'a, 'b: 'a, I, T>(
         &'b mut self,
         evm_cfg: CfgEnv,
         block_env: BlockEnv,
-        tx: Tx<'_, &'a mut Self>,
-        inspector: Option<I>,
-    ) -> Result<ResultAndState, SoflError<Self::Error>> {
+        tx: T,
+        inspector: I,
+    ) -> Result<ResultAndState, SoflError<Self::Error>>
+    where
+        I: Inspector<&'a mut Self>,
+        T: Into<TxOrPseudo<'a, &'a mut Self>>,
+    {
+        let tx = tx.into();
         let mut evm = EVM::new();
         if !tx.is_pseudo() {
             evm.env.cfg = evm_cfg;
@@ -95,97 +110,93 @@ pub trait BcState<E = reth_interfaces::Error>:
         Ok(r)
     }
 
-    fn transit<I: Inspector<Self>>(
+    fn transit<'a, I, T>(
         self,
         evm_cfg: CfgEnv,
         block_env: BlockEnv,
-        txs: Vec<Tx<'_, Self>>,
-        inspector: Option<&mut I>,
-    ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self::Error>> {
+        txs: Vec<T>,
+        mut inspector: &mut I,
+    ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self::Error>>
+    where
+        Self: 'a,
+        I: Inspector<Self>,
+        T: Into<TxOrPseudo<'a, Self>>,
+    {
         let mut results = Vec::new();
         let mut evm = EVM::new();
         evm.env.cfg = evm_cfg;
         evm.env.block = block_env;
         evm.database(self);
-        if let Some(mut inspector) = inspector {
-            for tx in txs {
-                let inspector = &mut inspector;
-                let result;
-                (evm, result) =
-                    Self::transact_with_evm(evm, tx, Some(inspector))?;
-                // evm.db must exist since we called evm.database(state) above
-                evm.db.as_mut().unwrap().commit(result.state);
-                results.push(result.result);
-            }
-        } else {
-            for tx in txs {
-                let result;
-                (evm, result) =
-                    Self::transact_with_evm::<Self, I>(evm, tx, None)?;
-                // evm.db must exist since we called evm.database(state) above
-                evm.db.as_mut().unwrap().commit(result.state);
-                results.push(result.result);
-            }
+        for tx in txs {
+            let inspector = &mut inspector;
+            let result;
+            (evm, result) = Self::transact_with_evm(evm, tx, inspector)?;
+            // evm.db must exist since we called evm.database(state) above
+            evm.db.as_mut().unwrap().commit(result.state);
+            results.push(result.result);
         }
         // evm.db must exist since we called evm.database(state) above
         let db = evm.db.unwrap();
         Ok((db, results))
     }
 
-    fn transit_one<I: Inspector<Self>>(
+    fn transit_one<'a, I, T>(
         self,
         evm_cfg: CfgEnv,
         block_env: BlockEnv,
-        tx: Tx<'_, Self>,
-        inspector: Option<&mut I>,
-    ) -> Result<(Self, ExecutionResult), SoflError<Self::Error>> {
+        tx: T,
+        inspector: &'a mut I,
+    ) -> Result<(Self, ExecutionResult), SoflError<Self::Error>>
+    where
+        Self: 'a,
+        I: Inspector<Self>,
+        T: Into<TxOrPseudo<'a, Self>>,
+    {
         let (this, mut results) =
             self.transit(evm_cfg, block_env, vec![tx], inspector)?;
         Ok((this, results.remove(0)))
     }
 
-    fn transit_inplace<'a, I: Inspector<&'a mut Self>>(
+    fn transit_inplace<'a, I, T>(
         &'a mut self,
         evm_cfg: CfgEnv,
         block_env: BlockEnv,
-        txs: Vec<Tx<'_, &'a mut Self>>,
-        inspector: Option<&mut I>,
-    ) -> Result<Vec<ExecutionResult>, SoflError<Self::Error>> {
+        txs: Vec<T>,
+        mut inspector: &mut I,
+    ) -> Result<Vec<ExecutionResult>, SoflError<Self::Error>>
+    where
+        I: Inspector<&'a mut Self>,
+        T: Into<TxOrPseudo<'a, &'a mut Self>>,
+    {
         let mut results = Vec::new();
         let mut evm = EVM::new();
         evm.env.cfg = evm_cfg;
         evm.env.block = block_env;
         evm.database(self);
-        if let Some(mut inspector) = inspector {
-            for tx in txs {
-                let inspector = &mut inspector;
-                let result;
-                (evm, result) =
-                    Self::transact_with_evm(evm, tx, Some(inspector))?;
-                // evm.db must exist since we called evm.database(state) above
-                evm.db.as_mut().unwrap().commit(result.state);
-                results.push(result.result);
-            }
-        } else {
-            for tx in txs {
-                let result;
-                (evm, result) =
-                    Self::transact_with_evm::<&'a mut Self, I>(evm, tx, None)?;
-                // evm.db must exist since we called evm.database(state) above
-                evm.db.as_mut().unwrap().commit(result.state);
-                results.push(result.result);
-            }
+        for tx in txs {
+            let inspector = &mut inspector;
+            let result;
+            (evm, result) = Self::transact_with_evm(evm, tx, inspector)?;
+            // evm.db must exist since we called evm.database(state) above
+            evm.db.as_mut().unwrap().commit(result.state);
+            results.push(result.result);
         }
+
         // evm.db must exist since we called evm.database(state) above
         Ok(results)
     }
-    fn transit_one_inplace<'a, I: Inspector<&'a mut Self>>(
+    fn transit_one_inplace<'a, I, T>(
         &'a mut self,
         evm_cfg: CfgEnv,
         block_env: BlockEnv,
-        tx: Tx<'_, &'a mut Self>,
-        inspector: Option<&mut I>,
-    ) -> Result<ExecutionResult, SoflError<Self::Error>> {
+        tx: T,
+        inspector: &mut I,
+    ) -> Result<ExecutionResult, SoflError<Self::Error>>
+    where
+        Self: 'a,
+        I: Inspector<&'a mut Self>,
+        T: Into<TxOrPseudo<'a, &'a mut Self>>,
+    {
         let mut results =
             self.transit_inplace(evm_cfg, block_env, vec![tx], inspector)?;
         Ok(results.remove(0))

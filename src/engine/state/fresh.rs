@@ -130,8 +130,8 @@ mod tests_nodep {
     };
 
     use crate::engine::{
-        state::{BcState, NoInspector},
-        transaction::{StateChange, Tx},
+        state::{no_inspector, BcState},
+        transaction::{StateChange, Tx, TxOrPseudo},
     };
 
     use super::FreshBcState;
@@ -179,12 +179,7 @@ mod tests_nodep {
 
         // simulate
         let result = state
-            .transact::<NoInspector>(
-                cfg.clone(),
-                block_env.clone(),
-                tx.clone(),
-                None,
-            )
+            .transact(cfg.clone(), block_env.clone(), tx, no_inspector())
             .unwrap()
             .result;
 
@@ -205,7 +200,7 @@ mod tests_nodep {
         // transact
         let tx = Tx::Unsigned((spender, tx_inner));
         let (mut state, result) = state
-            .transit_one::<NoInspector>(cfg, block_env, tx, None)
+            .transit_one(cfg, block_env, tx, no_inspector())
             .unwrap();
 
         assert!(matches!(result, ExecutionResult::Success { .. }));
@@ -235,15 +230,15 @@ mod tests_nodep {
             changes.insert(account, change);
             changes
         };
-        let tx = Tx::Pseudo(&tx_lambda);
+        let tx = TxOrPseudo::Pseudo(&tx_lambda);
 
         let state = FreshBcState::new();
         let (mut state, result) = state
-            .transit_one::<NoInspector>(
+            .transit_one(
                 CfgEnv::default(),
                 BlockEnv::default(),
                 tx,
-                None,
+                no_inspector(),
             )
             .unwrap();
 

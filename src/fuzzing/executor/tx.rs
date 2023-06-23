@@ -7,7 +7,7 @@ use libafl::{
 use revm_primitives::{BlockEnv, CfgEnv, ExecutionResult};
 
 use crate::{
-    engine::state::{BcState, NoInspector},
+    engine::state::{no_inspector, BcState},
     fuzzing::corpus::tx::TxInput,
 };
 
@@ -29,6 +29,28 @@ where
     pub out: Option<ExecutionResult>,
 
     _phantom: std::marker::PhantomData<(E, S)>,
+}
+impl<E, BS, OT, S> TxExecutor<E, BS, OT, S>
+where
+    BS: BcState<E>,
+    OT: ObserversTuple<S>,
+    S: UsesInput<Input = TxInput>,
+{
+    pub fn new(
+        evm_cfg: CfgEnv,
+        block_env: BlockEnv,
+        bc_state: BS,
+        observers: OT,
+    ) -> Self {
+        Self {
+            evm_cfg,
+            block_env,
+            bc_state,
+            observers,
+            out: None,
+            _phantom: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<E, BS, OT, S> UsesState for TxExecutor<E, BS, OT, S>
@@ -77,7 +99,7 @@ where
         let tx = input.clone();
         let out = self
             .bc_state
-            .transact::<NoInspector>(cfg, block, tx.into(), None)
+            .transact(cfg, block, tx, no_inspector())
             .map_err(|e| {
                 libafl::Error::IllegalArgument(
                     format!("{}", e),

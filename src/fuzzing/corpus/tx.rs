@@ -1,8 +1,8 @@
 use libafl::prelude::{InMemoryCorpus, Input};
 
-use crate::engine::transaction::PortableTx;
+use crate::engine::transaction::Tx;
 
-pub type TxInput = PortableTx;
+pub type TxInput = Tx;
 
 impl Input for TxInput {
     fn generate_name(&self, idx: usize) -> String {
