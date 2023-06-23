@@ -1,4 +1,4 @@
-use std::{ops::Deref, ops::DerefMut, sync::Arc};
+use std::{fmt::Debug, ops::Deref, ops::DerefMut, sync::Arc};
 
 use reth_provider::{
     EvmEnvProvider, StateProviderBox, StateProviderFactory,
@@ -23,6 +23,12 @@ pub type InnerForkedBcState<'a> = CacheDB<Arc<WrappedDB<StateProviderBox<'a>>>>;
 
 /// NoInspector is used as a placeholder for type parameters when no inspector is needed.
 pub type NoInspector = NoOpInspector;
+
+impl Debug for ForkedBcState<'_> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_struct("ForkedBcState").finish()
+    }
+}
 
 impl<'a> Deref for ForkedBcState<'a> {
     type Target = InnerForkedBcState<'a>;

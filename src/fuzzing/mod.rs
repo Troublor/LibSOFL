@@ -9,6 +9,6 @@ pub mod state;
 
 // Some common traits
 
-pub trait OffersBcState<S: BcState<DBERR>, DBERR> {
+pub trait OffersBcState<S: BcState> {
     fn offer_bc_state(&self) -> &S;
 }

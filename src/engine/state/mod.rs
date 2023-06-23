@@ -1,3 +1,5 @@
+use std::fmt::Debug;
+
 use revm::{Database, DatabaseCommit, Inspector, EVM};
 use revm_primitives::{
     db::DatabaseRef, BlockEnv, Bytes, CfgEnv, Eval, ExecutionResult, Output,
@@ -12,19 +14,33 @@ pub mod fork;
 pub mod fresh;
 
 // Abstration of the forked state from which the blockchain state is built upon.
-pub trait BcStateGround: DatabaseRef + Sized {}
+pub trait BcStateGround:
+    DatabaseRef<Error = reth_interfaces::Error> + Sized
+{
+}
 
 // Auto implement BcStateGround for all types that implement DatabaseRef
-impl<T: DatabaseRef + Sized> BcStateGround for T {}
+impl<T: DatabaseRef<Error = reth_interfaces::Error> + Sized> BcStateGround
+    for T
+{
+}
 
 // Abstraction of the readonly blockchain state
-pub trait ReadonlyBcState: Database + Sized {}
+pub trait ReadonlyBcState:
+    Database<Error = reth_interfaces::Error> + Sized
+{
+}
 
 // Auto implement ReadonlyBcState for all types that implement Database
-impl<T: Database + Sized> ReadonlyBcState for T {}
+impl<T: Database<Error = reth_interfaces::Error> + Sized> ReadonlyBcState
+    for T
+{
+}
 
 // Abstraction of blockchain state
-pub trait BcState: Database + DatabaseCommit + Sized {
+pub trait BcState:
+    Database<Error = reth_interfaces::Error> + DatabaseCommit + Sized + Debug
+{
     fn transact<'a, 'b: 'a, I: Inspector<&'a mut Self>>(
         &'b mut self,
         evm_cfg: CfgEnv,
@@ -102,4 +118,11 @@ pub trait BcState: Database + DatabaseCommit + Sized {
 }
 
 // Auto implement BcState for all types that implement Database and DatabaseCommit
-impl<T: Database + DatabaseCommit + Sized> BcState for T {}
+impl<
+        T: Database<Error = reth_interfaces::Error>
+            + DatabaseCommit
+            + Sized
+            + Debug,
+    > BcState for T
+{
+}

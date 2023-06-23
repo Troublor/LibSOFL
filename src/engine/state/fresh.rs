@@ -10,6 +10,7 @@ use revm_primitives::{
 };
 
 /// A blockchain state that is empty and complete in memory.
+#[derive(Debug)]
 pub struct FreshBcState(CacheDB<EmptyDB>);
 
 impl FreshBcState {

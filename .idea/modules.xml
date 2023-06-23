@@ -2,7 +2,7 @@
 <project version="4">
   <component name="ProjectModuleManager">
     <modules>
-      <module fileurl="file://$PROJECT_DIR$/see_fuzz.iml" filepath="$PROJECT_DIR$/see_fuzz.iml" />
+      <module fileurl="file://$PROJECT_DIR$/LibSOFL.iml" filepath="$PROJECT_DIR$/LibSOFL.iml" />
     </modules>
   </component>
 </project>
