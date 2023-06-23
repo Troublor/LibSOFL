@@ -112,7 +112,7 @@ impl Shr<u64> for TxPosition {
     fn shr(self, rhs: u64) -> Self::Output {
         let BlockHashOrNumber::Number(n) = self.block else { panic!("TxPosition::shr: block is a hash (not a number)")};
         Self {
-            block: BlockHashOrNumber::from(n + rhs),
+            block: BlockHashOrNumber::from(n.add(rhs)),
             index: 0,
         }
     }
@@ -123,7 +123,7 @@ impl ShrAssign<u64> for TxPosition {
     /// If the block is a hash, this will panic.
     fn shr_assign(&mut self, rhs: u64) {
         let BlockHashOrNumber::Number(n) = self.block else { panic!("TxPosition::shr_assign: block is a hash (not a number)")};
-        self.block = BlockHashOrNumber::from(n + rhs);
+        self.block = BlockHashOrNumber::from(n.add(rhs));
         self.index = 0;
     }
 }

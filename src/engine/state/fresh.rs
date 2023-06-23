@@ -23,6 +23,12 @@ impl FreshBcState {
     }
 }
 
+impl Default for FreshBcState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Deref for FreshBcState {
     type Target = CacheDB<EmptyDB>;
 

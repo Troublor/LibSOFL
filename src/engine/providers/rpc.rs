@@ -704,10 +704,11 @@ impl<P: JsonRpcClient> StateProviderFactory for JsonRpcBcProvider<P> {
     }
 }
 
+type CodeHashMap = Mutex<Option<Arc<Mutex<HashMap<H256, Bytecode>>>>>;
+
 /// Global map from code hash to code.
 /// This global mapping is possible because we assume unique code hash must map to unique code.
-static CODE_HASH_TO_CODE: Mutex<Option<Arc<Mutex<HashMap<H256, Bytecode>>>>> =
-    Mutex::new(None);
+static CODE_HASH_TO_CODE: CodeHashMap = Mutex::new(None);
 
 fn get_code_hash_map() -> Arc<Mutex<HashMap<H256, Bytecode>>> {
     let mut maybe_map = CODE_HASH_TO_CODE.lock().unwrap();
