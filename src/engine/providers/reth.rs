@@ -1,4 +1,4 @@
-use std::{fmt::Write, path::Path, sync::Arc};
+use std::{path::Path, sync::Arc};
 
 use reth_beacon_consensus::BeaconConsensus;
 use reth_blockchain_tree::{
@@ -71,8 +71,6 @@ impl BcProviderBuilder {
 #[cfg(test)]
 mod tests_with_db {
     use std::{path::Path, sync::Arc};
-
-    use reth_db::mdbx::{Env, WriteMap};
 
     use crate::config::flags::SoflConfig;
 

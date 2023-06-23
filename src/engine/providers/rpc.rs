@@ -288,11 +288,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             return Ok(None);
         }
         let block = block.unwrap();
-        let txs = block
-            .transactions
-            .iter()
-            .map(|tx| ToPrimitive::cvt(tx))
-            .collect();
+        let txs = block.transactions.iter().map(ToPrimitive::cvt).collect();
         Ok(Some(txs))
     }
 
@@ -380,7 +376,7 @@ impl<P: JsonRpcClient> ReceiptProvider for JsonRpcBcProvider<P> {
         let receipts = block
             .transactions
             .iter()
-            .map(|t| ToPrimitive::cvt(t))
+            .map(ToPrimitive::cvt)
             .map(|t| self.receipt_by_hash(t).unwrap().unwrap())
             .collect();
         Ok(Some(receipts))
@@ -531,8 +527,8 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
         block_env: &mut BlockEnv,
         header: &Header,
     ) -> rethResult<()> {
-        let _ = self.fill_cfg_env_with_header(cfg, header)?;
-        let _ = self.fill_block_env_with_header(block_env, header)?;
+        self.fill_cfg_env_with_header(cfg, header)?;
+        self.fill_block_env_with_header(block_env, header)?;
         Ok(())
     }
 

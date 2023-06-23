@@ -29,7 +29,7 @@ impl SoflConfig {
 
 #[cfg(test)]
 mod tests_nodep {
-    use std::{env, path::Path};
+    use std::path::Path;
 
     use crate::config::flags::SoflConfig;
 
