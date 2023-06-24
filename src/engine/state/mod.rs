@@ -4,13 +4,13 @@ use revm::{
     inspectors::NoOpInspector, Database, DatabaseCommit, Inspector, EVM,
 };
 use revm_primitives::{
-    db::DatabaseRef, BlockEnv, Bytes, CfgEnv, Eval, ExecutionResult, Output,
+    db::DatabaseRef, BlockEnv, Bytes, Eval, ExecutionResult, Output,
     ResultAndState,
 };
 
 use crate::error::SoflError;
 
-use super::transaction::TxOrPseudo;
+use super::{config::EngineConfig, transaction::TxOrPseudo};
 
 pub mod fork;
 pub mod fresh;
@@ -47,6 +47,7 @@ pub trait BcState<E = reth_interfaces::Error>:
     Database<Error = E> + DatabaseCommit + Sized + Debug
 {
     fn transact_with_evm<'a, S, I, T>(
+        cfg: &EngineConfig,
         mut evm: EVM<S>,
         tx: T,
         inspector: I,
@@ -82,55 +83,62 @@ pub trait BcState<E = reth_interfaces::Error>:
             TxOrPseudo::Tx(tx) => {
                 let sender = tx.from();
                 reth_revm::env::fill_tx_env(&mut evm.env.tx, &tx, sender);
+                if cfg.disable_nonce_check {
+                    evm.env.tx.nonce = None;
+                }
                 let result = evm.inspect(inspector).map_err(SoflError::Evm)?;
                 Ok((evm, result))
             }
         }
     }
 
-    fn transact<'a, 'b: 'a, I, T>(
+    fn transact<'a, 'b: 'a, C, I, T>(
         &'b mut self,
-        evm_cfg: CfgEnv,
+        cfg: C,
         block_env: BlockEnv,
         tx: T,
         inspector: I,
     ) -> Result<ResultAndState, SoflError<Self::Error>>
     where
+        C: Into<EngineConfig>,
         I: Inspector<&'a mut Self>,
         T: Into<TxOrPseudo<'a, &'a mut Self>>,
     {
+        let cfg = cfg.into();
         let tx = tx.into();
         let mut evm = EVM::new();
         if !tx.is_pseudo() {
-            evm.env.cfg = evm_cfg;
+            evm.env.cfg = (*cfg).clone();
             evm.env.block = block_env;
         }
         evm.database(self);
-        let (_, r) = Self::transact_with_evm(evm, tx, inspector)?;
+        let (_, r) = Self::transact_with_evm(&cfg, evm, tx, inspector)?;
         Ok(r)
     }
 
-    fn transit<'a, I, T>(
+    fn transit<'a, C, I, T>(
         self,
-        evm_cfg: CfgEnv,
+        cfg: C,
         block_env: BlockEnv,
         txs: Vec<T>,
         mut inspector: &mut I,
     ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self::Error>>
     where
         Self: 'a,
+        C: Into<EngineConfig>,
         I: Inspector<Self>,
         T: Into<TxOrPseudo<'a, Self>>,
     {
+        let cfg = cfg.into();
         let mut results = Vec::new();
         let mut evm = EVM::new();
-        evm.env.cfg = evm_cfg;
+        evm.env.cfg = (*cfg).clone();
         evm.env.block = block_env;
         evm.database(self);
         for tx in txs {
             let inspector = &mut inspector;
             let result;
-            (evm, result) = Self::transact_with_evm(evm, tx, inspector)?;
+            (evm, result) = Self::transact_with_evm(&cfg, evm, tx, inspector)?;
             // evm.db must exist since we called evm.database(state) above
             evm.db.as_mut().unwrap().commit(result.state);
             results.push(result.result);
@@ -140,43 +148,46 @@ pub trait BcState<E = reth_interfaces::Error>:
         Ok((db, results))
     }
 
-    fn transit_one<'a, I, T>(
+    fn transit_one<'a, C, I, T>(
         self,
-        evm_cfg: CfgEnv,
+        cfg: C,
         block_env: BlockEnv,
         tx: T,
         inspector: &'a mut I,
     ) -> Result<(Self, ExecutionResult), SoflError<Self::Error>>
     where
         Self: 'a,
+        C: Into<EngineConfig>,
         I: Inspector<Self>,
         T: Into<TxOrPseudo<'a, Self>>,
     {
         let (this, mut results) =
-            self.transit(evm_cfg, block_env, vec![tx], inspector)?;
+            self.transit(cfg, block_env, vec![tx], inspector)?;
         Ok((this, results.remove(0)))
     }
 
-    fn transit_inplace<'a, I, T>(
+    fn transit_inplace<'a, C, I, T>(
         &'a mut self,
-        evm_cfg: CfgEnv,
+        cfg: C,
         block_env: BlockEnv,
         txs: Vec<T>,
         mut inspector: &mut I,
     ) -> Result<Vec<ExecutionResult>, SoflError<Self::Error>>
     where
+        C: Into<EngineConfig>,
         I: Inspector<&'a mut Self>,
         T: Into<TxOrPseudo<'a, &'a mut Self>>,
     {
+        let cfg = cfg.into();
         let mut results = Vec::new();
         let mut evm = EVM::new();
-        evm.env.cfg = evm_cfg;
+        evm.env.cfg = (*cfg).clone();
         evm.env.block = block_env;
         evm.database(self);
         for tx in txs {
             let inspector = &mut inspector;
             let result;
-            (evm, result) = Self::transact_with_evm(evm, tx, inspector)?;
+            (evm, result) = Self::transact_with_evm(&cfg, evm, tx, inspector)?;
             // evm.db must exist since we called evm.database(state) above
             evm.db.as_mut().unwrap().commit(result.state);
             results.push(result.result);
@@ -185,20 +196,21 @@ pub trait BcState<E = reth_interfaces::Error>:
         // evm.db must exist since we called evm.database(state) above
         Ok(results)
     }
-    fn transit_one_inplace<'a, I, T>(
+    fn transit_one_inplace<'a, C, I, T>(
         &'a mut self,
-        evm_cfg: CfgEnv,
+        cfg: C,
         block_env: BlockEnv,
         tx: T,
         inspector: &mut I,
     ) -> Result<ExecutionResult, SoflError<Self::Error>>
     where
         Self: 'a,
+        C: Into<EngineConfig>,
         I: Inspector<&'a mut Self>,
         T: Into<TxOrPseudo<'a, &'a mut Self>>,
     {
         let mut results =
-            self.transit_inplace(evm_cfg, block_env, vec![tx], inspector)?;
+            self.transit_inplace(cfg, block_env, vec![tx], inspector)?;
         Ok(results.remove(0))
     }
 }

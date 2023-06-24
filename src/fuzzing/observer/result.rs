@@ -31,8 +31,6 @@ impl ExecutionResultObserver {
     }
 }
 
-impl<S: UsesInput> Observer<S> for ExecutionResultObserver {}
-
 impl Named for ExecutionResultObserver {
     fn name(&self) -> &str {
         "ExecutionResultObserver"

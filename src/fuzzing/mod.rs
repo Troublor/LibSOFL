@@ -64,7 +64,7 @@ mod tests_nodep {
             .fill_env_at(&mut cfg, &mut block, fork_at.block)
             .unwrap();
         let bc_state =
-            ForkedBcState::fork_from(&provider, fork_at.clone()).unwrap();
+            ForkedBcState::fork_at(&provider, fork_at.clone()).unwrap();
         let mut executor = TxExecutor::new(
             cfg,
             block,
@@ -84,10 +84,15 @@ mod tests_nodep {
         let mon = SimpleMonitor::new(|s| println!("{s}"));
         let mut mgr = SimpleEventManager::new(mon);
 
-        let input = generator.generate(&mut state).unwrap();
-        fuzzer
-            .evaluate_input(&mut state, &mut executor, &mut mgr, input)
-            .unwrap();
+        state
+            .generate_initial_inputs(
+                &mut fuzzer,
+                &mut executor,
+                &mut generator,
+                &mut mgr,
+                8,
+            )
+            .expect("Failed to generate the initial corpus");
         fuzzer
             .fuzz_loop(&mut stages, &mut executor, &mut state, &mut mgr)
             .expect("Error in the fuzzing loop");

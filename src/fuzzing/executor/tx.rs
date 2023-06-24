@@ -10,7 +10,10 @@ use libafl::{
 use revm_primitives::{BlockEnv, CfgEnv, ExecutionResult};
 
 use crate::{
-    engine::state::{no_inspector, BcState},
+    engine::{
+        config::EngineConfig,
+        state::{no_inspector, BcState},
+    },
     fuzzing::corpus::tx::TxInput,
 };
 
@@ -99,6 +102,9 @@ where
         input: &Self::Input,
     ) -> Result<libafl::prelude::ExitKind, libafl::Error> {
         let cfg = self.evm_cfg.clone();
+        let cfg = EngineConfig::from(cfg)
+            .toggle_nonce_check(false)
+            .toggle_balance_check(false);
         let block = self.block_env.clone();
         let tx = input.clone();
         let out = self

@@ -11,10 +11,7 @@ use revm_primitives::{
     HashMap, B160, B256, B256 as H256, U256,
 };
 
-use crate::{
-    engine::transaction::{Tx, TxOrPseudo, TxPosition},
-    error::SoflError,
-};
+use crate::{engine::transaction::TxPosition, error::SoflError};
 
 use super::{BcState, NoInspector};
 
