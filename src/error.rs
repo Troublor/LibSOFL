@@ -2,6 +2,14 @@ use crate::engine::transaction::TxPosition;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SoflError<DBERR = reth_interfaces::Error> {
+    /// Wrapper of abi encoding and decoding error
+    #[error("abi error: {0}")]
+    Abi(
+        #[from]
+        #[source]
+        ethers::abi::Error,
+    ),
+
     /// Wrapper of reth error
     #[error("reth error: {0}")]
     Reth(
@@ -9,6 +17,10 @@ pub enum SoflError<DBERR = reth_interfaces::Error> {
         #[source]
         reth_interfaces::Error,
     ),
+
+    /// Wrapper of Execution Result
+    #[error("execution result error: {0:?}")]
+    Exec(revm_primitives::ExecutionResult),
 
     /// Fork position not found
     #[error("fork position ({0}) not found")]

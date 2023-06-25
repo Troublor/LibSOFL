@@ -46,6 +46,17 @@ impl<E, T: Database<Error = E> + Sized> ReadonlyBcState<E> for T {}
 pub trait BcState<E = reth_interfaces::Error>:
     Database<Error = E> + DatabaseCommit + Sized + Debug
 {
+    fn transact_with_tx_filled<'a, S, I>(
+        evm: &mut EVM<S>,
+        inspector: I,
+    ) -> Result<ResultAndState, SoflError<S::Error>>
+    where
+        S: BcState<E> + 'a,
+        I: Inspector<S>,
+    {
+        evm.inspect(inspector).map_err(SoflError::Evm)
+    }
+
     fn transact_with_evm<'a, S, I, T>(
         cfg: &EngineConfig,
         mut evm: EVM<S>,
@@ -86,7 +97,8 @@ pub trait BcState<E = reth_interfaces::Error>:
                 if cfg.disable_nonce_check {
                     evm.env.tx.nonce = None;
                 }
-                let result = evm.inspect(inspector).map_err(SoflError::Evm)?;
+                let result =
+                    Self::transact_with_tx_filled(&mut evm, inspector)?;
                 Ok((evm, result))
             }
         }
