@@ -37,7 +37,7 @@ pub struct CheatCodes {
     env: Env,
     inspector: CheatcodeInspector,
 
-    // slot info
+    // slot info: (codehash, calldata) -> slot_state
     slots: BTreeMap<(B256, Bytes), SlotQueryResult>,
 }
 
@@ -80,7 +80,14 @@ impl CheatCodes {
         fsig: u32,
         args: &[Token],
         rtypes: &[ParamType],
+        force_tracing: Option<bool>,
     ) -> Result<Vec<Token>, SoflError<S::Err>> {
+        match force_tracing {
+            Some(true) => self.inspector.reset_access_recording(),
+            Some(false) => self.inspector.disable_access_recording(),
+            None => (),
+        }
+
         let data = pack_calldata(fsig, args);
 
         let result = self.low_level_call(state, Some(to), Some(data))?;
@@ -134,12 +141,9 @@ impl CheatCodes {
         fsig: u32,
         args: &[Token],
     ) -> Option<U256> {
-        // enable inspector to get the slot
-        self.inspector.reset_access_recording();
-
         // staticcall to get the slot, where we force the return type as u256
         let ret = self
-            .call(state, to, fsig, args, &[ParamType::Uint(256)])
+            .call(state, to, fsig, args, &[ParamType::Uint(256)], Some(true))
             .ok()?;
         let cdata = get_the_first_uint!(ret);
 
@@ -178,7 +182,14 @@ impl CheatCodes {
                     // we have to do another staticcall to check if the slot is correct,
                     // because changing the slot might change the program flow
                     let ret = self
-                        .call(state, to, fsig, args, &[ParamType::Uint(256)])
+                        .call(
+                            state,
+                            to,
+                            fsig,
+                            args,
+                            &[ParamType::Uint(256)],
+                            Some(false),
+                        )
                         .ok()?;
                     let cdata = get_the_first_uint!(ret);
 
@@ -198,13 +209,14 @@ impl CheatCodes {
     }
 }
 
-// cheatcode: staticcall
+// cheatcode: cheat_read
 impl CheatCodes {
     // staticcall with slot lookup
     // this function can only work if the target function:
     //  1) is a view function (i.e. does not modify the state)
     //  2) returns a single primitive value (e.g., uint256, address, etc.)
-    pub fn static_call<'a, 'b: 'a, S: BcState + 'b>(
+    //  3) is derived from a public storage variable
+    pub fn cheat_read<'a, 'b: 'a, S: BcState + 'b>(
         &'a mut self,
         state: &'b mut S,
         to: Address,
@@ -244,7 +256,7 @@ impl CheatCodes {
             }
         }
 
-        self.call(state, to, fsig, args, rtypes)
+        self.call(state, to, fsig, args, rtypes, Some(false))
     }
 
     fn decode_from_storage<'a, 'b: 'a, S: BcState + 'b>(
@@ -348,7 +360,7 @@ impl CheatCodes {
         account: Address,
     ) -> Result<U256, SoflError<S::Err>> {
         // signature: balanceOf(address) -> 0x70a08231
-        let result = self.static_call(
+        let result = self.cheat_read(
             state,
             token,
             0x70a08231u32,
@@ -365,7 +377,7 @@ impl CheatCodes {
         token: Address,
     ) -> Result<U256, SoflError<S::Err>> {
         // signature: totalSupply() -> 0x18160ddd
-        let result = self.static_call(
+        let result = self.cheat_read(
             state,
             token,
             0x18160dddu32,
@@ -382,7 +394,7 @@ impl CheatCodes {
         token: Address,
     ) -> Result<U256, SoflError<S::Err>> {
         // signature: decimals() -> 0x313ce567
-        let result = self.static_call(
+        let result = self.cheat_read(
             state,
             token,
             0x313ce567u32,
@@ -402,9 +414,7 @@ impl CheatCodes {
         address: Address,
         balance: U256,
     ) -> Result<Option<U256>, SoflError<S::Err>> {
-        let mut account_info = state.basic(address)?.ok_or(
-            SoflError::Custom("account does not have code".to_string()),
-        )?;
+        let mut account_info = state.basic(address)?.unwrap_or_default();
         let old_balance = account_info.balance;
 
         if old_balance == balance {
@@ -436,6 +446,7 @@ impl CheatCodes {
             // we need to update total supply
             let total_supply = self.get_erc20_total_supply(state, token)?;
 
+            // signature: totalSupply() -> 0x18160ddd
             self.cheat_write(
                 state,
                 token,
@@ -455,7 +466,6 @@ impl CheatCodes {
 mod tests_with_db {
     use std::{path::Path, str::FromStr};
 
-    use ethers::prelude::k256::elliptic_curve::consts::U2;
     use reth_primitives::Address;
     use revm_primitives::U256;
 

@@ -1,5 +1,3 @@
-use reth_primitives::Address;
-
 use crate::engine::transaction::TxPosition;
 
 #[derive(Debug, thiserror::Error)]
