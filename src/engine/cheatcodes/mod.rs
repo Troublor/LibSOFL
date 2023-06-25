@@ -73,9 +73,9 @@ impl CheatCodes {
         }
     }
 
-    pub fn call<'a, 'b: 'a, S: BcState + 'b>(
-        &'a mut self,
-        state: &'b mut S,
+    pub fn call<S: BcState>(
+        &mut self,
+        state: &mut S,
         to: Address,
         fsig: u32,
         args: &[Token],
@@ -100,9 +100,9 @@ impl CheatCodes {
         }
     }
 
-    fn low_level_call<'a, 'b: 'a, S: BcState + 'b>(
-        &'a mut self,
-        state: &'b mut S,
+    fn low_level_call<S: BcState>(
+        &mut self,
+        state: &mut S,
         to: Option<Address>,
         data: Option<Bytes>,
     ) -> Result<ResultAndState, SoflError<S::Err>> {
@@ -134,9 +134,9 @@ impl CheatCodes {
         };
     }
 
-    fn find_slot<'a, 'b: 'a, S: BcState + 'b>(
-        &'a mut self,
-        state: &'b mut S,
+    fn find_slot<S: BcState>(
+        &mut self,
+        state: &mut S,
         to: Address,
         fsig: u32,
         args: &[Token],
@@ -179,7 +179,7 @@ impl CheatCodes {
                         .insert_account_storage(to, slot, magic)
                         .expect("insert should not fail");
 
-                    // we have to do another staticcall to check if the slot is correct,
+                    // we have to do another call to check if the slot is correct,
                     // because changing the slot might change the program flow
                     let ret = self
                         .call(
@@ -216,9 +216,9 @@ impl CheatCodes {
     //  1) is a view function (i.e. does not modify the state)
     //  2) returns a single primitive value (e.g., uint256, address, etc.)
     //  3) is derived from a public storage variable
-    pub fn cheat_read<'a, 'b: 'a, S: BcState + 'b>(
-        &'a mut self,
-        state: &'b mut S,
+    pub fn cheat_read<S: BcState>(
+        &mut self,
+        state: &mut S,
         to: Address,
         fsig: u32,
         args: &[Token],
@@ -259,8 +259,8 @@ impl CheatCodes {
         self.call(state, to, fsig, args, rtypes, Some(false))
     }
 
-    fn decode_from_storage<'a, 'b: 'a, S: BcState + 'b>(
-        state: &'b mut S,
+    fn decode_from_storage<S: BcState>(
+        state: &mut S,
         to: Address,
         slot: U256,
         rtypes: &[ParamType],
@@ -278,9 +278,9 @@ impl CheatCodes {
 
 // cheatcode: cheat_write
 impl CheatCodes {
-    pub fn cheat_write<'a, 'b: 'a, S: BcState + 'b>(
-        &'a mut self,
-        state: &'b mut S,
+    pub fn cheat_write<S: BcState>(
+        &mut self,
+        state: &mut S,
         to: Address,
         fsig: u32,
         args: &[Token],
@@ -324,8 +324,8 @@ impl CheatCodes {
         }
     }
 
-    fn write_or_err<'a, 'b: 'a, S: BcState + 'b>(
-        state: &'b mut S,
+    fn write_or_err<S: BcState>(
+        state: &mut S,
         to: Address,
         slot: U256,
         data: U256,
