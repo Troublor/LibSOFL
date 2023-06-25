@@ -32,16 +32,12 @@ pub struct CheatcodeInspector {
 }
 
 impl CheatcodeInspector {
-    pub fn new() -> Self {
-        Self { accesses: None }
+    pub fn reset_access_recording(&mut self) {
+        self.accesses = Some(RecordAccess::default());
     }
 
-    pub fn toggle_access_recording(&mut self, enable: bool) {
-        if enable {
-            self.accesses = Some(RecordAccess::default());
-        } else {
-            self.accesses = None;
-        }
+    pub fn disable_access_recording(&mut self) {
+        self.accesses = None;
     }
 }
 

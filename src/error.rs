@@ -1,7 +1,13 @@
+use reth_primitives::Address;
+
 use crate::engine::transaction::TxPosition;
 
 #[derive(Debug, thiserror::Error)]
 pub enum SoflError<DBERR = reth_interfaces::Error> {
+    /// Custom error
+    #[error("custom error: {0:?}")]
+    Custom(String),
+
     /// Wrapper of abi encoding and decoding error
     #[error("abi error: {0}")]
     Abi(

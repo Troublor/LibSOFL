@@ -7,6 +7,7 @@ use libsofl::engine::providers::BcProviderBuilder;
 use libsofl::engine::state::fork::ForkedBcState;
 use libsofl::engine::transaction::TxPosition;
 use reth_primitives::Address;
+use revm_primitives::U256;
 
 fn main() {
     let datadir = SoflConfig::load().unwrap().reth.datadir;
@@ -24,8 +25,34 @@ fn main() {
         Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
             .unwrap();
 
-    let balance = cheatcode
-        .get_token_balance(&mut state, token, account)
+    {
+        let balance = cheatcode
+            .get_erc20_balance(&mut state, token, account)
+            .unwrap();
+        println!("balance: {} {} : {}", token, account, balance);
+
+        let total_supply =
+            cheatcode.get_erc20_total_supply(&mut state, token).unwrap();
+        println!("total supply: {} : {}", token, total_supply);
+
+        let decimals = cheatcode.get_erc20_decimals(&mut state, token).unwrap();
+        println!("decimals: {} : {}", token, decimals);
+    }
+
+    cheatcode
+        .set_erc20_balance(&mut state, token, account, U256::from(1234567))
         .unwrap();
-    println!("{} {} : {}", token, account, balance);
+    {
+        let balance = cheatcode
+            .get_erc20_balance(&mut state, token, account)
+            .unwrap();
+        println!("balance: {} {} : {}", token, account, balance);
+
+        let total_supply =
+            cheatcode.get_erc20_total_supply(&mut state, token).unwrap();
+        println!("total supply: {} : {}", token, total_supply);
+
+        let decimals = cheatcode.get_erc20_decimals(&mut state, token).unwrap();
+        println!("decimals: {} : {}", token, decimals);
+    }
 }

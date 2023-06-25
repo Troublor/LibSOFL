@@ -6,8 +6,8 @@ use revm::{
     inspectors::NoOpInspector, Database, DatabaseCommit, Inspector, EVM,
 };
 use revm_primitives::{
-    db::DatabaseRef, BlockEnv, Bytes, Eval, ExecutionResult, Output,
-    ResultAndState, U256,
+    db::DatabaseRef, AccountInfo, BlockEnv, Bytes, Eval, ExecutionResult,
+    Output, ResultAndState, U256,
 };
 
 use crate::error::SoflError;
@@ -51,6 +51,8 @@ pub trait DatabaseEditable {
         slot: U256,
         value: U256,
     ) -> Result<(), Self::Err>;
+
+    fn insert_account_info(&mut self, address: Address, info: AccountInfo);
 }
 
 // Auto implement ReadonlyBcState for all types that implement Database

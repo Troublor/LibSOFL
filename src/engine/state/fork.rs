@@ -150,6 +150,10 @@ impl<'a> DatabaseEditable for ForkedBcState<'a> {
     ) -> Result<(), Self::Err> {
         self.0.insert_account_storage(address, slot, value)
     }
+
+    fn insert_account_info(&mut self, address: B160, mut info: AccountInfo) {
+        self.0.insert_account_info(address, info)
+    }
 }
 
 /// Delegate as revm Database

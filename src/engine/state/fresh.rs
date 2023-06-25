@@ -60,6 +60,10 @@ impl AsMut<CacheDB<EmptyDB>> for FreshBcState {
 impl DatabaseEditable for FreshBcState {
     type Err = Infallible;
 
+    fn insert_account_info(&mut self, address: B160, mut info: AccountInfo) {
+        self.0.insert_account_info(address, info)
+    }
+
     fn insert_account_storage(
         &mut self,
         address: Address,
