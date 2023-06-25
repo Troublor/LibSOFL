@@ -13,7 +13,7 @@ use revm_primitives::{
 
 use crate::{engine::transaction::TxPosition, error::SoflError};
 
-use super::{BcState, NoInspector};
+use super::{BcState, DatabaseEditable, NoInspector};
 
 /// Abstraction of the forked state in revm that can be cloned.
 /// This type implements both BcState and BcStateGround
@@ -136,6 +136,19 @@ impl<'a> ForkedBcState<'a> {
         let mut pos_mut = pos.clone();
         pos_mut.shift(p, 1).map_err(|_| SoflError::Fork(pos))?;
         Self::fork_at(p, pos_mut)
+    }
+}
+
+impl<'a> DatabaseEditable for ForkedBcState<'a> {
+    type Err = reth_interfaces::Error;
+
+    fn insert_account_storage(
+        &mut self,
+        address: Address,
+        slot: U256,
+        value: U256,
+    ) -> Result<(), Self::Err> {
+        self.0.insert_account_storage(address, slot, value)
     }
 }
 

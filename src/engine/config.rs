@@ -1,4 +1,4 @@
-use derive_more::{AsMut, AsRef, Deref, DerefMut, From};
+use derive_more::{AsMut, AsRef, Deref, DerefMut};
 use revm_primitives::CfgEnv;
 
 #[derive(

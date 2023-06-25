@@ -1,11 +1,13 @@
 use std::fmt::Debug;
 
+use auto_impl::auto_impl;
+use reth_primitives::Address;
 use revm::{
     inspectors::NoOpInspector, Database, DatabaseCommit, Inspector, EVM,
 };
 use revm_primitives::{
     db::DatabaseRef, BlockEnv, Bytes, Eval, ExecutionResult, Output,
-    ResultAndState,
+    ResultAndState, U256,
 };
 
 use crate::error::SoflError;
@@ -39,17 +41,29 @@ pub trait ReadonlyBcState<E = reth_interfaces::Error>:
 {
 }
 
+#[auto_impl(& mut, Box)]
+pub trait DatabaseEditable {
+    type Err;
+
+    fn insert_account_storage(
+        &mut self,
+        address: Address,
+        slot: U256,
+        value: U256,
+    ) -> Result<(), Self::Err>;
+}
+
 // Auto implement ReadonlyBcState for all types that implement Database
 impl<E, T: Database<Error = E> + Sized> ReadonlyBcState<E> for T {}
 
 // Abstraction of blockchain state
 pub trait BcState<E = reth_interfaces::Error>:
-    Database<Error = E> + DatabaseCommit + Sized + Debug
+    Database<Error = E> + DatabaseEditable<Err = E> + DatabaseCommit + Sized + Debug
 {
     fn transact_with_tx_filled<'a, S, I>(
         evm: &mut EVM<S>,
         inspector: I,
-    ) -> Result<ResultAndState, SoflError<S::Error>>
+    ) -> Result<ResultAndState, SoflError<S::Err>>
     where
         S: BcState<E> + 'a,
         I: Inspector<S>,
@@ -62,7 +76,7 @@ pub trait BcState<E = reth_interfaces::Error>:
         mut evm: EVM<S>,
         tx: T,
         inspector: I,
-    ) -> Result<(EVM<S>, ResultAndState), SoflError<S::Error>>
+    ) -> Result<(EVM<S>, ResultAndState), SoflError<S::Err>>
     where
         S: BcState<E> + 'a,
         I: Inspector<S>,
@@ -228,7 +242,13 @@ pub trait BcState<E = reth_interfaces::Error>:
 }
 
 // Auto implement BcState for all types that implement Database and DatabaseCommit
-impl<E, T: Database<Error = E> + DatabaseCommit + Sized + Debug> BcState<E>
-    for T
+impl<
+        E,
+        T: Database<Error = E>
+            + DatabaseCommit
+            + DatabaseEditable<Err = E>
+            + Sized
+            + Debug,
+    > BcState<E> for T
 {
 }

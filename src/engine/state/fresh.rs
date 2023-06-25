@@ -12,6 +12,8 @@ use revm_primitives::{
     db::DatabaseRef, Account, AccountInfo, Bytecode, HashMap, B160, B256, U256,
 };
 
+use super::DatabaseEditable;
+
 /// A blockchain state that is empty and complete in memory.
 #[derive(Debug)]
 pub struct FreshBcState(CacheDB<EmptyDB>);
@@ -52,6 +54,19 @@ impl AsRef<CacheDB<EmptyDB>> for FreshBcState {
 impl AsMut<CacheDB<EmptyDB>> for FreshBcState {
     fn as_mut(&mut self) -> &mut CacheDB<EmptyDB> {
         todo!()
+    }
+}
+
+impl DatabaseEditable for FreshBcState {
+    type Err = Infallible;
+
+    fn insert_account_storage(
+        &mut self,
+        address: Address,
+        slot: U256,
+        value: U256,
+    ) -> Result<(), Self::Err> {
+        self.0.insert_account_storage(address, slot, value)
     }
 }
 
@@ -222,7 +237,10 @@ mod tests_nodep {
     fn test_pseudo_tx() {
         let account = Address::from(0);
         let tx_lambda = |_state: &FreshBcState| {
-            let mut changes = StateChange::default();
+            let mut changes: revm_primitives::HashMap<
+                revm_primitives::B160,
+                Account,
+            > = StateChange::default();
             let mut change = Account::new_not_existing();
             change.is_not_existing = false;
             change.info.balance = U256::from(1000);

@@ -2,10 +2,10 @@ use std::path::Path;
 use std::str::FromStr;
 
 use libsofl::config::flags::SoflConfig;
+use libsofl::engine::cheatcodes::CheatCodes;
 use libsofl::engine::providers::BcProviderBuilder;
 use libsofl::engine::state::fork::ForkedBcState;
 use libsofl::engine::transaction::TxPosition;
-use libsofl::utils::cheatcodes::CheatCodes;
 use reth_primitives::Address;
 
 fn main() {
