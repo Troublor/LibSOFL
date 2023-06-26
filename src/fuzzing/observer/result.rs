@@ -1,35 +1,46 @@
-use libafl::{
-    prelude::{Named, Observer, UsesInput},
-    state::UsesState,
-};
-use revm_primitives::{ExecutionResult, Halt};
+use libafl::prelude::{Named, Observer, UsesInput};
+use revm_primitives::ExecutionResult;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Serialize, Deserialize)]
+use crate::engine::state::{no_inspector, BcState, NoInspector};
+
+use super::EvmObserver;
+
+#[derive(Debug, Serialize, Deserialize, Default)]
 pub struct ExecutionResultObserver {
-    result: ExecutionResult,
+    pub results: Vec<ExecutionResult>,
 }
 
-impl ExecutionResultObserver {
-    pub fn new() -> Self {
-        ExecutionResultObserver {
-            result: ExecutionResult::Halt {
-                reason: Halt::NotActivated,
-                gas_used: 0,
-            },
-        }
+impl<S: UsesInput> Observer<S> for ExecutionResultObserver {
+    fn pre_exec(
+        &mut self,
+        _state: &mut S,
+        _input: &<S as UsesInput>::Input,
+    ) -> Result<(), libafl::Error> {
+        self.results.clear();
+        Ok(())
     }
 }
 
-impl<S: UsesInput> Observer<S> for ExecutionResultObserver {}
-
-impl ExecutionResultObserver {
-    pub fn set_result(&mut self, result: ExecutionResult) {
-        self.result = result;
+impl<S: UsesInput, BS: BcState<E>, E> EvmObserver<S, BS, E, NoInspector>
+    for ExecutionResultObserver
+{
+    fn on_execution_result(
+        &mut self,
+        _result: ExecutionResult,
+        _input: &S::Input,
+        _index: u32,
+    ) -> Result<(), libafl::Error> {
+        self.results.push(_result);
+        Ok(())
     }
 
-    pub fn get_result(&self) -> &ExecutionResult {
-        &self.result
+    fn get_inspector(
+        &mut self,
+        _input: &S::Input,
+        _index: u32,
+    ) -> Result<&mut NoInspector, libafl::Error> {
+        Ok(no_inspector())
     }
 }
 

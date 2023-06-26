@@ -44,7 +44,7 @@ mod tests_nodep {
         let fork_at = TxPosition::new(14000000, 0);
         let contract: Address =
             ToPrimitive::cvt("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
-        let observer = ExecutionResultObserver::new();
+        let observer = ExecutionResultObserver::default();
         let mut feedback = AssertionFeedback::new();
         let mut objective = AssertionFeedback::new();
         let mut state = StdState::new(

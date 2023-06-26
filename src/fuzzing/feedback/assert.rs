@@ -36,9 +36,10 @@ impl<S: UsesInput + HasClientPerfMonitor> Feedback<S> for AssertionFeedback {
     {
         let obs: &ExecutionResultObserver =
             observers.match_name("ExecutionResultObserver").unwrap();
-        match obs.get_result() {
-            ExecutionResult::Halt { .. } => Ok(true),
-            _ => Ok(false),
-        }
+        let r = obs
+            .results
+            .iter()
+            .any(|r| matches!(r, ExecutionResult::Halt { .. }));
+        Ok(r)
     }
 }
