@@ -21,6 +21,8 @@ impl ExecutionResultObserver {
     }
 }
 
+impl<S: UsesInput> Observer<S> for ExecutionResultObserver {}
+
 impl ExecutionResultObserver {
     pub fn set_result(&mut self, result: ExecutionResult) {
         self.result = result;
