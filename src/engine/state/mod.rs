@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{convert::Infallible, fmt::Debug};
 
 use auto_impl::auto_impl;
 use reth_primitives::Address;
@@ -16,15 +16,6 @@ use super::{config::EngineConfig, transaction::TxOrPseudo};
 
 pub mod fork;
 pub mod fresh;
-
-/// NoInspector is used as a placeholder for type parameters when no inspector is needed.
-pub type NoInspector = NoOpInspector;
-
-pub static mut NO_INSPECTOR: NoInspector = NoInspector {};
-pub fn no_inspector() -> &'static mut NoInspector {
-    // unsafe is ok here since NoInspector is essential a no-op inspector
-    unsafe { &mut NO_INSPECTOR }
-}
 
 // Abstration of the forked state from which the blockchain state is built upon.
 pub trait BcStateGround<E = reth_interfaces::Error>:

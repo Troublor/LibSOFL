@@ -10,10 +10,7 @@ use libafl::{
 use revm_primitives::{BlockEnv, CfgEnv, ExecutionResult};
 
 use crate::{
-    engine::{
-        config::EngineConfig,
-        state::{no_inspector, BcState},
-    },
+    engine::{config::EngineConfig, inspectors::no_inspector, state::BcState},
     fuzzing::corpus::tx::TxInput,
 };
 

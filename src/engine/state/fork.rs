@@ -11,9 +11,12 @@ use revm_primitives::{
     HashMap, B160, B256, B256 as H256, U256,
 };
 
-use crate::{engine::transaction::TxPosition, error::SoflError};
+use crate::{
+    engine::{inspectors::no_inspector, transaction::TxPosition},
+    error::SoflError,
+};
 
-use super::{BcState, DatabaseEditable, NoInspector};
+use super::{BcState, DatabaseEditable};
 
 /// Abstraction of the forked state in revm that can be cloned.
 /// This type implements both BcState and BcStateGround
@@ -118,7 +121,7 @@ impl<'a> ForkedBcState<'a> {
                     evm_cfg.clone(),
                     block_env.clone(),
                     tx,
-                    NoInspector {},
+                    no_inspector(),
                 )?;
                 this.commit(r.state);
             }
@@ -231,9 +234,8 @@ mod tests_with_db {
     use crate::{
         config::flags::SoflConfig,
         engine::{
-            providers::BcProviderBuilder,
-            state::{no_inspector, BcState},
-            transaction::TxPosition,
+            inspectors::no_inspector, providers::BcProviderBuilder,
+            state::BcState, transaction::TxPosition,
         },
     };
 
@@ -292,8 +294,9 @@ mod tests_with_jsonrpc {
     use crate::{
         config::flags::SoflConfig,
         engine::{
+            inspectors::no_inspector,
             providers::BcProviderBuilder,
-            state::{fork::ForkedBcState, no_inspector, BcState},
+            state::{fork::ForkedBcState, BcState},
             transaction::TxPosition,
         },
         utils::conversion::{Convert, ToPrimitive},

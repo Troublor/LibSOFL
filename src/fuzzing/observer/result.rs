@@ -2,7 +2,10 @@ use libafl::prelude::{Named, Observer, UsesInput};
 use revm_primitives::ExecutionResult;
 use serde::{Deserialize, Serialize};
 
-use crate::engine::state::{no_inspector, BcState, NoInspector};
+use crate::engine::{
+    inspectors::{no_inspector, NoInspector},
+    state::BcState,
+};
 
 use super::EvmObserver;
 

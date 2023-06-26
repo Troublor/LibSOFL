@@ -149,7 +149,8 @@ mod tests_nodep {
     };
 
     use crate::engine::{
-        state::{no_inspector, BcState},
+        inspectors::no_inspector,
+        state::BcState,
         transaction::{StateChange, Tx, TxOrPseudo},
     };
 
