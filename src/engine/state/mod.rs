@@ -1,10 +1,8 @@
-use std::{convert::Infallible, fmt::Debug};
+use std::{error::Error, fmt::Debug};
 
 use auto_impl::auto_impl;
 use reth_primitives::Address;
-use revm::{
-    inspectors::NoOpInspector, Database, DatabaseCommit, Inspector, EVM,
-};
+use revm::{Database, DatabaseCommit, Inspector, EVM};
 use revm_primitives::{
     db::DatabaseRef, AccountInfo, BlockEnv, Bytes, Eval, ExecutionResult,
     Output, ResultAndState, U256,
@@ -18,19 +16,13 @@ pub mod fork;
 pub mod fresh;
 
 // Abstration of the forked state from which the blockchain state is built upon.
-pub trait BcStateGround<E = reth_interfaces::Error>:
-    DatabaseRef<Error = E> + Sized
-{
-}
+pub trait BcStateGround: DatabaseRef + Sized {}
 
 // Auto implement BcStateGround for all types that implement DatabaseRef
-impl<E, T: DatabaseRef<Error = E> + Sized> BcStateGround<E> for T {}
+impl<T: DatabaseRef + Sized> BcStateGround for T {}
 
 // Abstraction of the readonly blockchain state
-pub trait ReadonlyBcState<E = reth_interfaces::Error>:
-    Database<Error = E> + Sized
-{
-}
+pub trait ReadonlyBcState: Database + Sized {}
 
 #[auto_impl(& mut, Box)]
 pub trait DatabaseEditable {
@@ -47,18 +39,24 @@ pub trait DatabaseEditable {
 }
 
 // Auto implement ReadonlyBcState for all types that implement Database
-impl<E, T: Database<Error = E> + Sized> ReadonlyBcState<E> for T {}
+impl<T: Database + Sized> ReadonlyBcState for T {}
 
 // Abstraction of blockchain state
-pub trait BcState<E = reth_interfaces::Error>:
-    Database<Error = E> + DatabaseEditable<Err = E> + DatabaseCommit + Sized + Debug
+pub trait BcState:
+    Database<Error = Self::DbErr>
+    + DatabaseEditable<Err = Self::DbErr>
+    + DatabaseCommit
+    + Sized
+    + Debug
 {
+    type DbErr: Debug + Error;
+
     fn transact_with_tx_filled<'a, S, I>(
         evm: &mut EVM<S>,
         inspector: I,
-    ) -> Result<ResultAndState, SoflError<S::Err>>
+    ) -> Result<ResultAndState, SoflError<S>>
     where
-        S: BcState<E> + 'a,
+        S: BcState + 'a,
         I: Inspector<S>,
     {
         evm.inspect(inspector).map_err(SoflError::Evm)
@@ -69,9 +67,9 @@ pub trait BcState<E = reth_interfaces::Error>:
         mut evm: EVM<S>,
         tx: T,
         inspector: I,
-    ) -> Result<(EVM<S>, ResultAndState), SoflError<S::Err>>
+    ) -> Result<(EVM<S>, ResultAndState), SoflError<S>>
     where
-        S: BcState<E> + 'a,
+        S: BcState + 'a,
         I: Inspector<S>,
         T: Into<TxOrPseudo<'a, S>>,
     {
@@ -117,7 +115,7 @@ pub trait BcState<E = reth_interfaces::Error>:
         block_env: BlockEnv,
         tx: T,
         inspector: I,
-    ) -> Result<ResultAndState, SoflError<Self::Error>>
+    ) -> Result<ResultAndState, SoflError<&mut Self>>
     where
         C: Into<EngineConfig>,
         I: Inspector<&'a mut Self>,
@@ -141,7 +139,7 @@ pub trait BcState<E = reth_interfaces::Error>:
         block_env: BlockEnv,
         txs: Vec<T>,
         mut inspector: &mut I,
-    ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self::Error>>
+    ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self>>
     where
         Self: 'a,
         C: Into<EngineConfig>,
@@ -173,7 +171,7 @@ pub trait BcState<E = reth_interfaces::Error>:
         block_env: BlockEnv,
         tx: T,
         inspector: &'a mut I,
-    ) -> Result<(Self, ExecutionResult), SoflError<Self::Error>>
+    ) -> Result<(Self, ExecutionResult), SoflError<Self>>
     where
         Self: 'a,
         C: Into<EngineConfig>,
@@ -191,7 +189,7 @@ pub trait BcState<E = reth_interfaces::Error>:
         block_env: BlockEnv,
         txs: Vec<T>,
         mut inspector: &mut I,
-    ) -> Result<Vec<ExecutionResult>, SoflError<Self::Error>>
+    ) -> Result<Vec<ExecutionResult>, SoflError<&mut Self>>
     where
         C: Into<EngineConfig>,
         I: Inspector<&'a mut Self>,
@@ -221,7 +219,7 @@ pub trait BcState<E = reth_interfaces::Error>:
         block_env: BlockEnv,
         tx: T,
         inspector: &mut I,
-    ) -> Result<ExecutionResult, SoflError<Self::Error>>
+    ) -> Result<ExecutionResult, SoflError<&mut Self>>
     where
         Self: 'a,
         C: Into<EngineConfig>,
@@ -235,13 +233,6 @@ pub trait BcState<E = reth_interfaces::Error>:
 }
 
 // Auto implement BcState for all types that implement Database and DatabaseCommit
-impl<
-        E,
-        T: Database<Error = E>
-            + DatabaseCommit
-            + DatabaseEditable<Err = E>
-            + Sized
-            + Debug,
-    > BcState<E> for T
-{
+impl<T: BcState> BcState for &mut T {
+    type DbErr = T::DbErr;
 }

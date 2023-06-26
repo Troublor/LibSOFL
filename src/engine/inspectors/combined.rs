@@ -8,12 +8,11 @@ use revm_primitives::{Bytes, B160, B256};
 
 use crate::engine::state::BcState;
 
-pub struct CombinedInspector<BS: BcState<E>, E> {
+pub struct CombinedInspector<BS: BcState> {
     inspectors: Vec<Box<dyn Inspector<BS>>>,
-    _phantom: std::marker::PhantomData<E>,
 }
 
-impl<BS: BcState<E>, E> Inspector<BS> for CombinedInspector<BS, E> {
+impl<BS: BcState> Inspector<BS> for CombinedInspector<BS> {
     #[doc = " Called Before the interpreter is initialized."]
     #[doc = ""]
     #[doc = " If anything other than [InstructionResult::Continue] is returned then execution of the interpreter is"]

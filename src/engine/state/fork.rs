@@ -76,7 +76,7 @@ impl<'a> ForkedBcState<'a> {
     /// fork from the current latest blockchain state
     pub fn latest<P: StateProviderFactory>(
         p: &'a P,
-    ) -> Result<Self, SoflError> {
+    ) -> Result<Self, SoflError<Self>> {
         let sp = p.latest().map_err(SoflError::Reth)?;
         let wrapped = WrappedDB::new(sp);
         let state = CacheDB::new(Arc::new(wrapped));
@@ -89,7 +89,7 @@ impl<'a> ForkedBcState<'a> {
     >(
         p: &'a P,
         pos: TxPosition,
-    ) -> Result<Self, SoflError> {
+    ) -> Result<Self, SoflError<&mut Self>> {
         let pos_cp = pos.clone();
         let bn = pos
             .get_block_number(p)
@@ -135,11 +135,15 @@ impl<'a> ForkedBcState<'a> {
     >(
         p: &'a P,
         pos: TxPosition,
-    ) -> Result<Self, SoflError> {
+    ) -> Result<Self, SoflError<&mut Self>> {
         let mut pos_mut = pos.clone();
         pos_mut.shift(p, 1).map_err(|_| SoflError::Fork(pos))?;
         Self::fork_at(p, pos_mut)
     }
+}
+
+impl<'a> BcState for ForkedBcState<'a> {
+    type DbErr = reth_interfaces::Error;
 }
 
 impl<'a> DatabaseEditable for ForkedBcState<'a> {

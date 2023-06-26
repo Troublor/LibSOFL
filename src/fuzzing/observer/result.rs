@@ -25,7 +25,7 @@ impl<S: UsesInput> Observer<S> for ExecutionResultObserver {
     }
 }
 
-impl<S: UsesInput, BS: BcState<E>, E> EvmObserver<S, BS, E, NoInspector>
+impl<S: UsesInput, BS: BcState> EvmObserver<S, BS, NoInspector>
     for ExecutionResultObserver
 {
     fn on_execution_result(

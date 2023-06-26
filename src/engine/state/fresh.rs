@@ -12,7 +12,7 @@ use revm_primitives::{
     db::DatabaseRef, Account, AccountInfo, Bytecode, HashMap, B160, B256, U256,
 };
 
-use super::DatabaseEditable;
+use super::{BcState, DatabaseEditable};
 
 /// A blockchain state that is empty and complete in memory.
 #[derive(Debug)]
@@ -55,6 +55,10 @@ impl AsMut<CacheDB<EmptyDB>> for FreshBcState {
     fn as_mut(&mut self) -> &mut CacheDB<EmptyDB> {
         todo!()
     }
+}
+
+impl BcState for FreshBcState {
+    type DbErr = Infallible;
 }
 
 impl DatabaseEditable for FreshBcState {

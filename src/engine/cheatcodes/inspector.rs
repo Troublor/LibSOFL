@@ -43,7 +43,7 @@ impl CheatcodeInspector {
 
 impl<DB> Inspector<DB> for CheatcodeInspector
 where
-    DB: Database<Error = reth_interfaces::Error>,
+    DB: Database,
 {
     #[doc = " Called on each step of the interpreter."]
     #[doc = ""]

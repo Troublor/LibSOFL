@@ -12,10 +12,10 @@ use crate::engine::state::BcState;
 
 pub mod result;
 
-pub trait EvmObserver<S, BS, E, I>: Observer<S>
+pub trait EvmObserver<S, BS, I>: Observer<S>
 where
     S: UsesInput,
-    BS: BcState<E>,
+    BS: BcState,
     I: Inspector<BS>,
 {
     /// Get the EVM inspector of associated with observer.
@@ -46,16 +46,16 @@ where
 }
 
 #[derive(Default, Deref, DerefMut, AsRef, AsMut)]
-pub struct EvmObservers<S, BS, E, I>(Vec<Box<dyn EvmObserver<S, BS, E, I>>>)
+pub struct EvmObservers<S, BS, I>(Vec<Box<dyn EvmObserver<S, BS, I>>>)
 where
     S: UsesInput,
-    BS: BcState<E>,
+    BS: BcState,
     I: Inspector<BS>;
 
-impl<S, BS, E, I> Debug for EvmObservers<S, BS, E, I>
+impl<S, BS, I> Debug for EvmObservers<S, BS, I>
 where
     S: UsesInput,
-    BS: BcState<E>,
+    BS: BcState,
     I: Inspector<BS>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -66,10 +66,10 @@ where
         debug_struct.finish()
     }
 }
-impl<S, BS, E, I> EvmObservers<S, BS, E, I>
+impl<S, BS, I> EvmObservers<S, BS, I>
 where
     S: UsesInput,
-    BS: BcState<E>,
+    BS: BcState,
     I: Inspector<BS>,
 {
     pub fn get_inspector(
@@ -89,10 +89,10 @@ where
         todo!()
     }
 }
-impl<S, BS, E, I> MatchName for EvmObservers<S, BS, E, I>
+impl<S, BS, I> MatchName for EvmObservers<S, BS, I>
 where
     S: UsesInput,
-    BS: BcState<E>,
+    BS: BcState,
     I: Inspector<BS>,
 {
     fn match_name<T>(&self, name: &str) -> Option<&T> {
@@ -108,10 +108,10 @@ where
     }
 }
 
-impl<S, BS, E, I> ObserversTuple<S> for EvmObservers<S, BS, E, I>
+impl<S, BS, I> ObserversTuple<S> for EvmObservers<S, BS, I>
 where
     S: UsesInput,
-    BS: BcState<E>,
+    BS: BcState,
     I: Inspector<BS>,
 {
     fn pre_exec_all(

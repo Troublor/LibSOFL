@@ -81,7 +81,7 @@ impl CheatCodes {
         args: &[Token],
         rtypes: &[ParamType],
         force_tracing: Option<bool>,
-    ) -> Result<Vec<Token>, SoflError<S::Err>> {
+    ) -> Result<Vec<Token>, SoflError<&mut S>> {
         match force_tracing {
             Some(true) => self.inspector.reset_access_recording(),
             Some(false) => self.inspector.disable_access_recording(),
@@ -105,7 +105,7 @@ impl CheatCodes {
         state: &mut S,
         to: Option<Address>,
         data: Option<Bytes>,
-    ) -> Result<ResultAndState, SoflError<S::Err>> {
+    ) -> Result<ResultAndState, SoflError<&mut S>> {
         self.fill_tx_env_for_call(to, data);
 
         let mut evm: EVM<&mut S> = revm::EVM::with_env(self.env.clone());
@@ -223,7 +223,7 @@ impl CheatCodes {
         fsig: u32,
         args: &[Token],
         rtypes: &[ParamType],
-    ) -> Result<Vec<Token>, SoflError<S::Err>> {
+    ) -> Result<Vec<Token>, SoflError<&mut S>> {
         if let Ok(Some(account_info)) = state.basic(to) {
             let calldata = pack_calldata(fsig, args);
             let code_hash = account_info.code_hash;
@@ -259,15 +259,15 @@ impl CheatCodes {
         self.call(state, to, fsig, args, rtypes, Some(false))
     }
 
-    fn decode_from_storage<S: BcState>(
+    fn decode_from_storage<'a, S: BcState + 'a>(
         state: &mut S,
         to: Address,
         slot: U256,
         rtypes: &[ParamType],
-    ) -> Result<Vec<Token>, SoflError<S::Err>> {
+    ) -> Result<Vec<Token>, SoflError<&'a mut S>> {
         let mut rdata = state
             .storage(to, slot)
-            .map_err(SoflError::Reth)?
+            .map_err(SoflError::Db)?
             .as_le_bytes()
             .to_vec();
         rdata.reverse();
@@ -285,10 +285,10 @@ impl CheatCodes {
         fsig: u32,
         args: &[Token],
         data: U256,
-    ) -> Result<Option<U256>, SoflError<S::Err>> {
-        let account_info = state.basic(to)?.ok_or(SoflError::Custom(
-            "account does not have code".to_string(),
-        ))?;
+    ) -> Result<Option<U256>, SoflError<&mut S>> {
+        let account_info = state.basic(to).map_err(SoflError::Db)?.ok_or(
+            SoflError::Custom("account does not have code".to_string()),
+        )?;
 
         let calldata = pack_calldata(fsig, args);
         let code_hash = account_info.code_hash;
@@ -329,11 +329,13 @@ impl CheatCodes {
         to: Address,
         slot: U256,
         data: U256,
-    ) -> Result<Option<U256>, SoflError<S::Err>> {
-        let rdata = state.storage(to, slot)?;
+    ) -> Result<Option<U256>, SoflError<&mut S>> {
+        let rdata = state.storage(to, slot).map_err(SoflError::Db)?;
 
         if rdata != data {
-            state.insert_account_storage(to, slot, data)?;
+            state
+                .insert_account_storage(to, slot, data)
+                .map_err(SoflError::Db)?;
             Ok(Some(rdata))
         } else {
             Ok(None)
@@ -347,9 +349,10 @@ impl CheatCodes {
         &self,
         state: &mut S,
         account: Address,
-    ) -> Result<U256, SoflError<S::Err>> {
+    ) -> Result<U256, SoflError<S>> {
         state
-            .basic(account)?
+            .basic(account)
+            .map_err(SoflError::Db)?
             .map_or(Ok(U256::from(0)), |info| Ok(info.balance))
     }
 
@@ -358,7 +361,7 @@ impl CheatCodes {
         state: &mut S,
         token: Address,
         account: Address,
-    ) -> Result<U256, SoflError<S::Err>> {
+    ) -> Result<U256, SoflError<&mut S>> {
         // signature: balanceOf(address) -> 0x70a08231
         let result = self.cheat_read(
             state,
@@ -375,7 +378,7 @@ impl CheatCodes {
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::Err>> {
+    ) -> Result<U256, SoflError<&mut S>> {
         // signature: totalSupply() -> 0x18160ddd
         let result = self.cheat_read(
             state,
@@ -392,7 +395,7 @@ impl CheatCodes {
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::Err>> {
+    ) -> Result<U256, SoflError<&mut S>> {
         // signature: decimals() -> 0x313ce567
         let result = self.cheat_read(
             state,
@@ -413,8 +416,11 @@ impl CheatCodes {
         state: &mut S,
         address: Address,
         balance: U256,
-    ) -> Result<Option<U256>, SoflError<S::Err>> {
-        let mut account_info = state.basic(address)?.unwrap_or_default();
+    ) -> Result<Option<U256>, SoflError<&mut S>> {
+        let mut account_info = state
+            .basic(address)
+            .map_err(SoflError::Db)?
+            .unwrap_or_default();
         let old_balance = account_info.balance;
 
         if old_balance == balance {
@@ -434,7 +440,7 @@ impl CheatCodes {
         token: Address,
         account: Address,
         balance: U256,
-    ) -> Result<Option<U256>, SoflError<S::Error>> {
+    ) -> Result<Option<U256>, SoflError<&mut S>> {
         // signature: balanceOf(address) -> 0x70a08231
         if let Some(old_balance) = self.cheat_write(
             state,

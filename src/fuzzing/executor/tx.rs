@@ -2,8 +2,7 @@ use std::fmt::Debug;
 
 use libafl::{
     prelude::{
-        Executor, HasObservers, ObserversTuple, UsesInput, UsesObserver,
-        UsesObservers,
+        Executor, HasObservers, ObserversTuple, UsesInput, UsesObservers,
     },
     state::UsesState,
 };
@@ -17,9 +16,9 @@ use crate::{
 /// TxExecutor execute a single transaction.
 /// That is to say, the input of TxExecutor during fuzzing is a single transaction.
 #[derive(Default)]
-pub struct TxExecutor<E, BS, OT, S>
+pub struct TxExecutor<BS, OT, S>
 where
-    BS: BcState<E>,
+    BS: BcState,
     OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
 {
@@ -31,11 +30,11 @@ where
 
     pub out: Option<ExecutionResult>,
 
-    _phantom: std::marker::PhantomData<(E, S)>,
+    _phantom: std::marker::PhantomData<S>,
 }
-impl<E, BS, OT, S> TxExecutor<E, BS, OT, S>
+impl<BS, OT, S> TxExecutor<BS, OT, S>
 where
-    BS: BcState<E>,
+    BS: BcState,
     OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
 {
@@ -57,18 +56,18 @@ where
     }
 }
 
-impl<E, BS, OT, S> UsesState for TxExecutor<E, BS, OT, S>
+impl<BS, OT, S> UsesState for TxExecutor<BS, OT, S>
 where
-    BS: BcState<E>,
+    BS: BcState,
     OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
 {
     type State = S;
 }
 
-impl<E, BS, OT, S> Debug for TxExecutor<E, BS, OT, S>
+impl<BS, OT, S> Debug for TxExecutor<BS, OT, S>
 where
-    BS: BcState<E>,
+    BS: BcState,
     OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
 {
@@ -82,12 +81,11 @@ where
     }
 }
 
-impl<EM, Z, E, BS, OT, S> Executor<EM, Z> for TxExecutor<E, BS, OT, S>
+impl<EM, Z, BS, OT, S> Executor<EM, Z> for TxExecutor<BS, OT, S>
 where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
-    E: Debug,
-    BS: BcState<E>,
+    BS: BcState,
     OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
 {
@@ -109,7 +107,7 @@ where
             .transact(cfg, block, tx, no_inspector())
             .map_err(|e| {
                 libafl::Error::IllegalArgument(
-                    format!("{}", e),
+                    "failed to execute transaction".to_string(),
                     libafl::ErrorBacktrace::new(),
                 )
             })?;
@@ -120,20 +118,18 @@ where
     }
 }
 
-impl<E, BS, OT, S> UsesObservers for TxExecutor<E, BS, OT, S>
+impl<BS, OT, S> UsesObservers for TxExecutor<BS, OT, S>
 where
-    E: Debug,
-    BS: BcState<E>,
+    BS: BcState,
     OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
 {
     type Observers = OT;
 }
 
-impl<E, BS, OT, S> HasObservers for TxExecutor<E, BS, OT, S>
+impl<BS, OT, S> HasObservers for TxExecutor<BS, OT, S>
 where
-    E: Debug,
-    BS: BcState<E>,
+    BS: BcState,
     OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
 {
