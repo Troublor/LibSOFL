@@ -1,15 +1,10 @@
-use thiserror::__private::AsDynError;
-
 use crate::engine::{
-    state::{fork::ForkedBcState, fresh::FreshBcState, BcState},
+    state::{fresh::FreshBcState, BcState},
     transaction::TxPosition,
 };
 
 #[derive(Debug, thiserror::Error)]
-pub enum SoflError<BS: BcState = FreshBcState>
-where
-    BS::DbErr: std::error::Error,
-{
+pub enum SoflError<DBERR = <FreshBcState as BcState>::DbErr> {
     /// Custom error
     #[error("custom error: {0:?}")]
     Custom(String),
@@ -32,7 +27,7 @@ where
 
     /// Wrapper of BcState::DbErr
     #[error("database error: {0:?}")]
-    Db(BS::DbErr),
+    Db(DBERR),
 
     /// Wrapper of Execution Result
     #[error("execution result error: {0:?}")]
@@ -47,7 +42,7 @@ where
     Evm(
         #[from]
         #[source]
-        revm_primitives::EVMError<BS::DbErr>,
+        revm_primitives::EVMError<DBERR>,
     ),
 
     /// Wrapper of SolcVM error

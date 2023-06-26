@@ -76,7 +76,7 @@ impl<'a> ForkedBcState<'a> {
     /// fork from the current latest blockchain state
     pub fn latest<P: StateProviderFactory>(
         p: &'a P,
-    ) -> Result<Self, SoflError<Self>> {
+    ) -> Result<Self, SoflError<<Self as BcState>::DbErr>> {
         let sp = p.latest().map_err(SoflError::Reth)?;
         let wrapped = WrappedDB::new(sp);
         let state = CacheDB::new(Arc::new(wrapped));
@@ -89,7 +89,7 @@ impl<'a> ForkedBcState<'a> {
     >(
         p: &'a P,
         pos: TxPosition,
-    ) -> Result<Self, SoflError<&mut Self>> {
+    ) -> Result<Self, SoflError<<Self as BcState>::DbErr>> {
         let pos_cp = pos.clone();
         let bn = pos
             .get_block_number(p)
@@ -135,7 +135,7 @@ impl<'a> ForkedBcState<'a> {
     >(
         p: &'a P,
         pos: TxPosition,
-    ) -> Result<Self, SoflError<&mut Self>> {
+    ) -> Result<Self, SoflError<<Self as BcState>::DbErr>> {
         let mut pos_mut = pos.clone();
         pos_mut.shift(p, 1).map_err(|_| SoflError::Fork(pos))?;
         Self::fork_at(p, pos_mut)
@@ -147,14 +147,14 @@ impl<'a> BcState for ForkedBcState<'a> {
 }
 
 impl<'a> DatabaseEditable for ForkedBcState<'a> {
-    type Err = reth_interfaces::Error;
+    type Error = reth_interfaces::Error;
 
     fn insert_account_storage(
         &mut self,
         address: Address,
         slot: U256,
         value: U256,
-    ) -> Result<(), Self::Err> {
+    ) -> Result<(), Self::Error> {
         self.0.insert_account_storage(address, slot, value)
     }
 

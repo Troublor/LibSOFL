@@ -26,14 +26,14 @@ pub trait ReadonlyBcState: Database + Sized {}
 
 #[auto_impl(& mut, Box)]
 pub trait DatabaseEditable {
-    type Err;
+    type Error;
 
     fn insert_account_storage(
         &mut self,
         address: Address,
         slot: U256,
         value: U256,
-    ) -> Result<(), Self::Err>;
+    ) -> Result<(), Self::Error>;
 
     fn insert_account_info(&mut self, address: Address, info: AccountInfo);
 }
@@ -44,7 +44,7 @@ impl<T: Database + Sized> ReadonlyBcState for T {}
 // Abstraction of blockchain state
 pub trait BcState:
     Database<Error = Self::DbErr>
-    + DatabaseEditable<Err = Self::DbErr>
+    + DatabaseEditable<Error = Self::DbErr>
     + DatabaseCommit
     + Sized
     + Debug
@@ -54,7 +54,7 @@ pub trait BcState:
     fn transact_with_tx_filled<'a, S, I>(
         evm: &mut EVM<S>,
         inspector: I,
-    ) -> Result<ResultAndState, SoflError<S>>
+    ) -> Result<ResultAndState, SoflError<S::DbErr>>
     where
         S: BcState + 'a,
         I: Inspector<S>,
@@ -67,7 +67,7 @@ pub trait BcState:
         mut evm: EVM<S>,
         tx: T,
         inspector: I,
-    ) -> Result<(EVM<S>, ResultAndState), SoflError<S>>
+    ) -> Result<(EVM<S>, ResultAndState), SoflError<S::DbErr>>
     where
         S: BcState + 'a,
         I: Inspector<S>,
@@ -115,7 +115,7 @@ pub trait BcState:
         block_env: BlockEnv,
         tx: T,
         inspector: I,
-    ) -> Result<ResultAndState, SoflError<&mut Self>>
+    ) -> Result<ResultAndState, SoflError<Self::DbErr>>
     where
         C: Into<EngineConfig>,
         I: Inspector<&'a mut Self>,
@@ -139,7 +139,7 @@ pub trait BcState:
         block_env: BlockEnv,
         txs: Vec<T>,
         mut inspector: &mut I,
-    ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self>>
+    ) -> Result<(Self, Vec<ExecutionResult>), SoflError<Self::DbErr>>
     where
         Self: 'a,
         C: Into<EngineConfig>,
@@ -171,7 +171,7 @@ pub trait BcState:
         block_env: BlockEnv,
         tx: T,
         inspector: &'a mut I,
-    ) -> Result<(Self, ExecutionResult), SoflError<Self>>
+    ) -> Result<(Self, ExecutionResult), SoflError<Self::DbErr>>
     where
         Self: 'a,
         C: Into<EngineConfig>,
@@ -189,7 +189,7 @@ pub trait BcState:
         block_env: BlockEnv,
         txs: Vec<T>,
         mut inspector: &mut I,
-    ) -> Result<Vec<ExecutionResult>, SoflError<&mut Self>>
+    ) -> Result<Vec<ExecutionResult>, SoflError<Self::DbErr>>
     where
         C: Into<EngineConfig>,
         I: Inspector<&'a mut Self>,
@@ -219,7 +219,7 @@ pub trait BcState:
         block_env: BlockEnv,
         tx: T,
         inspector: &mut I,
-    ) -> Result<ExecutionResult, SoflError<&mut Self>>
+    ) -> Result<ExecutionResult, SoflError<Self::DbErr>>
     where
         Self: 'a,
         C: Into<EngineConfig>,

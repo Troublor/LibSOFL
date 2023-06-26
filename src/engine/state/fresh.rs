@@ -62,7 +62,7 @@ impl BcState for FreshBcState {
 }
 
 impl DatabaseEditable for FreshBcState {
-    type Err = Infallible;
+    type Error = Infallible;
 
     fn insert_account_info(&mut self, address: B160, mut info: AccountInfo) {
         self.0.insert_account_info(address, info)
@@ -73,7 +73,7 @@ impl DatabaseEditable for FreshBcState {
         address: Address,
         slot: U256,
         value: U256,
-    ) -> Result<(), Self::Err> {
+    ) -> Result<(), Self::Error> {
         self.0.insert_account_storage(address, slot, value)
     }
 }
