@@ -10,17 +10,17 @@ use revm_primitives::{BlockEnv, CfgEnv, ExecutionResult};
 
 use crate::{
     engine::{config::EngineConfig, inspectors::no_inspector, state::BcState},
-    fuzzing::corpus::tx::TxInput,
+    fuzzing::{corpus::tx::TxInput, observer::EvmObserversTuple},
 };
 
 /// TxExecutor execute a single transaction.
 /// That is to say, the input of TxExecutor during fuzzing is a single transaction.
 #[derive(Default)]
-pub struct TxExecutor<BS, OT, S>
+pub struct TxExecutor<'a, S, BS, OT>
 where
     BS: BcState,
-    OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
+    OT: EvmObserversTuple<'a, S, BS>,
 {
     evm_cfg: CfgEnv,
     block_env: BlockEnv,
@@ -30,13 +30,13 @@ where
 
     pub out: Option<ExecutionResult>,
 
-    _phantom: std::marker::PhantomData<S>,
+    _phantom: std::marker::PhantomData<&'a S>,
 }
-impl<BS, OT, S> TxExecutor<BS, OT, S>
+impl<'a, S, BS, OT> TxExecutor<'a, S, BS, OT>
 where
     BS: BcState,
-    OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
+    OT: EvmObserversTuple<'a, S, BS>,
 {
     pub fn new(
         evm_cfg: CfgEnv,
@@ -56,20 +56,20 @@ where
     }
 }
 
-impl<BS, OT, S> UsesState for TxExecutor<BS, OT, S>
+impl<'a, S, BS, OT> UsesState for TxExecutor<'a, S, BS, OT>
 where
     BS: BcState,
-    OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
+    OT: EvmObserversTuple<'a, S, BS>,
 {
     type State = S;
 }
 
-impl<BS, OT, S> Debug for TxExecutor<BS, OT, S>
+impl<'a, S, BS, OT> Debug for TxExecutor<'a, S, BS, OT>
 where
     BS: BcState,
-    OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
+    OT: EvmObserversTuple<'a, S, BS>,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("TxExecutor")
@@ -81,13 +81,13 @@ where
     }
 }
 
-impl<EM, Z, BS, OT, S> Executor<EM, Z> for TxExecutor<BS, OT, S>
+impl<'a, EM, Z, S, BS, OT> Executor<EM, Z> for TxExecutor<'a, S, BS, OT>
 where
     EM: UsesState<State = Self::State>,
     Z: UsesState<State = Self::State>,
     BS: BcState,
-    OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
+    OT: EvmObserversTuple<'a, S, BS>,
 {
     fn run_target(
         &mut self,
@@ -118,26 +118,26 @@ where
     }
 }
 
-impl<BS, OT, S> UsesObservers for TxExecutor<BS, OT, S>
+impl<'a, S, BS, OT> UsesObservers for TxExecutor<'a, S, BS, OT>
 where
     BS: BcState,
-    OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
+    OT: EvmObserversTuple<'a, S, BS>,
 {
     type Observers = OT;
 }
 
-impl<BS, OT, S> HasObservers for TxExecutor<BS, OT, S>
+impl<'a, S, BS, OT> HasObservers for TxExecutor<'a, S, BS, OT>
 where
     BS: BcState,
-    OT: ObserversTuple<S>,
     S: UsesInput<Input = TxInput>,
+    OT: EvmObserversTuple<'a, S, BS>,
 {
-    fn observers(&self) -> &Self::Observers {
-        &self.observers
+    fn observers_mut(&mut self) -> &mut Self::Observers {
+        todo!()
     }
 
-    fn observers_mut(&mut self) -> &mut Self::Observers {
-        &mut self.observers
+    fn observers(&self) -> &Self::Observers {
+        todo!()
     }
 }

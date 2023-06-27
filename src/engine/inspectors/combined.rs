@@ -8,11 +8,34 @@ use revm_primitives::{Bytes, B160, B256};
 
 use crate::engine::state::BcState;
 
-pub struct CombinedInspector<BS: BcState> {
-    inspectors: Vec<Box<dyn Inspector<BS>>>,
+#[derive(Default)]
+pub struct CombinedInspector<'a, BS: BcState> {
+    pub inspectors: Vec<Box<dyn Inspector<BS> + 'a>>,
 }
 
-impl<BS: BcState> Inspector<BS> for CombinedInspector<BS> {
+impl<'a, BS: BcState> CombinedInspector<'a, BS> {
+    pub fn new() -> Self {
+        Self {
+            inspectors: Vec::new(),
+        }
+    }
+    pub fn append<I: Inspector<BS> + 'a>(&mut self, inspector: I) -> &mut Self {
+        self.inspectors.push(Box::new(inspector));
+        self
+    }
+
+    pub fn iter(&'a self) -> std::slice::Iter<'a, Box<dyn Inspector<BS> + 'a>> {
+        self.inspectors.iter()
+    }
+
+    pub fn iter_mut(
+        &'a mut self,
+    ) -> std::slice::IterMut<'a, Box<dyn Inspector<BS> + 'a>> {
+        self.inspectors.iter_mut()
+    }
+}
+
+impl<'a, BS: BcState> Inspector<BS> for CombinedInspector<'a, BS> {
     #[doc = " Called Before the interpreter is initialized."]
     #[doc = ""]
     #[doc = " If anything other than [InstructionResult::Continue] is returned then execution of the interpreter is"]
