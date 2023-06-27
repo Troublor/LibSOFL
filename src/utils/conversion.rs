@@ -20,6 +20,36 @@ pub trait Convert<F, T> {
     fn cvt(v: F) -> T;
 }
 
+pub struct ToElementary {}
+
+impl Convert<U256, u64> for ToElementary {
+    /// convert U256 to u64.
+    /// Panics if the value is too large to fit in a u64
+    fn cvt(v: U256) -> u64 {
+        let be = v.to_be_bytes_trimmed_vec();
+        if be.len() > 8 {
+            panic!("U256 too large to fit in u64")
+        }
+        let mut bytes: [u8; 8] = [0; 8];
+        bytes[..be.len()].copy_from_slice(be.as_slice());
+        u64::from_be_bytes(bytes)
+    }
+}
+
+impl Convert<U256, u128> for ToElementary {
+    /// convert U256 to u128.
+    /// Panics if the value is too large to fit in a u128
+    fn cvt(v: U256) -> u128 {
+        let be = v.to_be_bytes_trimmed_vec();
+        if be.len() > 18 {
+            panic!("U256 too large to fit in u64")
+        }
+        let mut bytes: [u8; 16] = [0; 16];
+        bytes[..be.len()].copy_from_slice(be.as_slice());
+        u128::from_be_bytes(bytes)
+    }
+}
+
 /// ############################
 /// ToPrimitive
 /// Convert to reth_primitives or revm_primitives types
