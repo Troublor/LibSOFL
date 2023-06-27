@@ -20,6 +20,7 @@ use super::{BcState, DatabaseEditable};
 
 /// Abstraction of the forked state in revm that can be cloned.
 /// This type implements both BcState and BcStateGround
+#[derive(Clone)]
 pub struct ForkedBcState<'a>(InnerForkedBcState<'a>);
 
 pub type InnerForkedBcState<'a> = CacheDB<Arc<WrappedDB<StateProviderBox<'a>>>>;

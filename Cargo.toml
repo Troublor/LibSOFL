@@ -12,9 +12,15 @@ path = "src/lib.rs"
 name = "play"
 path = "bin/play/main.rs"
 
+[[bin]]
+name = "pom"
+path = "bin/pom/main.rs"
+
 [patch.crates-io]
-revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
-revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+# revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+# revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
+revm = { path = "./revm/crates/revm" }
+revm-primitives = { path = "./revm/crates/primitives" }
 
 [dependencies]
 auto_impl = "1.0"
@@ -46,8 +52,8 @@ dirs = "5.0" # from svm-rs
 semver = { version = "1.0", features = ["serde"] } # from svm-rs
 
 # reth
-revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25", features = ["memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
-revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25", features = ["memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
+revm = { path = "./revm/crates/revm", features = ["memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
+revm-primitives = { path = "./revm/crates/primitives", features = ["memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
 reth-config = { path = "./reth/crates/config" }
 reth-primitives = { path = "./reth/crates/primitives", features = ["arbitrary"] }
 reth-db = { path = "./reth/crates/storage/db", features = ["mdbx", "test-utils"] }

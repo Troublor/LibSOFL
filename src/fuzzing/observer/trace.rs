@@ -8,7 +8,7 @@ use super::EvmObserver;
 
 #[derive(Debug)]
 pub struct TraceObserver {
-    pub inspector: TracingInspector,
+    pub inspector: Option<TracingInspector>,
 }
 
 impl Named for TraceObserver {
@@ -24,7 +24,8 @@ impl<S: UsesInput> Observer<S> for TraceObserver {
         _input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
         // reset inspector
-        self.inspector = TracingInspector::new(TracingInspectorConfig::all());
+        self.inspector =
+            Some(TracingInspector::new(TracingInspectorConfig::all()));
         Ok(())
     }
     fn post_exec(
@@ -33,7 +34,6 @@ impl<S: UsesInput> Observer<S> for TraceObserver {
         _input: &<S as UsesInput>::Input,
         _exit_kind: &libafl::prelude::ExitKind,
     ) -> Result<(), libafl::Error> {
-        let builder = self.inspector.clone().into_geth_builder();
         Ok(())
     }
 }
@@ -41,20 +41,23 @@ impl<S: UsesInput> Observer<S> for TraceObserver {
 impl<S: UsesInput, BS: BcState> EvmObserver<S, BS> for TraceObserver {
     type Inspector = TracingInspector;
 
-    fn on_execution_result(
+    fn on_executed(
         &mut self,
-        _result: ExecutionResult,
+        _post_state: &BS,
+        _inspector: Self::Inspector,
+        _results: Vec<ExecutionResult>,
         _input: &S::Input,
-        _index: u32,
     ) -> Result<(), libafl::Error> {
+        self.inspector = Some(_inspector);
         Ok(())
     }
 
     fn get_inspector(
         &mut self,
+        _pre_state: &BS,
         _input: &S::Input,
-        _index: u32,
-    ) -> Result<&mut TracingInspector, libafl::Error> {
-        Ok(&mut self.inspector)
+    ) -> Result<TracingInspector, libafl::Error> {
+        let insp = self.inspector.take().unwrap();
+        Ok(insp)
     }
 }

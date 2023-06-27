@@ -2,7 +2,9 @@ use std::{error::Error, fmt::Debug};
 
 use auto_impl::auto_impl;
 use reth_primitives::Address;
-use revm::{Database, DatabaseCommit, Inspector, EVM};
+use revm::{
+    interpreter::InstructionResult, Database, DatabaseCommit, Inspector, EVM,
+};
 use revm_primitives::{
     db::DatabaseRef, AccountInfo, BlockEnv, Bytes, Eval, ExecutionResult,
     Output, ResultAndState, U256,
@@ -10,7 +12,10 @@ use revm_primitives::{
 
 use crate::error::SoflError;
 
-use super::{config::EngineConfig, transactions::TxOrPseudo};
+use super::{
+    config::EngineConfig, inspectors::MultiTxInspector,
+    transactions::TxOrPseudo,
+};
 
 pub mod fork;
 pub mod fresh;
@@ -51,17 +56,19 @@ pub trait BcState:
 {
     type DbErr: Debug + Error;
 
+    #[deprecated]
     fn transact_with_tx_filled<'a, S, I>(
         evm: &mut EVM<S>,
         inspector: I,
     ) -> Result<ResultAndState, SoflError<S::DbErr>>
     where
         S: BcState + 'a,
-        I: Inspector<S>,
+        I: MultiTxInspector<S>,
     {
         evm.inspect(inspector).map_err(SoflError::Evm)
     }
 
+    #[deprecated]
     fn transact_with_evm<'a, S, I, T>(
         cfg: &EngineConfig,
         mut evm: EVM<S>,
@@ -70,7 +77,7 @@ pub trait BcState:
     ) -> Result<(EVM<S>, ResultAndState), SoflError<S::DbErr>>
     where
         S: BcState + 'a,
-        I: Inspector<S>,
+        I: MultiTxInspector<S>,
         T: Into<TxOrPseudo<'a, S>>,
     {
         let tx = tx.into();
@@ -108,7 +115,7 @@ pub trait BcState:
             }
         }
     }
-
+    #[deprecated]
     fn transact<'a, 'b: 'a, C, I, T>(
         &'b mut self,
         cfg: C,
@@ -118,7 +125,7 @@ pub trait BcState:
     ) -> Result<ResultAndState, SoflError<Self::DbErr>>
     where
         C: Into<EngineConfig>,
-        I: Inspector<&'a mut Self>,
+        I: MultiTxInspector<&'a mut Self>,
         T: Into<TxOrPseudo<'a, &'a mut Self>>,
     {
         let cfg = cfg.into();
@@ -143,7 +150,7 @@ pub trait BcState:
     where
         Self: 'a,
         C: Into<EngineConfig>,
-        I: Inspector<Self>,
+        I: MultiTxInspector<Self>,
         T: Into<TxOrPseudo<'a, Self>>,
     {
         let cfg = cfg.into();
@@ -153,11 +160,23 @@ pub trait BcState:
         evm.env.block = block_env;
         evm.database(self);
         for tx in txs {
-            let inspector = &mut inspector;
+            let tx = tx.into();
+            let mut inspector = &mut inspector;
+            let bc_state_ref = evm.db.as_mut().unwrap();
+            // run inspector hook
+            if inspector.transaction(&tx, bc_state_ref)
+                != InstructionResult::Continue
+            {
+                continue;
+            }
             let result;
-            (evm, result) = Self::transact_with_evm(&cfg, evm, tx, inspector)?;
+            (evm, result) =
+                Self::transact_with_evm(&cfg, evm, tx.clone(), &mut inspector)?;
             // evm.db must exist since we called evm.database(state) above
-            evm.db.as_mut().unwrap().commit(result.state);
+            let bc_state_ref = evm.db.as_mut().unwrap();
+            bc_state_ref.commit(result.state);
+            // run inspector hook
+            inspector.transaction_end(&tx, bc_state_ref, &result.result);
             results.push(result.result);
         }
         // evm.db must exist since we called evm.database(state) above
@@ -175,7 +194,7 @@ pub trait BcState:
     where
         Self: 'a,
         C: Into<EngineConfig>,
-        I: Inspector<Self>,
+        I: MultiTxInspector<Self>,
         T: Into<TxOrPseudo<'a, Self>>,
     {
         let (this, mut results) =
@@ -192,7 +211,7 @@ pub trait BcState:
     ) -> Result<Vec<ExecutionResult>, SoflError<Self::DbErr>>
     where
         C: Into<EngineConfig>,
-        I: Inspector<&'a mut Self>,
+        I: MultiTxInspector<&'a mut Self>,
         T: Into<TxOrPseudo<'a, &'a mut Self>>,
     {
         let cfg = cfg.into();
@@ -223,7 +242,7 @@ pub trait BcState:
     where
         Self: 'a,
         C: Into<EngineConfig>,
-        I: Inspector<&'a mut Self>,
+        I: MultiTxInspector<&'a mut Self>,
         T: Into<TxOrPseudo<'a, &'a mut Self>>,
     {
         let mut results =

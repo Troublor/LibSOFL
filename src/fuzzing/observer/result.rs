@@ -2,10 +2,7 @@ use libafl::prelude::{Named, Observer, UsesInput};
 use revm_primitives::ExecutionResult;
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{
-    inspectors::{no_inspector, NoInspector},
-    state::BcState,
-};
+use crate::engine::{inspectors::NoInspector, state::BcState};
 
 use super::EvmObserver;
 
@@ -28,22 +25,23 @@ impl<S: UsesInput> Observer<S> for ExecutionResultObserver {
 impl<S: UsesInput, BS: BcState> EvmObserver<S, BS> for ExecutionResultObserver {
     type Inspector = NoInspector;
 
-    fn on_execution_result(
+    fn on_executed(
         &mut self,
-        _result: ExecutionResult,
+        _post_state: &BS,
+        _inspector: Self::Inspector,
+        mut _result: Vec<ExecutionResult>,
         _input: &S::Input,
-        _index: u32,
     ) -> Result<(), libafl::Error> {
-        self.results.push(_result);
+        self.results.append(&mut _result);
         Ok(())
     }
 
     fn get_inspector(
         &mut self,
+        _pre_state: &BS,
         _input: &S::Input,
-        _index: u32,
-    ) -> Result<&mut NoInspector, libafl::Error> {
-        Ok(no_inspector())
+    ) -> Result<NoInspector, libafl::Error> {
+        Ok(())
     }
 }
 

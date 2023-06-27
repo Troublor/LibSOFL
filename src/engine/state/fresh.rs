@@ -15,7 +15,7 @@ use revm_primitives::{
 use super::{BcState, DatabaseEditable};
 
 /// A blockchain state that is empty and complete in memory.
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct FreshBcState(CacheDB<EmptyDB>);
 
 impl FreshBcState {

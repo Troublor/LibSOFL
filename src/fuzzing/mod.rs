@@ -8,7 +8,7 @@ pub mod mutator;
 pub mod observer;
 
 #[cfg(test)]
-mod tests_nodep {
+mod tests_others {
     use libafl::{
         prelude::{
             current_nanos, havoc_mutations, tuple_list, BytesInsertMutator,
