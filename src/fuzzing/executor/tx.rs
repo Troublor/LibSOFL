@@ -134,10 +134,10 @@ where
     OT: EvmObserversTuple<'a, S, BS>,
 {
     fn observers_mut(&mut self) -> &mut Self::Observers {
-        todo!()
+        &mut self.observers
     }
 
     fn observers(&self) -> &Self::Observers {
-        todo!()
+        &self.observers
     }
 }
