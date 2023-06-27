@@ -155,7 +155,7 @@ mod tests_nodep {
     use crate::engine::{
         inspectors::no_inspector,
         state::BcState,
-        transaction::{StateChange, Tx, TxOrPseudo},
+        transactions::{StateChange, Tx, TxOrPseudo},
     };
 
     use super::FreshBcState;

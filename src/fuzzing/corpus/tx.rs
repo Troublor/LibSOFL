@@ -1,6 +1,6 @@
 use libafl::prelude::{InMemoryCorpus, Input};
 
-use crate::engine::transaction::Tx;
+use crate::engine::transactions::Tx;
 
 pub type TxInput = Tx;
 

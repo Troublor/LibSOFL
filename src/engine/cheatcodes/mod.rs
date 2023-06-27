@@ -479,7 +479,7 @@ mod tests_with_db {
         config::flags::SoflConfig,
         engine::{
             providers::BcProviderBuilder, state::fork::ForkedBcState,
-            transaction::TxPosition,
+            transactions::position::TxPosition,
         },
     };
 

@@ -12,7 +12,7 @@ use revm_primitives::{
 };
 
 use crate::{
-    engine::{inspectors::no_inspector, transaction::TxPosition},
+    engine::{inspectors::no_inspector, transactions::position::TxPosition},
     error::SoflError,
 };
 
@@ -239,7 +239,7 @@ mod tests_with_db {
         config::flags::SoflConfig,
         engine::{
             inspectors::no_inspector, providers::BcProviderBuilder,
-            state::BcState, transaction::TxPosition,
+            state::BcState, transactions::position::TxPosition,
         },
     };
 
@@ -301,7 +301,7 @@ mod tests_with_jsonrpc {
             inspectors::no_inspector,
             providers::BcProviderBuilder,
             state::{fork::ForkedBcState, BcState},
-            transaction::TxPosition,
+            transactions::position::TxPosition,
         },
         utils::conversion::{Convert, ToPrimitive},
     };

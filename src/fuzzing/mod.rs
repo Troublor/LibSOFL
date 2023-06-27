@@ -27,7 +27,7 @@ mod tests_nodep {
     use crate::{
         engine::{
             providers::rpc::JsonRpcBcProvider, state::fork::ForkedBcState,
-            transaction::TxPosition,
+            transactions::position::TxPosition,
         },
         utils::conversion::{Convert, ToPrimitive},
     };
@@ -39,7 +39,7 @@ mod tests_nodep {
         generator::history_tx::HistoricalTxGenerator,
         observer::result::ExecutionResultObserver,
     };
-
+    #[test]
     fn test_simple_replay_fuzz() {
         let provider = JsonRpcBcProvider::default();
         let fork_at = TxPosition::new(14000000, 0);
@@ -91,7 +91,7 @@ mod tests_nodep {
                 &mut executor,
                 &mut generator,
                 &mut mgr,
-                8,
+                2,
             )
             .expect("Failed to generate the initial corpus");
         fuzzer

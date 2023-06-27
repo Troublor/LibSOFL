@@ -2,7 +2,7 @@ use libafl::prelude::Generator;
 use reth_primitives::{Address, BlockNumber};
 use reth_provider::TransactionsProvider;
 
-use crate::{engine::transaction::Tx, fuzzing::corpus::tx::TxInput};
+use crate::{engine::transactions::Tx, fuzzing::corpus::tx::TxInput};
 
 /// Generate tx inputs from historical txs
 /// Given a contract address, the generator will search back from the latest
