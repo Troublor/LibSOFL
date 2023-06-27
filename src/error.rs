@@ -1,6 +1,6 @@
 use crate::engine::{
     state::{fresh::FreshBcState, BcState},
-    transaction::TxPosition,
+    transactions::position::TxPosition,
 };
 
 #[derive(Debug, thiserror::Error)]

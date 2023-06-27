@@ -5,7 +5,7 @@ use libsofl::config::flags::SoflConfig;
 use libsofl::engine::cheatcodes::CheatCodes;
 use libsofl::engine::providers::BcProviderBuilder;
 use libsofl::engine::state::fork::ForkedBcState;
-use libsofl::engine::transaction::TxPosition;
+use libsofl::engine::transactions::position::TxPosition;
 use reth_primitives::Address;
 use revm_primitives::U256;
 
