@@ -56,7 +56,6 @@ pub trait BcState:
 {
     type DbErr: Debug + Error;
 
-    #[deprecated]
     fn transact_with_tx_filled<'a, S, I>(
         evm: &mut EVM<S>,
         inspector: I,
@@ -68,7 +67,6 @@ pub trait BcState:
         evm.inspect(inspector).map_err(SoflError::Evm)
     }
 
-    #[deprecated]
     fn transact_with_evm<'a, S, I, T>(
         cfg: &EngineConfig,
         mut evm: EVM<S>,
@@ -115,7 +113,6 @@ pub trait BcState:
             }
         }
     }
-    #[deprecated]
     fn transact<'a, 'b: 'a, C, I, T>(
         &'b mut self,
         cfg: C,
@@ -171,7 +168,7 @@ pub trait BcState:
             }
             let result;
             (evm, result) =
-                Self::transact_with_evm(&cfg, evm, tx.clone(), &mut inspector)?;
+                Self::transact_with_evm(&cfg, evm, &tx, &mut inspector)?;
             // evm.db must exist since we called evm.database(state) above
             let bc_state_ref = evm.db.as_mut().unwrap();
             bc_state_ref.commit(result.state);

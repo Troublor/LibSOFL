@@ -3699,6 +3699,7 @@ dependencies = [
  "eyre",
  "futures",
  "hashbrown 0.14.0",
+ "lazy_static",
  "libafl",
  "mockall",
  "mockall_double",

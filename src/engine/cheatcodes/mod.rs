@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::{engine::state::BcState, error::SoflError};
-use ethers::abi::{self, ParamType, Token};
+use ethers::abi::{self, Function, ParamType, Token};
 use reth_primitives::{Address, Bytes, U256};
 use revm::EVM;
 use revm_primitives::{
@@ -12,6 +12,8 @@ use revm_primitives::{
 
 mod inspector;
 use inspector::CheatcodeInspector;
+
+use super::utils::HighLevelCaller;
 
 macro_rules! get_the_first_uint {
     ($tokens:expr) => {
@@ -142,6 +144,7 @@ impl CheatCodes {
         args: &[Token],
     ) -> Option<U256> {
         // staticcall to get the slot, where we force the return type as u256
+        let caller = HighLevelCaller::default().bypass_check();
         let ret = self
             .call(state, to, fsig, args, &[ParamType::Uint(256)], Some(true))
             .ok()?;

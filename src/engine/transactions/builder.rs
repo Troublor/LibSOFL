@@ -20,6 +20,12 @@ pub struct TxBuilder {
 }
 
 impl TxBuilder {
+    pub fn new() -> Self {
+        Self::default()
+    }
+}
+
+impl TxBuilder {
     pub fn build(self) -> Tx {
         let chain_id = self.chain_id.unwrap_or(1);
         let from = self.from.unwrap_or(Address::zero());
@@ -155,8 +161,11 @@ impl TxBuilder {
         self
     }
 
-    pub fn set_input(mut self, input: reth_primitives::Bytes) -> Self {
-        self.input = Some(input);
+    pub fn set_input<I: Into<reth_primitives::Bytes>>(
+        mut self,
+        input: I,
+    ) -> Self {
+        self.input = Some(input.into());
         self
     }
 
