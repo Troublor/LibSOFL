@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 
 use crate::{engine::state::BcState, error::SoflError};
-use ethers::abi::{self, Function, ParamType, Token};
+use ethers::abi::{self, ParamType, Token};
 use reth_primitives::{Address, Bytes, U256};
 use revm::EVM;
 use revm_primitives::{
@@ -13,7 +13,11 @@ use revm_primitives::{
 mod inspector;
 use inspector::CheatcodeInspector;
 
-use super::utils::HighLevelCaller;
+mod erc20;
+pub use erc20::ERC20Cheat;
+
+mod price_oracle;
+pub use price_oracle::{PriceOracle, PriceOracleCheat};
 
 macro_rules! get_the_first_uint {
     ($tokens:expr) => {
@@ -34,13 +38,16 @@ enum SlotQueryResult {
 }
 
 #[derive(Debug, Default)]
-pub struct CheatCodes {
+pub struct CheatCodes<S: BcState> {
     // runtime env
     env: Env,
     inspector: CheatcodeInspector,
 
     // slot info: (codehash, calldata) -> slot_state
     slots: BTreeMap<(B256, Bytes), SlotQueryResult>,
+
+    // price oracles
+    price_oracles: Vec<PriceOracle<S>>,
 }
 
 fn pack_calldata(fsig: u32, args: &[Token]) -> Bytes {
@@ -50,7 +57,7 @@ fn pack_calldata(fsig: u32, args: &[Token]) -> Bytes {
 }
 
 // basic functionality
-impl CheatCodes {
+impl<S: BcState> CheatCodes<S> {
     pub fn new(mut cfg: CfgEnv, block: BlockEnv) -> Self {
         // we want to disable this in eth_call, since this is common practice used by other node
         // impls and providers <https://github.com/foundry-rs/foundry/issues/4388>
@@ -71,11 +78,13 @@ impl CheatCodes {
                 block,
                 ..Default::default()
             },
-            ..Default::default()
+            price_oracles: Vec::new(),
+            inspector: CheatcodeInspector::default(),
+            slots: BTreeMap::new(),
         }
     }
 
-    pub fn call<S: BcState>(
+    pub fn call(
         &mut self,
         state: &mut S,
         to: Address,
@@ -102,7 +111,7 @@ impl CheatCodes {
         }
     }
 
-    fn low_level_call<S: BcState>(
+    fn low_level_call(
         &mut self,
         state: &mut S,
         to: Option<Address>,
@@ -136,7 +145,7 @@ impl CheatCodes {
         };
     }
 
-    fn find_slot<S: BcState>(
+    fn find_slot(
         &mut self,
         state: &mut S,
         to: Address,
@@ -144,7 +153,6 @@ impl CheatCodes {
         args: &[Token],
     ) -> Option<U256> {
         // staticcall to get the slot, where we force the return type as u256
-        let caller = HighLevelCaller::default().bypass_check();
         let ret = self
             .call(state, to, fsig, args, &[ParamType::Uint(256)], Some(true))
             .ok()?;
@@ -213,13 +221,13 @@ impl CheatCodes {
 }
 
 // cheatcode: cheat_read
-impl CheatCodes {
+impl<S: BcState> CheatCodes<S> {
     // staticcall with slot lookup
     // this function can only work if the target function:
     //  1) is a view function (i.e. does not modify the state)
     //  2) returns a single primitive value (e.g., uint256, address, etc.)
     //  3) is derived from a public storage variable
-    pub fn cheat_read<S: BcState>(
+    pub fn cheat_read(
         &mut self,
         state: &mut S,
         to: Address,
@@ -262,7 +270,7 @@ impl CheatCodes {
         self.call(state, to, fsig, args, rtypes, Some(false))
     }
 
-    fn decode_from_storage<'a, S: BcState + 'a>(
+    fn decode_from_storage(
         state: &mut S,
         to: Address,
         slot: U256,
@@ -280,8 +288,8 @@ impl CheatCodes {
 }
 
 // cheatcode: cheat_write
-impl CheatCodes {
-    pub fn cheat_write<S: BcState>(
+impl<S: BcState> CheatCodes<S> {
+    pub fn cheat_write(
         &mut self,
         state: &mut S,
         to: Address,
@@ -327,7 +335,7 @@ impl CheatCodes {
         }
     }
 
-    fn write_or_err<S: BcState>(
+    fn write_or_err(
         state: &mut S,
         to: Address,
         slot: U256,
@@ -347,8 +355,8 @@ impl CheatCodes {
 }
 
 // cheatcodes: get functions
-impl CheatCodes {
-    pub fn get_balance<S: BcState>(
+impl<S: BcState> CheatCodes<S> {
+    pub fn get_balance(
         &self,
         state: &mut S,
         account: Address,
@@ -359,62 +367,7 @@ impl CheatCodes {
             .map_or(Ok(U256::from(0)), |info| Ok(info.balance))
     }
 
-    pub fn get_erc20_balance<S: BcState>(
-        &mut self,
-        state: &mut S,
-        token: Address,
-        account: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
-        // signature: balanceOf(address) -> 0x70a08231
-        let result = self.cheat_read(
-            state,
-            token,
-            0x70a08231u32,
-            &[Token::Address(account.into())],
-            &[ParamType::Uint(256)],
-        )?;
-
-        Ok(result[0].clone().into_uint().expect("cannot fail").into())
-    }
-
-    pub fn get_erc20_total_supply<S: BcState>(
-        &mut self,
-        state: &mut S,
-        token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
-        // signature: totalSupply() -> 0x18160ddd
-        let result = self.cheat_read(
-            state,
-            token,
-            0x18160dddu32,
-            &[],
-            &[ParamType::Uint(256)],
-        )?;
-
-        Ok(result[0].clone().into_uint().expect("cannot fail").into())
-    }
-
-    pub fn get_erc20_decimals<S: BcState>(
-        &mut self,
-        state: &mut S,
-        token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
-        // signature: decimals() -> 0x313ce567
-        let result = self.cheat_read(
-            state,
-            token,
-            0x313ce567u32,
-            &[],
-            &[ParamType::Uint(256)],
-        )?;
-
-        Ok(result[0].clone().into_uint().expect("cannot fail").into())
-    }
-}
-
-// cheatcodes: set functions
-impl CheatCodes {
-    pub fn set_balance<S: BcState>(
+    pub fn set_balance(
         &self,
         state: &mut S,
         address: Address,
@@ -435,40 +388,6 @@ impl CheatCodes {
 
         Ok(Some(old_balance))
     }
-
-    // return the old balance if updated
-    pub fn set_erc20_balance<S: BcState>(
-        &mut self,
-        state: &mut S,
-        token: Address,
-        account: Address,
-        balance: U256,
-    ) -> Result<Option<U256>, SoflError<S::DbErr>> {
-        // signature: balanceOf(address) -> 0x70a08231
-        if let Some(old_balance) = self.cheat_write(
-            state,
-            token,
-            0x70a08231u32,
-            &[Token::Address(account.into())],
-            balance,
-        )? {
-            // we need to update total supply
-            let total_supply = self.get_erc20_total_supply(state, token)?;
-
-            // signature: totalSupply() -> 0x18160ddd
-            self.cheat_write(
-                state,
-                token,
-                0x18160dddu32,
-                &[],
-                total_supply + balance - old_balance,
-            )?;
-
-            Ok(Some(old_balance))
-        } else {
-            Ok(None)
-        }
-    }
 }
 
 #[cfg(test)]
@@ -476,13 +395,13 @@ mod tests_with_db {
     use std::{path::Path, str::FromStr};
 
     use reth_primitives::Address;
-    use revm_primitives::U256;
+    use revm_primitives::{BlockEnv, CfgEnv, U256};
 
     use crate::{
         config::flags::SoflConfig,
         engine::{
-            providers::BcProviderBuilder, state::fork::ForkedBcState,
-            transactions::position::TxPosition,
+            cheatcodes::ERC20Cheat, providers::BcProviderBuilder,
+            state::fork::ForkedBcState, transactions::position::TxPosition,
         },
     };
 
@@ -497,7 +416,10 @@ mod tests_with_db {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = ForkedBcState::fork_at(&bp, fork_at).unwrap();
 
-        let mut cheatcode = CheatCodes::default();
+        let mut cheatcode = CheatCodes::<ForkedBcState>::new(
+            CfgEnv::default(),
+            BlockEnv::default(),
+        );
 
         let token =
             Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")
