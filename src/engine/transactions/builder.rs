@@ -1,5 +1,5 @@
 use reth_primitives::Address;
-use revm_primitives::{BlockEnv, CfgEnv};
+use revm_primitives::{BlockEnv, CfgEnv, U256};
 
 use crate::utils::conversion::{Convert, ToElementary};
 
@@ -161,8 +161,8 @@ impl TxBuilder {
         self
     }
 
-    pub fn set_value(mut self, value: u128) -> Self {
-        self.value = Some(value);
+    pub fn set_value(mut self, value: U256) -> Self {
+        self.value = Some(ToElementary::cvt(value));
         self
     }
 

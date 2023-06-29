@@ -20,6 +20,13 @@ pub trait Convert<F, T> {
     fn cvt(v: F) -> T;
 }
 
+impl<F: Clone, T, C: Convert<F, T>> Convert<&F, T> for C {
+    /// Convert from F to To
+    fn cvt(v: &F) -> T {
+        C::cvt(v.clone())
+    }
+}
+
 pub struct ToElementary {}
 
 impl Convert<U256, u64> for ToElementary {
@@ -31,7 +38,7 @@ impl Convert<U256, u64> for ToElementary {
             panic!("U256 too large to fit in u64")
         }
         let mut bytes: [u8; 8] = [0; 8];
-        bytes[..be.len()].copy_from_slice(be.as_slice());
+        bytes[be.len()..].copy_from_slice(be.as_slice());
         u64::from_be_bytes(bytes)
     }
 }
@@ -45,7 +52,7 @@ impl Convert<U256, u128> for ToElementary {
             panic!("U256 too large to fit in u64")
         }
         let mut bytes: [u8; 16] = [0; 16];
-        bytes[..be.len()].copy_from_slice(be.as_slice());
+        bytes[be.len()..].copy_from_slice(be.as_slice());
         u128::from_be_bytes(bytes)
     }
 }
@@ -57,28 +64,28 @@ impl Convert<U256, u128> for ToElementary {
 
 pub struct ToPrimitive {}
 
-impl Convert<&ethersU256, U256> for ToPrimitive {
-    fn cvt(v: &ethersU256) -> U256 {
+impl Convert<ethersU256, U256> for ToPrimitive {
+    fn cvt(v: ethersU256) -> U256 {
         let mut b: [u8; 32] = [0; 32];
         v.to_big_endian(&mut b);
         U256::from_be_bytes(b)
     }
 }
 
-impl Convert<&ethersAddress, Address> for ToPrimitive {
-    fn cvt(v: &ethersAddress) -> Address {
-        (*v).into()
+impl Convert<ethersAddress, Address> for ToPrimitive {
+    fn cvt(v: ethersAddress) -> Address {
+        v.into()
     }
 }
 
-impl Convert<&ethersBytes, Bytes> for ToPrimitive {
-    fn cvt(v: &ethersBytes) -> Bytes {
-        v.clone().0.into()
+impl Convert<ethersBytes, Bytes> for ToPrimitive {
+    fn cvt(v: ethersBytes) -> Bytes {
+        v.0.into()
     }
 }
 
-impl Convert<&ethersH256, H256> for ToPrimitive {
-    fn cvt(v: &ethersH256) -> H256 {
+impl Convert<ethersH256, H256> for ToPrimitive {
+    fn cvt(v: ethersH256) -> H256 {
         v.0.into()
     }
 }
@@ -127,6 +134,22 @@ impl Convert<&str, Bytes> for ToPrimitive {
     }
 }
 
+impl Convert<u64, Address> for ToPrimitive {
+    fn cvt(v: u64) -> Address {
+        let mut b: [u8; 20] = [0; 20];
+        b[12..].copy_from_slice(&v.to_be_bytes());
+        Address::from_slice(&b)
+    }
+}
+
+impl Convert<u128, U256> for ToPrimitive {
+    fn cvt(v: u128) -> U256 {
+        let mut b: [u8; 32] = [0; 32];
+        b[16..].copy_from_slice(&v.to_be_bytes());
+        U256::from_be_bytes(b)
+    }
+}
+
 impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for ToPrimitive {
     fn cvt(block: ethersBlock<ethersTxHash>) -> Option<SealedHeader> {
         block.author?;
@@ -159,18 +182,18 @@ impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for ToPrimitive {
     }
 }
 
-impl Convert<&ethersLog, Log> for ToPrimitive {
-    fn cvt(v: &ethersLog) -> Log {
+impl Convert<ethersLog, Log> for ToPrimitive {
+    fn cvt(v: ethersLog) -> Log {
         Log {
-            address: ToPrimitive::cvt(&v.address),
+            address: ToPrimitive::cvt(v.address),
             topics: v.topics.iter().map(ToPrimitive::cvt).collect(),
-            data: ToPrimitive::cvt(&v.data),
+            data: ToPrimitive::cvt(v.data),
         }
     }
 }
 
-impl Convert<&ethersReceipt, Receipt> for ToPrimitive {
-    fn cvt(v: &ethersReceipt) -> Receipt {
+impl Convert<ethersReceipt, Receipt> for ToPrimitive {
+    fn cvt(v: ethersReceipt) -> Receipt {
         let tx_type = match v.transaction_type.map(|t| t.as_u64()) {
             None => TxType::Legacy,
             Some(1) => TxType::EIP2930,
@@ -192,8 +215,8 @@ impl Convert<&ethersReceipt, Receipt> for ToPrimitive {
     }
 }
 
-impl Convert<&ethersTransaction, TransactionSigned> for ToPrimitive {
-    fn cvt(tx: &ethersTransaction) -> TransactionSigned {
+impl Convert<ethersTransaction, TransactionSigned> for ToPrimitive {
+    fn cvt(tx: ethersTransaction) -> TransactionSigned {
         let rlp = tx.rlp();
         let mut rlp = rlp.as_ref();
         TransactionSigned::decode(&mut rlp).unwrap()
@@ -207,26 +230,26 @@ impl Convert<&ethersTransaction, TransactionSigned> for ToPrimitive {
 
 pub struct ToEthers {}
 
-impl Convert<&B256, ethersH256> for ToEthers {
-    fn cvt(v: &B256) -> ethersH256 {
+impl Convert<B256, ethersH256> for ToEthers {
+    fn cvt(v: B256) -> ethersH256 {
         ethersH256::from_slice(&v.0)
     }
 }
 
-impl Convert<&u64, ethersU64> for ToEthers {
-    fn cvt(v: &u64) -> ethersU64 {
-        ethersU64::from(*v)
+impl Convert<u64, ethersU64> for ToEthers {
+    fn cvt(v: u64) -> ethersU64 {
+        ethersU64::from(v)
     }
 }
 
-impl Convert<&Address, ethersAddress> for ToEthers {
-    fn cvt(v: &Address) -> ethersAddress {
+impl Convert<Address, ethersAddress> for ToEthers {
+    fn cvt(v: Address) -> ethersAddress {
         ethersAddress::from_slice(v.as_slice())
     }
 }
 
-impl Convert<&BlockHashOrNumber, ethersBlockId> for ToEthers {
-    fn cvt(v: &BlockHashOrNumber) -> ethersBlockId {
+impl Convert<BlockHashOrNumber, ethersBlockId> for ToEthers {
+    fn cvt(v: BlockHashOrNumber) -> ethersBlockId {
         match v {
             BlockHashOrNumber::Hash(h) => ethersBlockId::Hash(ToEthers::cvt(h)),
             BlockHashOrNumber::Number(n) => ethersBlockId::Number(
@@ -236,22 +259,24 @@ impl Convert<&BlockHashOrNumber, ethersBlockId> for ToEthers {
     }
 }
 
-impl Convert<&BlockHash, ethersBlockId> for ToEthers {
-    fn cvt(v: &BlockHash) -> ethersBlockId {
+impl Convert<BlockHash, ethersBlockId> for ToEthers {
+    fn cvt(v: BlockHash) -> ethersBlockId {
         ethersBlockId::Hash(ToEthers::cvt(v))
     }
 }
 
-impl Convert<&u64, ethersBlockId> for ToEthers {
-    fn cvt(v: &u64) -> ethersBlockId {
+impl Convert<u64, ethersBlockId> for ToEthers {
+    fn cvt(v: u64) -> ethersBlockId {
         ethersBlockId::Number(ethersBlockNumber::Number(ToEthers::cvt(v)))
     }
 }
 
 pub struct ToIterator {}
 
-impl<R: RangeBounds<u64>> Convert<R, RangeInclusive<u64>> for ToIterator {
-    fn cvt(rb: R) -> RangeInclusive<u64> {
+impl ToIterator {
+    pub fn from_range_bounds<R: RangeBounds<u64>>(
+        rb: R,
+    ) -> RangeInclusive<u64> {
         let start: u64 = match rb.start_bound() {
             std::ops::Bound::Included(v) => *v,
             std::ops::Bound::Excluded(v) => v + 1,

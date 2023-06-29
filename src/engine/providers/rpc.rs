@@ -298,7 +298,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         range: impl RangeBounds<BlockNumber>,
     ) -> rethResult<Vec<Vec<TransactionSigned>>> {
         let mut bs = Vec::new();
-        for bn in ToIterator::cvt(range) {
+        for bn in ToIterator::from_range_bounds(range) {
             let b =
                 self.transactions_by_block(BlockHashOrNumber::Number(bn))?;
             if b.is_none() {
@@ -447,7 +447,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         range: impl RangeBounds<BlockNumber>,
     ) -> rethResult<Vec<Header>> {
         let mut bs = Vec::new();
-        for bn in ToIterator::cvt(range) {
+        for bn in ToIterator::from_range_bounds(range) {
             let b = self.header_by_number(bn)?;
             if b.is_none() {
                 break;
@@ -464,7 +464,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
         range: impl RangeBounds<BlockNumber>,
     ) -> rethResult<Vec<SealedHeader>> {
         let mut bs = Vec::new();
-        for bn in ToIterator::cvt(range) {
+        for bn in ToIterator::from_range_bounds(range) {
             let b = self.sealed_header(bn)?;
             if b.is_none() {
                 break;
