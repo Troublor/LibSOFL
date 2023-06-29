@@ -2,7 +2,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use libsofl::config::flags::SoflConfig;
-use libsofl::engine::cheatcodes::{CheatCodes, ERC20Cheat};
+use libsofl::engine::cheatcodes::{CheatCodes, ERC20Cheat, PriceOracleCheat};
 use libsofl::engine::providers::BcProviderBuilder;
 use libsofl::engine::state::fork::ForkedBcState;
 use libsofl::engine::transactions::position::TxPosition;
@@ -57,5 +57,21 @@ fn main() {
 
         let decimals = cheatcode.get_erc20_decimals(&mut state, token).unwrap();
         println!("decimals: {} : {}", token, decimals);
+    }
+
+    {
+        let WBTC =
+            Address::from_str("0x2260fac5e5542a773aa44fbcfedf7c193bc2c599")
+                .unwrap();
+        let price = cheatcode.get_price_in_ether(&mut state, WBTC).unwrap();
+        let decimals = cheatcode.get_erc20_decimals(&mut state, WBTC).unwrap();
+        println!("price: {} : {} : {}", WBTC, price, decimals);
+    }
+    if false {
+        let WETH =
+            Address::from_str("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+                .unwrap();
+        let price = cheatcode.get_price_in_ether(&mut state, WETH).unwrap();
+        println!("price: {} : {}", WETH, price);
     }
 }

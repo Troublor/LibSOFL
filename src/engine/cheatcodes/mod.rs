@@ -1,6 +1,6 @@
 // A set of cheatcodes that can directly modify the environments
 
-use std::collections::BTreeMap;
+use std::{collections::BTreeMap, marker::PhantomData};
 
 use crate::{engine::state::BcState, error::SoflError};
 use ethers::abi::{self, ParamType, Token};
@@ -17,7 +17,7 @@ mod erc20;
 pub use erc20::ERC20Cheat;
 
 mod price_oracle;
-pub use price_oracle::{PriceOracle, PriceOracleCheat};
+pub use price_oracle::PriceOracleCheat;
 
 macro_rules! get_the_first_uint {
     ($tokens:expr) => {
@@ -39,15 +39,15 @@ enum SlotQueryResult {
 
 #[derive(Debug, Default)]
 pub struct CheatCodes<S: BcState> {
+    // phantom
+    phantom: PhantomData<S>,
+
     // runtime env
     env: Env,
     inspector: CheatcodeInspector,
 
     // slot info: (codehash, calldata) -> slot_state
     slots: BTreeMap<(B256, Bytes), SlotQueryResult>,
-
-    // price oracles
-    price_oracles: Vec<PriceOracle<S>>,
 }
 
 fn pack_calldata(fsig: u32, args: &[Token]) -> Bytes {
@@ -78,7 +78,7 @@ impl<S: BcState> CheatCodes<S> {
                 block,
                 ..Default::default()
             },
-            price_oracles: Vec::new(),
+            phantom: PhantomData,
             inspector: CheatcodeInspector::default(),
             slots: BTreeMap::new(),
         }
