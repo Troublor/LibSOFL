@@ -32,7 +32,7 @@ impl TxBuilder {
         let to = self
             .to
             .unwrap_or(None)
-            .map(|a| reth_primitives::TransactionKind::Call(a))
+            .map(reth_primitives::TransactionKind::Call)
             .unwrap_or(reth_primitives::TransactionKind::Create);
         let nonce = self.nonce.unwrap_or(0);
         let value = self.value.unwrap_or(0);
@@ -129,8 +129,13 @@ impl TxBuilder {
         self
     }
 
-    pub fn set_to(mut self, to: Option<Address>) -> Self {
-        self.to = Some(to);
+    pub fn set_to(mut self, to: Address) -> Self {
+        self.to = Some(Some(to));
+        self
+    }
+
+    pub fn unset_to(mut self) -> Self {
+        self.to = Some(None);
         self
     }
 
