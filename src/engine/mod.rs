@@ -1,3 +1,4 @@
+pub mod actions;
 pub mod cheatcodes;
 pub mod config;
 pub mod inspectors;

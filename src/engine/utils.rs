@@ -61,7 +61,7 @@ impl HighLevelCaller {
     ) -> Result<Bytes, SoflError<BS::DbErr>> {
         let tx = TxBuilder::new()
             .set_from(self.address)
-            .set_to(Some(callee))
+            .set_to(callee)
             .set_input(calldata)
             .build();
         let out = state.transact(
@@ -89,7 +89,7 @@ impl HighLevelCaller {
     ) -> Result<Bytes, SoflError<BS::DbErr>> {
         let tx = TxBuilder::new()
             .set_from(self.address)
-            .set_to(Some(callee))
+            .set_to(callee)
             .set_input(calldata)
             .build();
         let out = state.transact(
