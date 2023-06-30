@@ -1,5 +1,6 @@
 use std::ops::{RangeBounds, RangeInclusive};
 
+use ethers::abi::RawLog as ethersRawLog;
 use ethers::types::{
     Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
     BlockNumber as ethersBlockNumber, Bytes as ethersBytes, Log as ethersLog,
@@ -230,6 +231,12 @@ impl Convert<ethersTransaction, TransactionSigned> for ToPrimitive {
 
 pub struct ToEthers {}
 
+impl Convert<Bytes, ethersBytes> for ToEthers {
+    fn cvt(v: Bytes) -> ethersBytes {
+        ethersBytes::from(v.0)
+    }
+}
+
 impl Convert<B256, ethersH256> for ToEthers {
     fn cvt(v: B256) -> ethersH256 {
         ethersH256::from_slice(&v.0)
@@ -268,6 +275,15 @@ impl Convert<BlockHash, ethersBlockId> for ToEthers {
 impl Convert<u64, ethersBlockId> for ToEthers {
     fn cvt(v: u64) -> ethersBlockId {
         ethersBlockId::Number(ethersBlockNumber::Number(ToEthers::cvt(v)))
+    }
+}
+
+impl Convert<Log, ethersRawLog> for ToEthers {
+    fn cvt(v: Log) -> ethersRawLog {
+        ethersRawLog {
+            topics: v.topics.iter().map(ToEthers::cvt).collect(),
+            data: v.data.to_vec(),
+        }
     }
 }
 
