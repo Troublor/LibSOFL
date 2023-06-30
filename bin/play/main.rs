@@ -60,18 +60,43 @@ fn main() {
     }
 
     {
-        let WBTC =
+        let wbtc =
             Address::from_str("0x2260fac5e5542a773aa44fbcfedf7c193bc2c599")
                 .unwrap();
-        let price = cheatcode.get_price_in_ether(&mut state, WBTC).unwrap();
-        let decimals = cheatcode.get_erc20_decimals(&mut state, WBTC).unwrap();
-        println!("price: {} : {} : {}", WBTC, price, decimals);
+        let price = cheatcode.get_price_in_ether(&mut state, wbtc).unwrap();
+        let decimals = cheatcode.get_erc20_decimals(&mut state, wbtc).unwrap();
+        println!("price: {} : {} : {}", wbtc, price, decimals);
     }
-    if false {
-        let WETH =
+    {
+        let weth =
             Address::from_str("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
                 .unwrap();
-        let price = cheatcode.get_price_in_ether(&mut state, WETH).unwrap();
-        println!("price: {} : {}", WETH, price);
+        let price = cheatcode.get_price_in_ether(&mut state, weth).unwrap();
+        let decimals = cheatcode.get_erc20_decimals(&mut state, weth).unwrap();
+        println!("price: {} : {} : {}", weth, price, decimals);
+    }
+    {
+        let usdc: Address =
+            Address::from_str("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+                .unwrap();
+        let price = cheatcode.get_price_in_ether(&mut state, usdc).unwrap();
+        let decimals = cheatcode.get_erc20_decimals(&mut state, usdc).unwrap();
+        println!("price: {} : {} : {}", usdc, price, decimals);
+    }
+    {
+        let dai: Address =
+            Address::from_str("0x6b175474e89094c44da98b954eedeac495271d0f")
+                .unwrap();
+        let price = cheatcode.get_price_in_ether(&mut state, dai).unwrap();
+        let decimals = cheatcode.get_erc20_decimals(&mut state, dai).unwrap();
+        println!("price: {} : {} : {}", dai, price, decimals);
+    }
+    {
+        let usdt: Address =
+            Address::from_str("0xdac17f958d2ee523a2206206994597c13d831ec7")
+                .unwrap();
+        let price = cheatcode.get_price_in_ether(&mut state, usdt).unwrap();
+        let decimals = cheatcode.get_erc20_decimals(&mut state, usdt).unwrap();
+        println!("price: {} : {} : {}", usdt, price, decimals);
     }
 }

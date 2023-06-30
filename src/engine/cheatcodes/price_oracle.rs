@@ -114,39 +114,67 @@ impl<S: BcState> CheatCodes<S> {
             &[ParamType::Address],
         )?;
 
+        if token == *WETH {
+            return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
+        }
+
         // iterate through all main stream tokens and fees
         let mut best_pool = Address::default();
         let mut best_ms_token = Address::default();
         let mut best_liquidity = U256::ZERO;
-        for ms_token in MAINSTREAM_TOKENS.iter() {
-            for fee in UNISWAP_V3_FEES.iter() {
-                let pool: Address = ToPrimitive::cvt(
-                    &self.cheat_read(
-                        state,
-                        *UNISWAP_V3_FACTORY,
-                        0x1698ee82u32, // getPool
-                        &[
-                            Token::Address(token.into()),
-                            Token::Address((*ms_token).into()),
-                            Token::Uint(ethers::types::U256::from(*fee)),
-                        ],
-                        &[ParamType::Address],
-                    )?[0]
-                        .clone()
-                        .into_address()
-                        .expect("cannot fail"),
-                );
-                if pool == Address::from(0) {
-                    continue;
-                }
 
-                if let Ok(token_liquidity) =
-                    self.get_erc20_balance(state, token, pool)
-                {
-                    if token_liquidity > best_liquidity {
-                        best_liquidity = token_liquidity;
-                        best_pool = pool;
-                        best_ms_token = *ms_token;
+        // a shortcut for mainstream tokens
+        if MAINSTREAM_TOKENS.contains(&token) {
+            // this cannot be WETH
+            best_pool = ToPrimitive::cvt(
+                &self.cheat_read(
+                    state,
+                    *UNISWAP_V3_FACTORY,
+                    0x1698ee82u32, // getPool
+                    &[
+                        Token::Address(token.into()),
+                        Token::Address((*WETH).into()),
+                        Token::Uint(ethers::types::U256::from(500)), // WETH-USD pool
+                    ],
+                    &[ParamType::Address],
+                )?[0]
+                    .clone()
+                    .into_address()
+                    .expect("cannot fail"),
+            );
+            best_ms_token = *WETH;
+            best_liquidity = self.get_erc20_balance(state, token, best_pool)?;
+        } else {
+            for ms_token in MAINSTREAM_TOKENS.iter() {
+                for fee in UNISWAP_V3_FEES.iter() {
+                    let pool: Address = ToPrimitive::cvt(
+                        &self.cheat_read(
+                            state,
+                            *UNISWAP_V3_FACTORY,
+                            0x1698ee82u32, // getPool
+                            &[
+                                Token::Address(token.into()),
+                                Token::Address((*ms_token).into()),
+                                Token::Uint(ethers::types::U256::from(*fee)),
+                            ],
+                            &[ParamType::Address],
+                        )?[0]
+                            .clone()
+                            .into_address()
+                            .expect("cannot fail"),
+                    );
+                    if pool == Address::from(0) {
+                        continue;
+                    }
+
+                    if let Ok(token_liquidity) =
+                        self.get_erc20_balance(state, token, pool)
+                    {
+                        if token_liquidity > best_liquidity {
+                            best_liquidity = token_liquidity;
+                            best_pool = pool;
+                            best_ms_token = *ms_token;
+                        }
                     }
                 }
             }
@@ -185,10 +213,6 @@ impl<S: BcState> CheatCodes<S> {
                     )
             }
         };
-        println!(
-            "token balance: {}, ms token balance: {}, pool: {:?}",
-            token_balance, ms_token_balance_in_pool1, best_pool,
-        );
 
         if best_ms_token == *WETH {
             Ok((
