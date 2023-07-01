@@ -9,8 +9,6 @@ use revm::Database;
 use revm_primitives::Address;
 use serde::{Deserialize, Serialize};
 
-use super::state::BcState;
-
 pub type StateChange = revm_primitives::State;
 #[derive(From)]
 pub enum TxOrPseudo<'a, S> {
@@ -61,7 +59,7 @@ impl<'a, S: Database> From<reth_primitives::TransactionSigned>
     }
 }
 
-impl<'a, S: BcState> From<&TxOrPseudo<'a, S>> for TxOrPseudo<'a, S> {
+impl<'a, S: Database> From<&TxOrPseudo<'a, S>> for TxOrPseudo<'a, S> {
     fn from(value: &TxOrPseudo<'a, S>) -> Self {
         match value {
             TxOrPseudo::Tx(tx) => TxOrPseudo::Tx(tx.clone()),

@@ -14,7 +14,7 @@ use reth_primitives::{
 };
 
 use reth_rlp::Decodable;
-use revm_primitives::{hex, B256, B256 as H256, U256};
+use revm_primitives::{hex, Bytes as revmBytes, B256, B256 as H256, U256};
 
 pub trait Convert<F, T> {
     /// Convert from F to To
@@ -82,6 +82,12 @@ impl Convert<ethersAddress, Address> for ToPrimitive {
 impl Convert<ethersBytes, Bytes> for ToPrimitive {
     fn cvt(v: ethersBytes) -> Bytes {
         v.0.into()
+    }
+}
+
+impl Convert<revmBytes, Bytes> for ToPrimitive {
+    fn cvt(v: revmBytes) -> Bytes {
+        v.as_ref().into()
     }
 }
 

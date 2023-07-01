@@ -53,8 +53,8 @@ dirs = "5.0" # from svm-rs
 semver = { version = "1.0", features = ["serde"] } # from svm-rs
 
 # reth
-revm = { path = "./revm/crates/revm", features = ["memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
-revm-primitives = { path = "./revm/crates/primitives", features = ["memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
+revm = { path = "./revm/crates/revm", features = ["serde", "memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
+revm-primitives = { path = "./revm/crates/primitives", features = ["serde", "memory_limit", "optional_balance_check", "optional_block_gas_limit", "optional_eip3607", "optional_gas_refund", "optional_no_base_fee"] }
 reth-config = { path = "./reth/crates/config" }
 reth-primitives = { path = "./reth/crates/primitives", features = ["arbitrary"] }
 reth-db = { path = "./reth/crates/storage/db", features = ["mdbx", "test-utils"] }

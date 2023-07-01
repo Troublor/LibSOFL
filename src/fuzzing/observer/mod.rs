@@ -7,16 +7,12 @@ use derive_more::{AsMut, AsRef, Deref, DerefMut};
 use libafl::prelude::{
     tuple_list, Input, MatchName, Observer, ObserversTuple, UsesInput,
 };
-use revm::Inspector;
+use revm::{Database, Inspector};
 use revm_primitives::ExecutionResult;
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{
-    inspectors::{
-        combined::CombinedInspector, no_inspector, MultiTxInspector,
-        NoInspector,
-    },
-    state::BcState,
+use crate::engine::inspectors::{
+    combined::CombinedInspector, no_inspector, MultiTxInspector, NoInspector,
 };
 
 pub mod result;
@@ -25,7 +21,7 @@ pub mod trace;
 pub trait EvmObserver<S, BS>: Observer<S>
 where
     S: UsesInput,
-    BS: BcState,
+    BS: Database,
 {
     type Inspector: MultiTxInspector<BS>;
 
@@ -58,7 +54,7 @@ where
     }
 }
 
-pub trait EvmObserversTuple<S: UsesInput, BS: BcState>:
+pub trait EvmObserversTuple<S: UsesInput, BS: Database>:
     ObserversTuple<S>
 {
     type Inspector: MultiTxInspector<BS>;
@@ -78,7 +74,7 @@ pub trait EvmObserversTuple<S: UsesInput, BS: BcState>:
     ) -> Result<(), libafl::Error>;
 }
 
-impl<S: UsesInput, BS: BcState> EvmObserversTuple<S, BS> for () {
+impl<S: UsesInput, BS: Database> EvmObserversTuple<S, BS> for () {
     type Inspector = ();
 
     fn get_inspector(
@@ -103,7 +99,7 @@ impl<S: UsesInput, BS: BcState> EvmObserversTuple<S, BS> for () {
 impl<S, BS, Head, Tail> EvmObserversTuple<S, BS> for (Head, Tail)
 where
     S: UsesInput,
-    BS: BcState + revm::Database,
+    BS: Database + revm::Database,
     Head: EvmObserver<S, BS>,
     Tail: EvmObserversTuple<S, BS>,
 {

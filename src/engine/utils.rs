@@ -1,20 +1,20 @@
 use reth_primitives::Address;
-use revm_primitives::{BlockEnv, Bytes, ExecutionResult, Output, U256};
+use revm::{Database, DatabaseCommit};
+use revm_primitives::{BlockEnv, Bytes, CfgEnv, ExecutionResult, Output, U256};
 
-use crate::{
-    engine::{inspectors::no_inspector, transactions::builder::TxBuilder},
-    error::SoflError,
+use crate::{engine::transactions::builder::TxBuilder, error::SoflError};
+
+use super::{
+    inspectors::{static_call::StaticCallEnforceInspector, MultiTxInspector},
+    state::{env::TransitionSpecBuilder, state::BcState},
 };
-
-use super::{config::EngineConfig, state::BcState};
 
 #[derive(Debug, Clone, Default)]
 pub struct HighLevelCaller {
     pub address: Address,
     pub nonce: u64,
     pub gas_limit: u64,
-    pub cfg: EngineConfig,
-    pub block: BlockEnv,
+    pub spec_builder: TransitionSpecBuilder,
 }
 
 impl From<Address> for HighLevelCaller {
@@ -36,13 +36,13 @@ impl HighLevelCaller {
         self
     }
 
-    pub fn set_cfg(mut self, cfg: EngineConfig) -> Self {
-        self.cfg = cfg;
+    pub fn set_cfg(mut self, cfg: CfgEnv) -> Self {
+        self.spec_builder = self.spec_builder.set_cfg(cfg);
         self
     }
 
     pub fn set_block(mut self, block: BlockEnv) -> Self {
-        self.block = block;
+        self.spec_builder = self.spec_builder.set_block(block);
         self
     }
 
@@ -52,54 +52,58 @@ impl HighLevelCaller {
     }
 
     pub fn bypass_check(mut self) -> Self {
-        self.cfg = self
-            .cfg
-            .toggle_nonce_check(false)
-            .toggle_balance_check(false)
-            .toggle_base_fee(false)
-            .toggle_block_gas_limit(false)
-            .toggle_eip3607(false)
-            .toggle_base_fee(false);
+        self.spec_builder = self.spec_builder.bypass_check();
         self.set_gas_limit(u64::MAX)
     }
 }
 
 impl HighLevelCaller {
-    pub fn static_call<BS: BcState>(
+    pub fn static_call<
+        'a,
+        BS: Database + DatabaseCommit,
+        I: MultiTxInspector<&'a mut BS>,
+    >(
         &self,
-        state: &mut BS,
+        state: &'a mut BS,
         callee: Address,
         calldata: &[u8],
-    ) -> Result<Bytes, SoflError<BS::DbErr>> {
+        inspector: &mut I,
+    ) -> Result<Bytes, SoflError<BS::Error>> {
         let tx = TxBuilder::new()
             .set_from(self.address)
             .set_to(callee)
             .set_input(calldata)
             .build();
-        let out = state.transact(
-            self.cfg.clone(),
-            self.block.clone(),
-            tx,
-            no_inspector(),
+        let spec = self.spec_builder.clone().append_tx(tx.from(), tx).build();
+        let (_, mut result) = BcState::transit(
+            state,
+            spec,
+            &mut (&mut StaticCallEnforceInspector::default(), inspector),
         )?;
-        match out.result {
+        let result = result.pop().unwrap();
+        match result {
             ExecutionResult::Success { output, .. } => {
                 let Output::Call(ret) = output else {
                     panic!("should not happen since `tx.to` is set")
                 };
                 Ok(ret)
             }
-            _ => Err(SoflError::Exec(out.result)),
+            _ => Err(SoflError::Exec(result)),
         }
     }
 
-    pub fn call<BS: BcState>(
+    pub fn call<
+        'a,
+        BS: Database + DatabaseCommit,
+        I: MultiTxInspector<&'a mut BS>,
+    >(
         &self,
-        state: &mut BS,
+        state: &'a mut BS,
         callee: Address,
         calldata: &[u8],
         value: Option<U256>,
-    ) -> Result<Bytes, SoflError<BS::DbErr>> {
+        inspector: &mut I,
+    ) -> Result<Bytes, SoflError<BS::Error>> {
         let tx = TxBuilder::new()
             .set_from(self.address)
             .set_to(callee)
@@ -107,47 +111,53 @@ impl HighLevelCaller {
             .set_gas_limit(self.gas_limit)
             .set_value(value.unwrap_or(U256::default()))
             .build();
-        let out = state.transact(
-            self.cfg.clone(),
-            self.block.clone(),
-            tx,
-            no_inspector(),
-        )?;
-        match out.result {
+        let spec = self.spec_builder.clone().append_tx(tx.from(), tx).build();
+        let (_, mut result) = BcState::transit(state, spec, inspector)?;
+        let result = result.pop().unwrap();
+        match result {
             ExecutionResult::Success { output, .. } => {
                 let Output::Call(ret) = output else {
                     panic!("should not happen since `tx.to` is set")
                 };
-                state.commit(out.state);
                 Ok(ret)
             }
-            _ => Err(SoflError::Exec(out.result)),
+            _ => Err(SoflError::Exec(result)),
         }
     }
 
-    pub fn view<BS: BcState>(
+    pub fn view<
+        'a,
+        BS: Database + DatabaseCommit,
+        I: MultiTxInspector<&'a mut BS>,
+    >(
         &self,
-        state: &mut BS,
+        state: &'a mut BS,
         callee: Address,
         func: &ethers::abi::Function,
         args: &[ethers::abi::Token],
-    ) -> Result<Vec<ethers::abi::Token>, SoflError<BS::DbErr>> {
+        inspector: &mut I,
+    ) -> Result<Vec<ethers::abi::Token>, SoflError<BS::Error>> {
         let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
-        let ret = self.static_call(state, callee, &calldata)?;
+        let ret = self.static_call(state, callee, &calldata, inspector)?;
         func.decode_output(ret.to_vec().as_slice())
             .map_err(SoflError::Abi)
     }
 
-    pub fn invoke<BS: BcState>(
+    pub fn invoke<
+        'a,
+        BS: Database + DatabaseCommit,
+        I: MultiTxInspector<&'a mut BS>,
+    >(
         &self,
-        state: &mut BS,
+        state: &'a mut BS,
         callee: Address,
         func: &ethers::abi::Function,
         args: &[ethers::abi::Token],
         value: Option<U256>,
-    ) -> Result<Vec<ethers::abi::Token>, SoflError<BS::DbErr>> {
+        inspector: &mut I,
+    ) -> Result<Vec<ethers::abi::Token>, SoflError<BS::Error>> {
         let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
-        let ret = self.call(state, callee, &calldata, value)?;
+        let ret = self.call(state, callee, &calldata, value, inspector)?;
         func.decode_output(ret.to_vec().as_slice())
             .map_err(SoflError::Abi)
     }

@@ -7,7 +7,7 @@ use revm::{
 };
 use revm_primitives::U256;
 
-use crate::engine::{inspectors::MultiTxInspector, state::BcState};
+use crate::engine::inspectors::MultiTxInspector;
 
 /// Returns [InstructionResult::Continue] on an error, discarding the error.
 ///
@@ -97,4 +97,4 @@ where
     }
 }
 
-impl<BS> MultiTxInspector<BS> for CheatcodeInspector where BS: BcState {}
+impl<BS> MultiTxInspector<BS> for CheatcodeInspector where BS: Database {}
