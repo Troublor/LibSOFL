@@ -99,7 +99,7 @@ fn token_price_in_ether(
         / (token_balance * bs_token_balance2)
 }
 
-// basic functions for price oracle
+// Uniswap V2
 impl<S: BcState> CheatCodes<S> {
     fn query_uniswap_v2(
         &mut self,
@@ -256,5 +256,98 @@ impl<S: BcState> CheatCodes<S> {
         Ok(ToPrimitive::cvt(
             token_pair[0].clone().into_address().expect("cannot fail"),
         ))
+    }
+}
+
+// Uniswap v3
+impl<S: BcState> CheatCodes<S> {
+    fn query_uniswap_v3(
+        &mut self,
+        state: &mut S,
+        token: Address,
+    ) -> Result<(U256, U256), SoflError<S::DbErr>> {
+        // check whether uniswap v3 exists
+        let _ = self.cheat_read(
+            state,
+            *UNISWAP_V3_FACTORY,
+            0x8da5cb5bu32, /* owner() */
+            &[],
+            &[ParamType::Address],
+        )?;
+
+        if token == *WETH {
+            return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
+        }
+
+        // iterate through all main stream tokens and fees
+        let mut best_pool = Address::default();
+        let mut best_ms_token = Address::default();
+        let mut best_liquidity = U256::ZERO;
+
+        // a shortcut for mainstream tokens
+        if MAINSTREAM_TOKENS.contains(&token) {
+            // this cannot be WETH
+            best_pool = ToPrimitive::cvt(
+                &self.cheat_read(
+                    state,
+                    *UNISWAP_V3_FACTORY,
+                    0x1698ee82u32, // getPool
+                    &[
+                        Token::Address(token.into()),
+                        Token::Address((*WETH).into()),
+                        Token::Uint(ethers::types::U256::from(500)), // WETH-USD pool
+                    ],
+                    &[ParamType::Address],
+                )?[0]
+                    .clone()
+                    .into_address()
+                    .expect("cannot fail"),
+            );
+            best_ms_token = *WETH;
+            best_liquidity = self.get_erc20_balance(state, token, best_pool)?;
+        } else {
+            for ms_token in MAINSTREAM_TOKENS.iter() {
+                for fee in UNISWAP_V3_FEES.iter() {
+                    let pool: Address = ToPrimitive::cvt(
+                        &self.cheat_read(
+                            state,
+                            *UNISWAP_V3_FACTORY,
+                            0x1698ee82u32, // getPool
+                            &[
+                                Token::Address(token.into()),
+                                Token::Address((*ms_token).into()),
+                                Token::Uint(ethers::types::U256::from(*fee)),
+                            ],
+                            &[ParamType::Address],
+                        )?[0]
+                            .clone()
+                            .into_address()
+                            .expect("cannot fail"),
+                    );
+                    if pool == Address::from(0) {
+                        continue;
+                    }
+
+                    if let Ok(token_liquidity) =
+                        self.get_erc20_balance(state, token, pool)
+                    {
+                        if token_liquidity > best_liquidity {
+                            best_liquidity = token_liquidity;
+                            best_pool = pool;
+                            best_ms_token = *ms_token;
+                        }
+                    }
+                }
+            }
+        }
+
+        // if no pool found, return error
+        if best_pool == Address::default() {
+            return Err(SoflError::Custom(
+                "No pool found for uniswap v3".to_string(),
+            ));
+        }
+
+        todo!()
     }
 }
