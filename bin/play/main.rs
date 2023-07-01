@@ -14,7 +14,7 @@ fn main() {
     let datadir = Path::new(&datadir);
     let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
 
-    let fork_at = TxPosition::new(17000001, 0);
+    let fork_at = TxPosition::new(17395698, 0);
     let mut state = ForkedBcState::fork_at(&bp, fork_at).unwrap();
 
     let mut cheatcode = CheatCodes::<ForkedBcState>::new(
