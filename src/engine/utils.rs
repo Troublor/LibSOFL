@@ -6,7 +6,7 @@ use crate::{engine::transactions::builder::TxBuilder, error::SoflError};
 
 use super::{
     inspectors::{static_call::StaticCallEnforceInspector, MultiTxInspector},
-    state::{env::TransitionSpecBuilder, state::BcState},
+    state::{env::TransitionSpecBuilder, BcState},
 };
 
 #[derive(Debug, Clone, Default)]

@@ -4,7 +4,7 @@ use std::str::FromStr;
 use libsofl::config::flags::SoflConfig;
 use libsofl::engine::cheatcodes::{CheatCodes, ERC20Cheat, PriceOracleCheat};
 use libsofl::engine::providers::BcProviderBuilder;
-use libsofl::engine::state::state::BcStateBuilder;
+use libsofl::engine::state::BcStateBuilder;
 use libsofl::engine::transactions::position::TxPosition;
 use reth_primitives::Address;
 use revm_primitives::U256;

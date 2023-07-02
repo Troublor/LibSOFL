@@ -421,10 +421,7 @@ mod tests_with_jsonrpc {
         engine::{
             inspectors::asset_flow::AssetKind,
             providers::rpc::JsonRpcBcProvider,
-            state::{
-                env::TransitionSpec,
-                state::{BcState, BcStateBuilder},
-            },
+            state::{env::TransitionSpec, BcState, BcStateBuilder},
         },
         utils::conversion::{Convert, ToPrimitive},
     };

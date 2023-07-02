@@ -10,10 +10,7 @@ mod tests_with_db {
         engine::{
             inspectors::no_inspector,
             providers::BcProviderBuilder,
-            state::{
-                env::TransitionSpecBuilder,
-                state::{BcState, BcStateBuilder},
-            },
+            state::{env::TransitionSpecBuilder, BcState, BcStateBuilder},
             transactions::position::TxPosition,
         },
     };
@@ -28,7 +25,7 @@ mod tests_with_db {
         let receipts = bp.receipts_by_block(fork_at.block).unwrap().unwrap();
 
         // prepare state
-        let state = BcStateBuilder::fork_at(&bp, fork_at.clone()).unwrap();
+        let state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
         // prepare cfg and env
         let spec = TransitionSpecBuilder::new()
@@ -63,20 +60,14 @@ mod tests_with_db {
 
 #[cfg(test)]
 mod tests_with_jsonrpc {
-    use reth_provider::{
-        EvmEnvProvider, ReceiptProvider, TransactionsProvider,
-    };
-    use revm_primitives::{BlockEnv, CfgEnv};
+    use reth_provider::ReceiptProvider;
 
     use crate::{
         config::flags::SoflConfig,
         engine::{
             inspectors::no_inspector,
             providers::BcProviderBuilder,
-            state::{
-                env::{TransitionSpec, TransitionSpecBuilder},
-                state::{BcState, BcStateBuilder},
-            },
+            state::{env::TransitionSpec, BcState, BcStateBuilder},
             transactions::position::TxPosition,
         },
         utils::conversion::{Convert, ToPrimitive},
@@ -94,7 +85,7 @@ mod tests_with_jsonrpc {
         let fork_at = TxPosition::new(17000000, 0);
 
         // prepare state
-        let mut state = BcStateBuilder::fork_at(&bp, fork_at.clone()).unwrap();
+        let state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
         // collect the tx
         let tx_hash = ToPrimitive::cvt("0xa278205118a242c87943b9ed83aacafe9906002627612ac3672d8ea224e38181");

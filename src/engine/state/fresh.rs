@@ -5,17 +5,14 @@ mod tests_nodep {
 
     use revm::Database;
     use revm_primitives::{
-        Account, AccountInfo, Address, BlockEnv, Bytecode, Bytes, CfgEnv,
-        ExecutionResult, U256,
+        AccountInfo, Address, BlockEnv, Bytecode, CfgEnv, ExecutionResult, U256,
     };
 
     use crate::engine::{
         inspectors::no_inspector,
-        state::{
-            env::TransitionSpecBuilder,
-            state::{BcState, BcStateBuilder},
-        },
-        transactions::{StateChange, Tx, TxOrPseudo},
+        state::env::TransitionSpecBuilder,
+        state::{BcState, BcStateBuilder},
+        transactions::Tx,
     };
 
     #[test]

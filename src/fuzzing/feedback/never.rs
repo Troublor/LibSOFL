@@ -12,16 +12,16 @@ impl Named for NeverFeedback {
 impl<S: UsesInput + HasClientPerfMonitor> Feedback<S> for NeverFeedback {
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
-        observers: &OT,
-        exit_kind: &libafl::prelude::ExitKind,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &S::Input,
+        _observers: &OT,
+        _exit_kind: &libafl::prelude::ExitKind,
     ) -> Result<bool, libafl::Error>
     where
         EM: libafl::prelude::EventFirer<State = S>,
         OT: libafl::prelude::ObserversTuple<S>,
     {
-        return Ok(false);
+        Ok(false)
     }
 }

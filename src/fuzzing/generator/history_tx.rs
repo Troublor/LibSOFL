@@ -39,7 +39,7 @@ impl<S, P: TransactionsProvider> Generator<TxInput, S>
                 }
             } else {
                 // fetch previous block
-                self.bn = self.bn - 1;
+                self.bn -= 1;
                 self.txs = self
                     .provider
                     .transactions_by_block(self.bn.into())

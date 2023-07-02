@@ -343,7 +343,7 @@ mod tests_with_db {
     use revm_primitives::U256;
 
     use crate::engine::cheatcodes::ERC20Cheat;
-    use crate::engine::state::state::BcStateBuilder;
+    use crate::engine::state::BcStateBuilder;
     use crate::{
         config::flags::SoflConfig,
         engine::{

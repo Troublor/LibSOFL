@@ -7,7 +7,7 @@ use libafl::{
 use revm::{Database, DatabaseCommit};
 use revm_primitives::{BlockEnv, CfgEnv};
 
-use crate::engine::state::{env::TransitionSpecBuilder, state::BcState};
+use crate::engine::state::{env::TransitionSpecBuilder, BcState};
 use crate::fuzzing::{corpus::tx::TxInput, observer::EvmObserversTuple};
 
 /// TxExecutor execute a single transaction.

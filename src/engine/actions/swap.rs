@@ -128,7 +128,7 @@ mod tests_with_jsonrpc {
 
     use crate::{
         engine::{
-            providers::rpc::JsonRpcBcProvider, state::state::BcStateBuilder,
+            providers::rpc::JsonRpcBcProvider, state::BcStateBuilder,
             transactions::position::TxPosition, utils::HighLevelCaller,
         },
         utils::conversion::{Convert, ToPrimitive},

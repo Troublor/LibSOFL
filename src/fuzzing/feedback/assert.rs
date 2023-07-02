@@ -15,6 +15,12 @@ impl AssertionFeedback {
     }
 }
 
+impl Default for AssertionFeedback {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl Named for AssertionFeedback {
     fn name(&self) -> &str {
         "AssertionFeedback"
@@ -24,11 +30,11 @@ impl Named for AssertionFeedback {
 impl<S: UsesInput + HasClientPerfMonitor> Feedback<S> for AssertionFeedback {
     fn is_interesting<EM, OT>(
         &mut self,
-        state: &mut S,
-        manager: &mut EM,
-        input: &S::Input,
+        _state: &mut S,
+        _manager: &mut EM,
+        _input: &S::Input,
         observers: &OT,
-        exit_kind: &libafl::prelude::ExitKind,
+        _exit_kind: &libafl::prelude::ExitKind,
     ) -> Result<bool, libafl::Error>
     where
         EM: libafl::prelude::EventFirer<State = S>,

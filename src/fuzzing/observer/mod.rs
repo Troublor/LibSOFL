@@ -1,19 +1,8 @@
-use std::{
-    fmt::Debug,
-    ptr::{addr_of, addr_of_mut},
-};
-
-use derive_more::{AsMut, AsRef, Deref, DerefMut};
-use libafl::prelude::{
-    tuple_list, Input, MatchName, Observer, ObserversTuple, UsesInput,
-};
-use revm::{Database, Inspector};
+use libafl::prelude::{Observer, ObserversTuple, UsesInput};
+use revm::Database;
 use revm_primitives::ExecutionResult;
-use serde::{Deserialize, Serialize};
 
-use crate::engine::inspectors::{
-    combined::CombinedInspector, no_inspector, MultiTxInspector, NoInspector,
-};
+use crate::engine::inspectors::MultiTxInspector;
 
 pub mod result;
 pub mod trace;

@@ -8,7 +8,7 @@ use revm::{Database, DatabaseCommit};
 use revm_primitives::{BlockEnv, CfgEnv};
 
 use crate::{
-    engine::state::{env::TransitionSpecBuilder, state::BcState},
+    engine::state::{env::TransitionSpecBuilder, BcState},
     fuzzing::{corpus::seq::TxSequenceInput, observer::EvmObserversTuple},
 };
 

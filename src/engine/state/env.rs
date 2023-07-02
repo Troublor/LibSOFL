@@ -112,7 +112,7 @@ impl TransitionSpecBuilder {
     }
 
     pub fn append_tx<T: AsRef<Transaction>>(
-        mut self,
+        self,
         from: Address,
         tx: T,
     ) -> Self {
@@ -121,10 +121,7 @@ impl TransitionSpecBuilder {
         self.append_tx_env(tx_env)
     }
 
-    pub fn append_signed_tx<T: AsRef<TransactionSigned>>(
-        mut self,
-        tx: T,
-    ) -> Self {
+    pub fn append_signed_tx<T: AsRef<TransactionSigned>>(self, tx: T) -> Self {
         let mut tx_env = TxEnv::default();
         fill_tx_env(
             &mut tx_env,
@@ -134,7 +131,7 @@ impl TransitionSpecBuilder {
         self.append_tx_env(tx_env)
     }
 
-    pub fn append_signed_txs(mut self, txs: Vec<TransactionSigned>) -> Self {
+    pub fn append_signed_txs(self, txs: Vec<TransactionSigned>) -> Self {
         let mut this = self;
         for tx in txs.into_iter() {
             this = this.append_signed_tx(tx);
