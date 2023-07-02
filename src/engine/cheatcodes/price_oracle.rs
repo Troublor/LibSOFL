@@ -1,4 +1,4 @@
-use std::{cmp::Ordering, fmt::Debug, str::FromStr};
+use std::{cmp::Ordering, fmt::Debug};
 
 use ethers::abi::Token;
 use reth_primitives::Address;
@@ -10,37 +10,14 @@ use crate::{
     error::SoflError,
     utils::{
         abi::{UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI},
+        addresses::{
+            DAI, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY, USDC, USDT, WETH,
+        },
         conversion::{Convert, ToPrimitive},
     },
 };
 
 use super::{CheatCodes, ERC20Cheat};
-
-lazy_static! {
-    static ref WETH: Address = Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2").unwrap();
-
-    static ref UNISWAP_V3_FACTORY: Address =
-        Address::from_str("0x1F98431c8aD98523631AE4a59f267346ea31F984")
-            .unwrap();
-    static ref UNISWAP_V3_FEES: Vec<u64> = vec![500, 3000, 10000];
-
-    static ref UNISWAP_V2_FACTORY: Address =
-        Address::from_str("0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f")
-            .unwrap();
-    static ref UNISWAP_V2_FEES: Vec<u64> = vec![500, 3000, 10000];
-
-    static ref MAINSTREAM_TOKENS: Vec<Address> =
-        vec![
-            // WETH
-            Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2").unwrap(),
-            // USDC
-            Address::from_str("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48").unwrap(),
-            // USDT
-            Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7").unwrap(),
-            // DAI
-            Address::from_str("0x6B175474E89094C44Da98b954EedeAC495271d0F").unwrap(),
-        ];
-}
 
 pub trait PriceOracleCheat<
     E,
@@ -177,19 +154,21 @@ where
         state: &mut S,
         token: Address,
     ) -> Result<(Address, Address, U256), SoflError<E>> {
+        let mainstream_tokens = &[*WETH, *USDT, *USDC, *DAI];
+
         // iterate through all main stream tokens and fees
         let mut pool = Address::default();
         let mut bs_token = Address::default();
         let mut liquidity = U256::ZERO;
 
         // a shortcut for mainstream tokens
-        if MAINSTREAM_TOKENS.contains(&token) {
+        if mainstream_tokens.contains(&token) {
             // this cannot be WETH
             pool = self.__get_pair_address(state, token, *WETH)?;
             bs_token = *WETH;
             liquidity = self.get_erc20_balance(state, token, pool)?;
         } else {
-            for ms_token in MAINSTREAM_TOKENS.iter() {
+            for ms_token in mainstream_tokens.iter() {
                 let cur_pool =
                     self.__get_pair_address(state, token, *ms_token)?;
 

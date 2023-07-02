@@ -8,18 +8,10 @@ use serde::{Deserialize, Serialize};
 
 use crate::engine::inspectors::no_inspector;
 use crate::engine::utils::HighLevelCaller;
+use crate::utils::abi::UNISWAP_V2_ROUTER02_ABI;
 use crate::utils::conversion::{Convert, ToEthers, ToPrimitive};
 
 use super::TokenAddress;
-
-lazy_static! {
-    static ref UNISWAP_V2_ROUTER02_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../../assets/uniswap_v2_router02.abi.json"
-        )))
-        .expect("failed to parse ERC20 ABI")
-    };
-}
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 pub struct UniswapV2Swap {
