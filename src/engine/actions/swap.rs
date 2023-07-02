@@ -2,10 +2,11 @@ use std::str::FromStr;
 
 use ethers::abi::Token;
 use reth_primitives::Address;
+use revm::{Database, DatabaseCommit};
 use revm_primitives::U256;
 use serde::{Deserialize, Serialize};
 
-use crate::engine::state::BcState;
+use crate::engine::inspectors::no_inspector;
 use crate::engine::utils::HighLevelCaller;
 use crate::utils::conversion::{Convert, ToEthers, ToPrimitive};
 
@@ -37,11 +38,15 @@ impl UniswapV2Swap {
             .expect("failed to parse uniswap v2 factory address")
     }
 
-    pub fn router02_transact<BS: BcState>(
+    pub fn router02_transact<BS>(
         &self,
         state: &mut BS,
         caller: HighLevelCaller,
-    ) -> U256 {
+    ) -> U256
+    where
+        BS: Database + DatabaseCommit,
+        BS::Error: std::fmt::Debug,
+    {
         let path_error_msg = "path must have at least 2 elements";
         let swap_path: Vec<Token> = self
             .path
@@ -98,7 +103,14 @@ impl UniswapV2Swap {
                 ),
             };
         let rets = caller
-            .invoke(state, Self::router02_address(), func, &args, Some(value))
+            .invoke(
+                state,
+                Self::router02_address(),
+                func,
+                &args,
+                Some(value),
+                no_inspector(),
+            )
             .expect("failed to invoke swap");
         let Token::Array(ret) =
             rets.first().expect("should have one return value") else {panic!("the return value should be an array")};
@@ -116,7 +128,7 @@ mod tests_with_jsonrpc {
 
     use crate::{
         engine::{
-            providers::rpc::JsonRpcBcProvider, state::fork::ForkedBcState,
+            providers::rpc::JsonRpcBcProvider, state::state::BcStateBuilder,
             transactions::position::TxPosition, utils::HighLevelCaller,
         },
         utils::conversion::{Convert, ToPrimitive},
@@ -126,7 +138,7 @@ mod tests_with_jsonrpc {
     fn test_swap() {
         let p = JsonRpcBcProvider::default();
         let mut state =
-            ForkedBcState::fork_at(&p, TxPosition::new(16000000, 0)).unwrap();
+            BcStateBuilder::fork_at(&p, TxPosition::new(16000000, 0)).unwrap();
         let swap = super::UniswapV2Swap {
             path: vec![
                 super::TokenAddress::weth(),

@@ -1,5 +1,6 @@
 use std::ops::{RangeBounds, RangeInclusive};
 
+use ethers::abi::RawLog as ethersRawLog;
 use ethers::types::{
     Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
     BlockNumber as ethersBlockNumber, Bytes as ethersBytes, Log as ethersLog,
@@ -13,7 +14,7 @@ use reth_primitives::{
 };
 
 use reth_rlp::Decodable;
-use revm_primitives::{hex, B256, B256 as H256, U256};
+use revm_primitives::{hex, Bytes as revmBytes, B256, B256 as H256, U256};
 
 pub trait Convert<F, T> {
     /// Convert from F to To
@@ -38,7 +39,7 @@ impl Convert<U256, u64> for ToElementary {
             panic!("U256 too large to fit in u64")
         }
         let mut bytes: [u8; 8] = [0; 8];
-        bytes[be.len()..].copy_from_slice(be.as_slice());
+        bytes[8 - be.len()..].copy_from_slice(be.as_slice());
         u64::from_be_bytes(bytes)
     }
 }
@@ -48,11 +49,11 @@ impl Convert<U256, u128> for ToElementary {
     /// Panics if the value is too large to fit in a u128
     fn cvt(v: U256) -> u128 {
         let be = v.to_be_bytes_trimmed_vec();
-        if be.len() > 18 {
-            panic!("U256 too large to fit in u64")
+        if be.len() > 16 {
+            panic!("U256 too large to fit in u128")
         }
         let mut bytes: [u8; 16] = [0; 16];
-        bytes[be.len()..].copy_from_slice(be.as_slice());
+        bytes[16 - be.len()..].copy_from_slice(be.as_slice());
         u128::from_be_bytes(bytes)
     }
 }
@@ -81,6 +82,12 @@ impl Convert<ethersAddress, Address> for ToPrimitive {
 impl Convert<ethersBytes, Bytes> for ToPrimitive {
     fn cvt(v: ethersBytes) -> Bytes {
         v.0.into()
+    }
+}
+
+impl Convert<revmBytes, Bytes> for ToPrimitive {
+    fn cvt(v: revmBytes) -> Bytes {
+        v.as_ref().into()
     }
 }
 
@@ -230,6 +237,12 @@ impl Convert<ethersTransaction, TransactionSigned> for ToPrimitive {
 
 pub struct ToEthers {}
 
+impl Convert<Bytes, ethersBytes> for ToEthers {
+    fn cvt(v: Bytes) -> ethersBytes {
+        ethersBytes::from(v.0)
+    }
+}
+
 impl Convert<B256, ethersH256> for ToEthers {
     fn cvt(v: B256) -> ethersH256 {
         ethersH256::from_slice(&v.0)
@@ -268,6 +281,15 @@ impl Convert<BlockHash, ethersBlockId> for ToEthers {
 impl Convert<u64, ethersBlockId> for ToEthers {
     fn cvt(v: u64) -> ethersBlockId {
         ethersBlockId::Number(ethersBlockNumber::Number(ToEthers::cvt(v)))
+    }
+}
+
+impl Convert<Log, ethersRawLog> for ToEthers {
+    fn cvt(v: Log) -> ethersRawLog {
+        ethersRawLog {
+            topics: v.topics.iter().map(ToEthers::cvt).collect(),
+            data: v.data.to_vec(),
+        }
     }
 }
 

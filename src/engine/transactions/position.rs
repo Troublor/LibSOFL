@@ -54,7 +54,7 @@ impl Display for TxPositionOutOfRangeError {
 
 impl Error for TxPositionOutOfRangeError {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct TxPosition {
     pub block: BlockHashOrNumber,
     pub index: u64,
@@ -69,6 +69,24 @@ impl TxPosition {
     }
 
     pub fn from(block: B256, index: u64) -> Self {
+        Self {
+            block: BlockHashOrNumber::from(block),
+            index,
+        }
+    }
+}
+
+impl From<u64> for TxPosition {
+    fn from(block: u64) -> Self {
+        Self {
+            block: BlockHashOrNumber::from(block),
+            index: 0,
+        }
+    }
+}
+
+impl From<(u64, u64)> for TxPosition {
+    fn from((block, index): (u64, u64)) -> Self {
         Self {
             block: BlockHashOrNumber::from(block),
             index,

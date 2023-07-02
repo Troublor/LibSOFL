@@ -7,6 +7,8 @@ use revm::{
 };
 use revm_primitives::U256;
 
+use crate::engine::inspectors::MultiTxInspector;
+
 /// Returns [InstructionResult::Continue] on an error, discarding the error.
 ///
 /// Useful for inspectors that read state that might be invalid, but do not want to emit
@@ -94,3 +96,5 @@ where
         InstructionResult::Continue
     }
 }
+
+impl<BS> MultiTxInspector<BS> for CheatcodeInspector where BS: Database {}

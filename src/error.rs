@@ -1,10 +1,9 @@
-use crate::engine::{
-    state::{fresh::FreshBcState, BcState},
-    transactions::position::TxPosition,
-};
+use std::convert::Infallible;
+
+use crate::engine::transactions::position::TxPosition;
 
 #[derive(Debug, thiserror::Error)]
-pub enum SoflError<DBERR = <FreshBcState as BcState>::DbErr> {
+pub enum SoflError<DBERR = Infallible> {
     /// Custom error
     #[error("custom error: {0:?}")]
     Custom(String),

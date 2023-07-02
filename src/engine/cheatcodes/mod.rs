@@ -1,14 +1,12 @@
 // A set of cheatcodes that can directly modify the environments
 
-use std::{collections::BTreeMap, marker::PhantomData};
+use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData};
 
-use crate::{engine::state::BcState, error::SoflError};
-use ethers::abi::{self, ParamType, Token};
+use crate::error::SoflError;
+use ethers::abi::{self, Function, ParamType, Token};
 use reth_primitives::{Address, Bytes, U256};
-use revm::EVM;
-use revm_primitives::{
-    BlockEnv, CfgEnv, Env, ResultAndState, TransactTo, TxEnv, B256,
-};
+use revm::{Database, DatabaseCommit};
+use revm_primitives::{BlockEnv, CfgEnv, B256};
 
 mod inspector;
 use inspector::CheatcodeInspector;
@@ -18,6 +16,8 @@ pub use erc20::ERC20Cheat;
 
 mod price_oracle;
 pub use price_oracle::PriceOracleCheat;
+
+use super::{state::DatabaseEditable, utils::HighLevelCaller};
 
 macro_rules! get_the_first_uint {
     ($tokens:expr) => {
@@ -38,12 +38,11 @@ enum SlotQueryResult {
 }
 
 #[derive(Debug, Default)]
-pub struct CheatCodes<S: BcState> {
+pub struct CheatCodes<S: DatabaseEditable> {
     // phantom
     phantom: PhantomData<S>,
 
     // runtime env
-    env: Env,
     inspector: CheatcodeInspector,
 
     // slot info: (codehash, calldata) -> slot_state
@@ -57,104 +56,31 @@ fn pack_calldata(fsig: u32, args: &[Token]) -> Bytes {
 }
 
 // basic functionality
-impl<S: BcState> CheatCodes<S> {
+impl<
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    > CheatCodes<S>
+{
     pub fn new(mut cfg: CfgEnv, block: BlockEnv) -> Self {
-        // we want to disable this in eth_call, since this is common practice used by other node
-        // impls and providers <https://github.com/foundry-rs/foundry/issues/4388>
-        cfg.disable_block_gas_limit = true;
-
-        // Disabled because eth_call is sometimes used with eoa senders
-        // See <https://github.com/paradigmxyz/reth/issues/1959>
-        cfg.disable_eip3607 = true;
-
-        // The basefee should be ignored for eth_call
-        // See:
-        // <https://github.com/ethereum/go-ethereum/blob/ee8e83fa5f6cb261dad2ed0a7bbcde4930c41e6c/internal/ethapi/api.go#L985>
-        cfg.disable_base_fee = true;
-
         Self {
-            env: Env {
-                cfg,
-                block,
-                ..Default::default()
-            },
             phantom: PhantomData,
             inspector: CheatcodeInspector::default(),
             slots: BTreeMap::new(),
         }
     }
 
-    pub fn call(
-        &mut self,
-        state: &mut S,
-        to: Address,
-        fsig: u32,
-        args: &[Token],
-        rtypes: &[ParamType],
-        force_tracing: Option<bool>,
-    ) -> Result<Vec<Token>, SoflError<S::DbErr>> {
-        match force_tracing {
-            Some(true) => self.inspector.reset_access_recording(),
-            Some(false) => self.inspector.disable_access_recording(),
-            None => (),
-        }
-
-        let data = pack_calldata(fsig, args);
-
-        let result = self.low_level_call(state, Some(to), Some(data))?;
-        match result.result {
-            revm_primitives::ExecutionResult::Success {
-                output: revm_primitives::Output::Call(bytes),
-                ..
-            } => abi::decode(rtypes, &bytes).map_err(SoflError::Abi),
-            _ => Err(SoflError::Exec(result.result)),
-        }
-    }
-
-    fn low_level_call(
-        &mut self,
-        state: &mut S,
-        to: Option<Address>,
-        data: Option<Bytes>,
-    ) -> Result<ResultAndState, SoflError<S::DbErr>> {
-        self.fill_tx_env_for_call(to, data);
-
-        let mut evm: EVM<&mut S> = revm::EVM::with_env(self.env.clone());
-        evm.database(state);
-
-        S::transact_with_tx_filled(&mut evm, &mut self.inspector)
-    }
-
-    // fill the tx env for an eth_call
-    fn fill_tx_env_for_call(
-        &mut self,
-        to: Option<Address>,
-        data: Option<Bytes>,
-    ) {
-        self.env.tx = TxEnv {
-            gas_limit: u64::MAX,
-            nonce: None,
-            gas_price: U256::ZERO,
-            gas_priority_fee: None,
-            transact_to: to
-                .map(TransactTo::Call)
-                .unwrap_or_else(TransactTo::create),
-            data: data.map(|data| data.0).unwrap_or_default(),
-            chain_id: None,
-            ..Default::default()
-        };
-    }
-
     fn find_slot(
         &mut self,
         state: &mut S,
         to: Address,
-        fsig: u32,
+        func: &Function,
         args: &[Token],
     ) -> Option<U256> {
         // staticcall to get the slot, where we force the return type as u256
-        let ret = self
-            .call(state, to, fsig, args, &[ParamType::Uint(256)], Some(true))
+        self.inspector.reset_access_recording();
+        let caller = HighLevelCaller::default().bypass_check();
+        let ret = caller
+            .invoke(state, to, func, args, None, &mut self.inspector)
             .ok()?;
         let cdata = get_the_first_uint!(ret);
 
@@ -192,14 +118,16 @@ impl<S: BcState> CheatCodes<S> {
 
                     // we have to do another call to check if the slot is correct,
                     // because changing the slot might change the program flow
-                    let ret = self
-                        .call(
+                    self.inspector.disable_access_recording();
+                    let caller = HighLevelCaller::default().bypass_check();
+                    let ret = caller
+                        .invoke(
                             state,
                             to,
-                            fsig,
+                            func,
                             args,
-                            &[ParamType::Uint(256)],
-                            Some(false),
+                            None,
+                            &mut self.inspector,
                         )
                         .ok()?;
                     let cdata = get_the_first_uint!(ret);
@@ -221,7 +149,11 @@ impl<S: BcState> CheatCodes<S> {
 }
 
 // cheatcode: cheat_read
-impl<S: BcState> CheatCodes<S> {
+impl<
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    > CheatCodes<S>
+{
     // staticcall with slot lookup
     // this function can only work if the target function:
     //  1) is a view function (i.e. does not modify the state)
@@ -231,10 +163,13 @@ impl<S: BcState> CheatCodes<S> {
         &mut self,
         state: &mut S,
         to: Address,
-        fsig: u32,
+        func: &Function,
         args: &[Token],
-        rtypes: &[ParamType],
-    ) -> Result<Vec<Token>, SoflError<S::DbErr>> {
+    ) -> Result<Vec<Token>, SoflError<E>> {
+        let fsig = u32::from_be_bytes(func.short_signature());
+        let rtypes: Vec<ParamType> =
+            func.outputs.iter().map(|p| p.kind.clone()).collect();
+        let rtypes = rtypes.as_slice();
         if let Ok(Some(account_info)) = state.basic(to) {
             let calldata = pack_calldata(fsig, args);
             let code_hash = account_info.code_hash;
@@ -245,7 +180,7 @@ impl<S: BcState> CheatCodes<S> {
                 Some(SlotQueryResult::NotFound) => {}
                 None => {
                     // we have not tried to find the slot, so we first try to find the slot
-                    if let Some(slot) = self.find_slot(state, to, fsig, args) {
+                    if let Some(slot) = self.find_slot(state, to, func, args) {
                         // cache the slot
                         self.slots.insert(
                             (code_hash, calldata),
@@ -267,7 +202,15 @@ impl<S: BcState> CheatCodes<S> {
             }
         }
 
-        self.call(state, to, fsig, args, rtypes, Some(false))
+        self.inspector.disable_access_recording();
+        HighLevelCaller::default().bypass_check().invoke(
+            state,
+            to,
+            func,
+            args,
+            None,
+            &mut self.inspector,
+        )
     }
 
     fn decode_from_storage(
@@ -275,7 +218,7 @@ impl<S: BcState> CheatCodes<S> {
         to: Address,
         slot: U256,
         rtypes: &[ParamType],
-    ) -> Result<Vec<Token>, SoflError<S::DbErr>> {
+    ) -> Result<Vec<Token>, SoflError<E>> {
         let mut rdata = state
             .storage(to, slot)
             .map_err(SoflError::Db)?
@@ -288,15 +231,20 @@ impl<S: BcState> CheatCodes<S> {
 }
 
 // cheatcode: cheat_write
-impl<S: BcState> CheatCodes<S> {
+impl<
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    > CheatCodes<S>
+{
     pub fn cheat_write(
         &mut self,
         state: &mut S,
         to: Address,
-        fsig: u32,
+        func: &Function,
         args: &[Token],
         data: U256,
-    ) -> Result<Option<U256>, SoflError<S::DbErr>> {
+    ) -> Result<Option<U256>, SoflError<E>> {
+        let fsig = u32::from_be_bytes(func.short_signature());
         let account_info = state.basic(to).map_err(SoflError::Db)?.ok_or(
             SoflError::Custom("account does not have code".to_string()),
         )?;
@@ -312,7 +260,7 @@ impl<S: BcState> CheatCodes<S> {
             )),
             None => {
                 // we need to find the slot
-                if let Some(slot) = self.find_slot(state, to, fsig, args) {
+                if let Some(slot) = self.find_slot(state, to, func, args) {
                     // cache the slot
                     self.slots.insert(
                         (code_hash, calldata),
@@ -340,7 +288,7 @@ impl<S: BcState> CheatCodes<S> {
         to: Address,
         slot: U256,
         data: U256,
-    ) -> Result<Option<U256>, SoflError<S::DbErr>> {
+    ) -> Result<Option<U256>, SoflError<E>> {
         let rdata = state.storage(to, slot).map_err(SoflError::Db)?;
 
         if rdata != data {
@@ -355,12 +303,12 @@ impl<S: BcState> CheatCodes<S> {
 }
 
 // cheatcodes: get functions
-impl<S: BcState> CheatCodes<S> {
+impl<S: DatabaseEditable + Database> CheatCodes<S> {
     pub fn get_balance(
         &self,
         state: &mut S,
         account: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
+    ) -> Result<U256, SoflError<<S as Database>::Error>> {
         state
             .basic(account)
             .map_err(SoflError::Db)?
@@ -372,7 +320,7 @@ impl<S: BcState> CheatCodes<S> {
         state: &mut S,
         address: Address,
         balance: U256,
-    ) -> Result<Option<U256>, SoflError<S::DbErr>> {
+    ) -> Result<Option<U256>, SoflError<<S as Database>::Error>> {
         let mut account_info = state
             .basic(address)
             .map_err(SoflError::Db)?
@@ -397,11 +345,12 @@ mod tests_with_db {
     use reth_primitives::Address;
     use revm_primitives::{BlockEnv, CfgEnv, U256};
 
+    use crate::engine::cheatcodes::ERC20Cheat;
+    use crate::engine::state::state::BcStateBuilder;
     use crate::{
         config::flags::SoflConfig,
         engine::{
-            cheatcodes::ERC20Cheat, providers::BcProviderBuilder,
-            state::fork::ForkedBcState, transactions::position::TxPosition,
+            providers::BcProviderBuilder, transactions::position::TxPosition,
         },
     };
 
@@ -414,12 +363,10 @@ mod tests_with_db {
         let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
 
         let fork_at = TxPosition::new(17000001, 0);
-        let mut state = ForkedBcState::fork_at(&bp, fork_at).unwrap();
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-        let mut cheatcode = CheatCodes::<ForkedBcState>::new(
-            CfgEnv::default(),
-            BlockEnv::default(),
-        );
+        let mut cheatcode =
+            CheatCodes::new(CfgEnv::default(), BlockEnv::default());
 
         let token =
             Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")

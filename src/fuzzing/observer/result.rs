@@ -1,8 +1,9 @@
 use libafl::prelude::{Named, Observer, UsesInput};
+use revm::Database;
 use revm_primitives::ExecutionResult;
 use serde::{Deserialize, Serialize};
 
-use crate::engine::{inspectors::NoInspector, state::BcState};
+use crate::engine::inspectors::NoInspector;
 
 use super::EvmObserver;
 
@@ -22,7 +23,9 @@ impl<S: UsesInput> Observer<S> for ExecutionResultObserver {
     }
 }
 
-impl<S: UsesInput, BS: BcState> EvmObserver<S, BS> for ExecutionResultObserver {
+impl<S: UsesInput, BS: Database> EvmObserver<S, BS>
+    for ExecutionResultObserver
+{
     type Inspector = NoInspector;
 
     fn on_executed(

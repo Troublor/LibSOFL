@@ -1,30 +1,39 @@
-use ethers::abi::{ParamType, Token};
+use std::fmt::Debug;
+
+use ethers::abi::Token;
 use reth_primitives::Address;
+use revm::{Database, DatabaseCommit};
 use revm_primitives::U256;
 
-use crate::{engine::state::BcState, error::SoflError};
+use crate::{
+    engine::state::DatabaseEditable, error::SoflError, utils::abi::ERC20_ABI,
+};
 
 use super::CheatCodes;
 
-pub trait ERC20Cheat<S: BcState> {
+pub trait ERC20Cheat<
+    E,
+    S: DatabaseEditable<Error = E> + Database<Error = E> + Database,
+>
+{
     fn get_erc20_balance(
         &mut self,
         state: &mut S,
         token: Address,
         account: Address,
-    ) -> Result<U256, SoflError<S::DbErr>>;
+    ) -> Result<U256, SoflError<E>>;
 
     fn get_erc20_total_supply(
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>>;
+    ) -> Result<U256, SoflError<E>>;
 
     fn get_erc20_decimals(
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>>;
+    ) -> Result<U256, SoflError<E>>;
 
     fn set_erc20_balance(
         &mut self,
@@ -32,24 +41,30 @@ pub trait ERC20Cheat<S: BcState> {
         token: Address,
         account: Address,
         balance: U256,
-    ) -> Result<Option<U256>, SoflError<S::DbErr>>;
+    ) -> Result<Option<U256>, SoflError<E>>;
 }
 
 // cheatcodes: get functions
-impl<S: BcState> ERC20Cheat<S> for CheatCodes<S> {
+impl<
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    > ERC20Cheat<E, S> for CheatCodes<S>
+{
     fn get_erc20_balance(
         &mut self,
         state: &mut S,
         token: Address,
         account: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
+    ) -> Result<U256, SoflError<E>> {
         // signature: balanceOf(address) -> 0x70a08231
+        let func = ERC20_ABI
+            .function("balanceOf")
+            .expect("bug: cannot find balanceOf function in ERC20 ABI");
         let result = self.cheat_read(
             state,
             token,
-            0x70a08231u32,
+            func,
             &[Token::Address(account.into())],
-            &[ParamType::Uint(256)],
         )?;
 
         Ok(result[0].clone().into_uint().expect("cannot fail").into())
@@ -59,15 +74,12 @@ impl<S: BcState> ERC20Cheat<S> for CheatCodes<S> {
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
+    ) -> Result<U256, SoflError<E>> {
         // signature: totalSupply() -> 0x18160ddd
-        let result = self.cheat_read(
-            state,
-            token,
-            0x18160dddu32,
-            &[],
-            &[ParamType::Uint(256)],
-        )?;
+        let func = ERC20_ABI
+            .function("totalSupply")
+            .expect("bug: cannot find totalSupply function in ERC20 ABI");
+        let result = self.cheat_read(state, token, func, &[])?;
 
         Ok(result[0].clone().into_uint().expect("cannot fail").into())
     }
@@ -76,15 +88,12 @@ impl<S: BcState> ERC20Cheat<S> for CheatCodes<S> {
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
+    ) -> Result<U256, SoflError<E>> {
         // signature: decimals() -> 0x313ce567
-        let result = self.cheat_read(
-            state,
-            token,
-            0x313ce567u32,
-            &[],
-            &[ParamType::Uint(256)],
-        )?;
+        let func = ERC20_ABI
+            .function("decimals")
+            .expect("bug: cannot find decimals function in ERC20 ABI");
+        let result = self.cheat_read(state, token, func, &[])?;
 
         Ok(result[0].clone().into_uint().expect("cannot fail").into())
     }
@@ -96,12 +105,15 @@ impl<S: BcState> ERC20Cheat<S> for CheatCodes<S> {
         token: Address,
         account: Address,
         balance: U256,
-    ) -> Result<Option<U256>, SoflError<S::DbErr>> {
+    ) -> Result<Option<U256>, SoflError<E>> {
         // signature: balanceOf(address) -> 0x70a08231
+        let func = ERC20_ABI
+            .function("balanceOf")
+            .expect("bug: cannot find balanceOf function in ERC20 ABI");
         if let Some(old_balance) = self.cheat_write(
             state,
             token,
-            0x70a08231u32,
+            func,
             &[Token::Address(account.into())],
             balance,
         )? {
@@ -109,10 +121,13 @@ impl<S: BcState> ERC20Cheat<S> for CheatCodes<S> {
             let total_supply = self.get_erc20_total_supply(state, token)?;
 
             // signature: totalSupply() -> 0x18160ddd
+            let funct = ERC20_ABI
+                .function("totalSupply")
+                .expect("bug: cannot find totalSupply function in ERC20 ABI");
             self.cheat_write(
                 state,
                 token,
-                0x18160dddu32,
+                func,
                 &[],
                 total_supply + balance - old_balance,
             )?;

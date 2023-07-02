@@ -4,7 +4,7 @@ use std::str::FromStr;
 use libsofl::config::flags::SoflConfig;
 use libsofl::engine::cheatcodes::{CheatCodes, ERC20Cheat, PriceOracleCheat};
 use libsofl::engine::providers::BcProviderBuilder;
-use libsofl::engine::state::fork::ForkedBcState;
+use libsofl::engine::state::state::BcStateBuilder;
 use libsofl::engine::transactions::position::TxPosition;
 use reth_primitives::Address;
 use revm_primitives::{BlockEnv, CfgEnv, U256};
@@ -15,12 +15,9 @@ fn main() {
     let bp = BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap();
 
     let fork_at = TxPosition::new(17395698, 0);
-    let mut state = ForkedBcState::fork_at(&bp, fork_at).unwrap();
+    let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-    let mut cheatcode = CheatCodes::<ForkedBcState>::new(
-        CfgEnv::default(),
-        BlockEnv::default(),
-    );
+    let mut cheatcode = CheatCodes::new(CfgEnv::default(), BlockEnv::default());
 
     let token = Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")
         .unwrap();

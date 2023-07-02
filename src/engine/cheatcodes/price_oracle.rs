@@ -1,14 +1,19 @@
-use std::{cmp::Ordering, str::FromStr};
+use std::{cmp::Ordering, fmt::Debug, str::FromStr};
 
 use ethers::abi::{ParamType, Token};
-use reth_downloaders::bodies::task::BODIES_TASK_BUFFER_SIZE;
 use reth_primitives::Address;
+use revm::{Database, DatabaseCommit};
 use revm_primitives::{B256, U256};
 
 use crate::{
-    engine::state::BcState,
+    engine::state::DatabaseEditable,
     error::SoflError,
-    utils::conversion::{Convert, ToElementary, ToEthers, ToPrimitive},
+    utils::{
+        abi::{
+            UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V3_FACTORY_ABI,
+        },
+        conversion::{Convert, ToPrimitive},
+    },
 };
 
 use super::{CheatCodes, ERC20Cheat};
@@ -39,20 +44,28 @@ lazy_static! {
         ];
 }
 
-pub trait PriceOracleCheat<S: BcState> {
+pub trait PriceOracleCheat<
+    E,
+    S: DatabaseEditable<Error = E> + Database<Error = E>,
+>
+{
     fn get_price_in_ether(
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>>;
+    ) -> Result<U256, SoflError<E>>;
 }
 
-impl<S: BcState> PriceOracleCheat<S> for CheatCodes<S> {
+impl<E, S> PriceOracleCheat<E, S> for CheatCodes<S>
+where
+    E: Debug,
+    S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+{
     fn get_price_in_ether(
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
+    ) -> Result<U256, SoflError<E>> {
         let (price, liquidity) = self.query_uniswap_v2(state, token)?;
         Ok(price)
     }
@@ -100,20 +113,21 @@ fn token_price_in_ether(
 }
 
 // Uniswap V2
-impl<S: BcState> CheatCodes<S> {
+impl<E, S> CheatCodes<S>
+where
+    E: Debug,
+    S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+{
     fn query_uniswap_v2(
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<(U256, U256), SoflError<S::DbErr>> {
+    ) -> Result<(U256, U256), SoflError<E>> {
         // check whether uniswap v3 exists
-        let _ = self.cheat_read(
-            state,
-            *UNISWAP_V2_FACTORY,
-            0x094b7415, /* feeToSetter */
-            &[],
-            &[ParamType::Address],
-        )?;
+        let func = UNISWAP_V2_FACTORY_ABI.function("feeToSetter").expect(
+            "bug: cannot find feeToSetter function in UniswapV2Factory ABI",
+        );
+        let _ = self.cheat_read(state, *UNISWAP_V2_FACTORY, func, &[])?;
 
         if token == *WETH {
             return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
@@ -164,7 +178,7 @@ impl<S: BcState> CheatCodes<S> {
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<(Address, Address, U256), SoflError<S::DbErr>> {
+    ) -> Result<(Address, Address, U256), SoflError<E>> {
         // iterate through all main stream tokens and fees
         let mut pool = Address::default();
         let mut bs_token = Address::default();
@@ -212,7 +226,7 @@ impl<S: BcState> CheatCodes<S> {
         state: &mut S,
         token: Address,
         pool: Address,
-    ) -> Result<U256, SoflError<S::DbErr>> {
+    ) -> Result<U256, SoflError<E>> {
         let token_decimals = self.get_erc20_decimals(state, token)?;
         let raw_balance = self.get_erc20_balance(state, token, pool)?;
 
@@ -244,13 +258,15 @@ impl<S: BcState> CheatCodes<S> {
         state: &mut S,
         token1: Address,
         token2: Address,
-    ) -> Result<Address, SoflError<S::DbErr>> {
+    ) -> Result<Address, SoflError<E>> {
+        let func = UNISWAP_V2_FACTORY_ABI.function("getPair").expect(
+            "bug: cannot find getPair function in UniswapV2Factory ABI",
+        );
         let token_pair = self.cheat_read(
             state,
             *UNISWAP_V2_FACTORY,
-            0xe6a43905, // getPair
+            func,
             &[Token::Address(token1.into()), Token::Address(token2.into())],
-            &[ParamType::Address],
         )?;
 
         Ok(ToPrimitive::cvt(
@@ -260,93 +276,21 @@ impl<S: BcState> CheatCodes<S> {
 }
 
 // Uniswap v3
-impl<S: BcState> CheatCodes<S> {
+impl<E, S> CheatCodes<S>
+where
+    E: Debug,
+    S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+{
     fn query_uniswap_v3(
         &mut self,
         state: &mut S,
         token: Address,
-    ) -> Result<(U256, U256), SoflError<S::DbErr>> {
+    ) -> Result<(U256, U256), SoflError<E>> {
         // check whether uniswap v3 exists
-        let _ = self.cheat_read(
-            state,
-            *UNISWAP_V3_FACTORY,
-            0x8da5cb5bu32, /* owner() */
-            &[],
-            &[ParamType::Address],
-        )?;
-
-        if token == *WETH {
-            return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
-        }
-
-        // iterate through all main stream tokens and fees
-        let mut best_pool = Address::default();
-        let mut best_ms_token = Address::default();
-        let mut best_liquidity = U256::ZERO;
-
-        // a shortcut for mainstream tokens
-        if MAINSTREAM_TOKENS.contains(&token) {
-            // this cannot be WETH
-            best_pool = ToPrimitive::cvt(
-                &self.cheat_read(
-                    state,
-                    *UNISWAP_V3_FACTORY,
-                    0x1698ee82u32, // getPool
-                    &[
-                        Token::Address(token.into()),
-                        Token::Address((*WETH).into()),
-                        Token::Uint(ethers::types::U256::from(500)), // WETH-USD pool
-                    ],
-                    &[ParamType::Address],
-                )?[0]
-                    .clone()
-                    .into_address()
-                    .expect("cannot fail"),
-            );
-            best_ms_token = *WETH;
-            best_liquidity = self.get_erc20_balance(state, token, best_pool)?;
-        } else {
-            for ms_token in MAINSTREAM_TOKENS.iter() {
-                for fee in UNISWAP_V3_FEES.iter() {
-                    let pool: Address = ToPrimitive::cvt(
-                        &self.cheat_read(
-                            state,
-                            *UNISWAP_V3_FACTORY,
-                            0x1698ee82u32, // getPool
-                            &[
-                                Token::Address(token.into()),
-                                Token::Address((*ms_token).into()),
-                                Token::Uint(ethers::types::U256::from(*fee)),
-                            ],
-                            &[ParamType::Address],
-                        )?[0]
-                            .clone()
-                            .into_address()
-                            .expect("cannot fail"),
-                    );
-                    if pool == Address::from(0) {
-                        continue;
-                    }
-
-                    if let Ok(token_liquidity) =
-                        self.get_erc20_balance(state, token, pool)
-                    {
-                        if token_liquidity > best_liquidity {
-                            best_liquidity = token_liquidity;
-                            best_pool = pool;
-                            best_ms_token = *ms_token;
-                        }
-                    }
-                }
-            }
-        }
-
-        // if no pool found, return error
-        if best_pool == Address::default() {
-            return Err(SoflError::Custom(
-                "No pool found for uniswap v3".to_string(),
-            ));
-        }
+        let func = UNISWAP_V3_FACTORY_ABI
+            .function("owner")
+            .expect("bug: cannot find owner function in UniswapV3Factory ABI");
+        let _ = self.cheat_read(state, *UNISWAP_V3_FACTORY, func, &[])?;
 
         todo!()
     }

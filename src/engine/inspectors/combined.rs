@@ -2,18 +2,16 @@ use revm::{
     interpreter::{
         CallInputs, CreateInputs, Gas, InstructionResult, Interpreter,
     },
-    EVMData, Inspector,
+    Database, EVMData, Inspector,
 };
 use revm_primitives::{Bytes, B160, B256};
 
-use crate::engine::state::BcState;
-
 #[derive(Default)]
-pub struct CombinedInspector<'a, BS: BcState> {
+pub struct CombinedInspector<'a, BS: Database> {
     pub inspectors: Vec<Box<dyn Inspector<BS> + 'a>>,
 }
 
-impl<'a, BS: BcState> CombinedInspector<'a, BS> {
+impl<'a, BS: Database> CombinedInspector<'a, BS> {
     pub fn new() -> Self {
         Self {
             inspectors: Vec::new(),
@@ -35,7 +33,7 @@ impl<'a, BS: BcState> CombinedInspector<'a, BS> {
     }
 }
 
-impl<'a, BS: BcState> Inspector<BS> for CombinedInspector<'a, BS> {
+impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
     #[doc = " Called Before the interpreter is initialized."]
     #[doc = ""]
     #[doc = " If anything other than [InstructionResult::Continue] is returned then execution of the interpreter is"]

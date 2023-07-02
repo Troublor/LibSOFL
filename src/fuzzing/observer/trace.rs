@@ -1,8 +1,7 @@
 use libafl::prelude::{Named, Observer, UsesInput};
 use reth_revm_inspectors::tracing::{TracingInspector, TracingInspectorConfig};
+use revm::Database;
 use revm_primitives::ExecutionResult;
-
-use crate::engine::state::BcState;
 
 use super::EvmObserver;
 
@@ -38,7 +37,7 @@ impl<S: UsesInput> Observer<S> for TraceObserver {
     }
 }
 
-impl<S: UsesInput, BS: BcState> EvmObserver<S, BS> for TraceObserver {
+impl<S: UsesInput, BS: Database> EvmObserver<S, BS> for TraceObserver {
     type Inspector = TracingInspector;
 
     fn on_executed(
