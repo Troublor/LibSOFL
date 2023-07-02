@@ -1,56 +1,35 @@
-lazy_static! {
-    pub static ref UNISWAP_V2_ROUTER02_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/uniswap_v2_router02.abi.json"
-        )))
-        .expect("failed to parse UniswapV2Router02 ABI")
-    };
-    pub static ref ERC20_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/erc20.abi.json"
-        )))
-        .expect("failed to parse ERC20 ABI")
-    };
-    pub static ref ERC721_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/erc721.abi.json"
-        )))
-        .expect("failed to parse ERC721 ABI")
-    };
-    pub static ref ERC777_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/erc777.abi.json"
-        )))
-        .expect("failed to parse ERC777 ABI")
-    };
-    pub static ref ERC1155_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/erc1155.abi.json"
-        )))
-        .expect("failed to parse ERC1155 ABI")
-    };
-    pub static ref WETH_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/weth.abi.json"
-        )))
-        .expect("failed to parse WETH ABI")
-    };
-    pub static ref UNISWAP_V2_PAIR_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/uniswap_v2_pair.abi.json"
-        )))
-        .expect("failed to parse UniswapV2Pair ABI")
-    };
-    pub static ref UNISWAP_V2_FACTORY_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/uniswap_v2_factory.abi.json"
-        )))
-        .expect("failed to parse UniswapV2Factory ABI")
-    };
-    pub static ref UNISWAP_V3_FACTORY_ABI: ethers::abi::Contract = {
-        ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
-            "../../assets/uniswap_v3_factory.abi.json"
-        )))
-        .expect("failed to parse UniswapV3Factory ABI")
+macro_rules! define_contract {
+    ($name:ident, $path:expr) => {
+        lazy_static! {
+            pub static ref $name: ethers::abi::Contract = {
+                ethers::abi::Abi::load(std::io::Cursor::new(include_str!(
+                    $path
+                )))
+                .expect(concat!(
+                    "failed to parse ",
+                    stringify!($name),
+                    " ABI"
+                ))
+            };
+        }
     };
 }
+
+define_contract!(
+    UNISWAP_V2_ROUTER02_ABI,
+    "../../assets/uniswap_v2_router02.abi.json"
+);
+define_contract!(ERC20_ABI, "../../assets/erc20.abi.json");
+define_contract!(ERC721_ABI, "../../assets/erc721.abi.json");
+define_contract!(ERC777_ABI, "../../assets/erc777.abi.json");
+define_contract!(ERC1155_ABI, "../../assets/erc1155.abi.json");
+define_contract!(WETH_ABI, "../../assets/weth.abi.json");
+define_contract!(UNISWAP_V2_PAIR_ABI, "../../assets/uniswap_v2_pair.abi.json");
+define_contract!(
+    UNISWAP_V2_FACTORY_ABI,
+    "../../assets/uniswap_v2_factory.abi.json"
+);
+define_contract!(
+    UNISWAP_V3_FACTORY_ABI,
+    "../../assets/uniswap_v3_factory.abi.json"
+);
