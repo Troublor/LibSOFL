@@ -6,7 +6,7 @@ use crate::error::SoflError;
 use ethers::abi::{self, Function, ParamType, Token};
 use reth_primitives::{Address, Bytes, U256};
 use revm::{Database, DatabaseCommit};
-use revm_primitives::{BlockEnv, CfgEnv, B256};
+use revm_primitives::B256;
 
 mod inspector;
 use inspector::CheatcodeInspector;
@@ -49,8 +49,7 @@ pub struct CheatCodes<S: DatabaseEditable> {
     slots: BTreeMap<(B256, Bytes), SlotQueryResult>,
 }
 
-fn pack_calldata(fsig: u32, args: &[Token]) -> Bytes {
-    let fsig = fsig.to_be_bytes();
+fn pack_calldata(fsig: [u8; 4], args: &[Token]) -> Bytes {
     let args = abi::encode(args);
     [fsig.as_slice(), args.as_slice()].concat().into()
 }
@@ -61,7 +60,7 @@ impl<
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     > CheatCodes<S>
 {
-    pub fn new(mut cfg: CfgEnv, block: BlockEnv) -> Self {
+    pub fn new() -> Self {
         Self {
             phantom: PhantomData,
             inspector: CheatcodeInspector::default(),
@@ -166,12 +165,11 @@ impl<
         func: &Function,
         args: &[Token],
     ) -> Result<Vec<Token>, SoflError<E>> {
-        let fsig = u32::from_be_bytes(func.short_signature());
         let rtypes: Vec<ParamType> =
             func.outputs.iter().map(|p| p.kind.clone()).collect();
         let rtypes = rtypes.as_slice();
         if let Ok(Some(account_info)) = state.basic(to) {
-            let calldata = pack_calldata(fsig, args);
+            let calldata = pack_calldata(func.short_signature(), args);
             let code_hash = account_info.code_hash;
             match self.slots.get(&(code_hash, calldata.clone())) {
                 Some(SlotQueryResult::Found(slot)) => {
@@ -244,12 +242,11 @@ impl<
         args: &[Token],
         data: U256,
     ) -> Result<Option<U256>, SoflError<E>> {
-        let fsig = u32::from_be_bytes(func.short_signature());
         let account_info = state.basic(to).map_err(SoflError::Db)?.ok_or(
             SoflError::Custom("account does not have code".to_string()),
         )?;
 
-        let calldata = pack_calldata(fsig, args);
+        let calldata = pack_calldata(func.short_signature(), args);
         let code_hash = account_info.code_hash;
         match self.slots.get(&(code_hash, calldata.clone())) {
             Some(SlotQueryResult::Found(slot)) => {
@@ -343,7 +340,7 @@ mod tests_with_db {
     use std::{path::Path, str::FromStr};
 
     use reth_primitives::Address;
-    use revm_primitives::{BlockEnv, CfgEnv, U256};
+    use revm_primitives::U256;
 
     use crate::engine::cheatcodes::ERC20Cheat;
     use crate::engine::state::state::BcStateBuilder;
@@ -365,8 +362,7 @@ mod tests_with_db {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-        let mut cheatcode =
-            CheatCodes::new(CfgEnv::default(), BlockEnv::default());
+        let mut cheatcode = CheatCodes::new();
 
         let token =
             Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")

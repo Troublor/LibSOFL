@@ -439,7 +439,7 @@ mod tests_with_jsonrpc {
         let transition_spec =
             TransitionSpec::from_tx_hash(&provider, tx).unwrap();
         let mut insp = AssetFlowInspector::new();
-        BcState::transit(state, transition_spec, &mut insp);
+        let _ = BcState::transit(state, transition_spec, &mut insp).unwrap();
         assert_eq!(insp.transfers.len(), 1);
         let transfers = &insp.transfers[0];
         assert_eq!(transfers.len(), 1);

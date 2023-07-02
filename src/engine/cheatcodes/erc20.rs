@@ -121,7 +121,7 @@ impl<
             let total_supply = self.get_erc20_total_supply(state, token)?;
 
             // signature: totalSupply() -> 0x18160ddd
-            let funct = ERC20_ABI
+            let func = ERC20_ABI
                 .function("totalSupply")
                 .expect("bug: cannot find totalSupply function in ERC20 ABI");
             self.cheat_write(

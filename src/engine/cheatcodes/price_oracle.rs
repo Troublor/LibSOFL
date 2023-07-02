@@ -1,17 +1,15 @@
 use std::{cmp::Ordering, fmt::Debug, str::FromStr};
 
-use ethers::abi::{ParamType, Token};
+use ethers::abi::Token;
 use reth_primitives::Address;
 use revm::{Database, DatabaseCommit};
-use revm_primitives::{B256, U256};
+use revm_primitives::U256;
 
 use crate::{
     engine::state::DatabaseEditable,
     error::SoflError,
     utils::{
-        abi::{
-            UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V3_FACTORY_ABI,
-        },
+        abi::{UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI},
         conversion::{Convert, ToPrimitive},
     },
 };
@@ -66,7 +64,7 @@ where
         state: &mut S,
         token: Address,
     ) -> Result<U256, SoflError<E>> {
-        let (price, liquidity) = self.query_uniswap_v2(state, token)?;
+        let (price, _liquidity) = self.query_uniswap_v2(state, token)?;
         Ok(price)
     }
 }
@@ -281,10 +279,10 @@ where
     E: Debug,
     S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
 {
-    fn query_uniswap_v3(
+    fn _query_uniswap_v3(
         &mut self,
         state: &mut S,
-        token: Address,
+        _token: Address,
     ) -> Result<(U256, U256), SoflError<E>> {
         // check whether uniswap v3 exists
         let func = UNISWAP_V3_FACTORY_ABI

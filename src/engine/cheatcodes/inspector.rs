@@ -58,7 +58,7 @@ where
     fn step(
         &mut self,
         interpreter: &mut Interpreter,
-        data: &mut EVMData<'_, DB>,
+        _data: &mut EVMData<'_, DB>,
         _: bool,
     ) -> InstructionResult {
         // Record writes and reads if `record` has been called

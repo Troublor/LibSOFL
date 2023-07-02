@@ -71,10 +71,6 @@ impl<BS: Database> MultiTxInspector<BS> for StaticCallEnforceInspector {
         _tx: &revm_primitives::TxEnv,
         _state: &BS,
     ) -> bool {
-        if _tx.value != U256::ZERO {
-            false
-        } else {
-            true
-        }
+        _tx.value == U256::ZERO
     }
 }

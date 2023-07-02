@@ -7,7 +7,7 @@ use libsofl::engine::providers::BcProviderBuilder;
 use libsofl::engine::state::state::BcStateBuilder;
 use libsofl::engine::transactions::position::TxPosition;
 use reth_primitives::Address;
-use revm_primitives::{BlockEnv, CfgEnv, U256};
+use revm_primitives::U256;
 
 fn main() {
     let datadir = SoflConfig::load().unwrap().reth.datadir;
@@ -17,7 +17,7 @@ fn main() {
     let fork_at = TxPosition::new(17395698, 0);
     let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-    let mut cheatcode = CheatCodes::new(CfgEnv::default(), BlockEnv::default());
+    let mut cheatcode = CheatCodes::new();
 
     let token = Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")
         .unwrap();
