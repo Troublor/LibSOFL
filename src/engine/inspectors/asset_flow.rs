@@ -255,9 +255,9 @@ impl AssetFlowInspector {
             .call_transfers_stack
             .pop()
             .expect("bug: call transfer stack is empty at the end of a call");
-        if success {
+        if success && !self.call_transfers_stack.is_empty() {
             // aggregate the finished call's transfers to its parent call
-            self.transfers[self.idx].append(&mut current);
+            self.current_call_transfers().append(&mut current);
         }
         current
     }
@@ -294,12 +294,15 @@ impl<BS: Database> Inspector<BS> for AssetFlowInspector {
         revm_primitives::Bytes,
     ) {
         self.start_call();
-        let transfer = AssetTransfer::new_ether(
-            _inputs.transfer.source,
-            _inputs.transfer.target,
-            _inputs.transfer.value,
-        );
-        self.current_call_transfers().push(transfer);
+        // transfer ether to the contract
+        if _inputs.transfer.value > U256::ZERO {
+            let transfer = AssetTransfer::new_ether(
+                _inputs.transfer.source,
+                _inputs.transfer.target,
+                _inputs.transfer.value,
+            );
+            self.current_call_transfers().push(transfer);
+        }
         (
             revm::interpreter::InstructionResult::Continue,
             revm::interpreter::Gas::new(0),
@@ -355,7 +358,7 @@ impl<BS: Database> Inspector<BS> for AssetFlowInspector {
         revm_primitives::Bytes,
     ) {
         let outcome = SuccessOrHalt::from(ret);
-        if outcome.is_success() {
+        if outcome.is_success() && _inputs.value > U256::ZERO {
             let transfer = AssetTransfer::new_ether(
                 _inputs.caller,
                 address.expect(
@@ -373,18 +376,11 @@ impl<BS: Database> Inspector<BS> for AssetFlowInspector {
 impl<BS: Database> super::MultiTxInspector<BS> for AssetFlowInspector {
     fn transaction(
         &mut self,
-        tx: &revm_primitives::TxEnv,
+        _tx: &revm_primitives::TxEnv,
         _state: &BS,
     ) -> bool {
         self.start_call();
-        // transfer ether to the contract
-        if tx.value > U256::ZERO {
-            if let TransactTo::Call(to) = tx.transact_to {
-                let transfer =
-                    AssetTransfer::new_ether(tx.caller, to, tx.value);
-                self.current_call_transfers().push(transfer);
-            }
-        }
+
         true
     }
 
@@ -447,14 +443,38 @@ mod tests_with_jsonrpc {
             ToPrimitive::cvt("0x78eC5C6265B45B9c98CF682665A00A3E8f085fFE")
         );
         assert_eq!(
-            transfer.from,
+            transfer.to,
             ToPrimitive::cvt("0x4E41e19f939a0040330F7Cd3CFfde8cA96700d9b")
         );
         assert_eq!(
             transfer.amount,
-            ToPrimitive::cvt(
-                ethers::utils::parse_ether("0.000256838704269").unwrap()
-            )
+            ToPrimitive::cvt(ethers::utils::parse_ether("0.002312").unwrap())
         );
+    }
+
+    #[test]
+    fn test_no_transfer() {
+        let provider = JsonRpcBcProvider::default();
+        let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
+        let tx: TxHash = ToPrimitive::cvt("0xd801d27211b0dfcfdff7e370069268e6fb3ef08ea25148c1065718482c4eab32");
+        let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
+        let mut insp = AssetFlowInspector::new();
+        let _ = BcState::transit(state, spec, &mut insp).unwrap();
+        assert_eq!(insp.transfers.len(), 1);
+        let transfers = &insp.transfers[0];
+        assert_eq!(transfers.len(), 0);
+    }
+
+    #[test]
+    fn test_token_transfer() {
+        let provider = JsonRpcBcProvider::default();
+        let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
+        let tx: TxHash = ToPrimitive::cvt("0x90c93f15f470569d0339a28a6d0d0af7eeaeb6b40e6e53eb56016158119906dc");
+        let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
+        let mut insp = AssetFlowInspector::new();
+        let _ = BcState::transit(state, spec, &mut insp).unwrap();
+        assert_eq!(insp.transfers.len(), 1);
+        let transfers = &insp.transfers[0];
+        assert_eq!(transfers.len(), 6);
     }
 }
