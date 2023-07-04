@@ -9,11 +9,14 @@ use crate::{
     engine::state::DatabaseEditable,
     error::SoflError,
     utils::{
-        abi::{UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI},
+        abi::{
+            UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
+        },
         addresses::{
             DAI, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY, USDC, USDT, WETH,
         },
         conversion::{Convert, ToPrimitive},
+        math::HPMultipler,
     },
 };
 
@@ -42,6 +45,7 @@ where
         token: Address,
     ) -> Result<U256, SoflError<E>> {
         let (price, _liquidity) = self.query_uniswap_v2(state, token)?;
+        // let _ = self.query_uniswap_v3(state, token)?;
         Ok(price)
     }
 }
@@ -50,41 +54,18 @@ where
 // price = (bs_token_balance1 / token_balance) * (weth_balance / bs_token_balance2) * (10^18)
 //       = bs_token_balance1 * weth_balance * 10^18 / (token_balance * bs_token_balance2)
 fn token_price_in_ether(
-    mut token_balance: U256,
-    mut bs_token_balance1: U256,
-    mut bs_token_balance2: U256,
-    mut weth_balance: U256,
+    token_balance: U256,
+    bs_token_balance1: U256,
+    bs_token_balance2: U256,
+    weth_balance: U256,
 ) -> U256 {
-    // let's do this one step at a time
-    let mut gcd;
-    let mut multiplier = U256::from(10).pow(U256::from(18));
-
-    gcd = multiplier.gcd(bs_token_balance2);
-    multiplier /= gcd;
-    bs_token_balance2 /= gcd;
-
-    gcd = multiplier.gcd(token_balance);
-    multiplier /= gcd;
-    token_balance /= gcd;
-
-    gcd = bs_token_balance1.gcd(token_balance);
-    token_balance /= gcd;
-    bs_token_balance1 /= gcd;
-
-    gcd = bs_token_balance1.gcd(bs_token_balance2);
-    bs_token_balance1 /= gcd;
-    bs_token_balance2 /= gcd;
-
-    gcd = weth_balance.gcd(bs_token_balance2);
-    bs_token_balance2 /= gcd;
-    weth_balance /= gcd;
-
-    gcd = weth_balance.gcd(token_balance);
-    token_balance /= gcd;
-    weth_balance /= gcd;
-
-    bs_token_balance1 * weth_balance * multiplier
-        / (token_balance * bs_token_balance2)
+    let mut result = HPMultipler::default();
+    result *= bs_token_balance1;
+    result /= token_balance;
+    result *= weth_balance;
+    result /= bs_token_balance2;
+    result *= U256::from(10).pow(U256::from(18));
+    result.into()
 }
 
 // Uniswap V2
@@ -109,10 +90,10 @@ where
         }
 
         let (best_pool, best_bs_token, best_liquidity) =
-            self.__get_best_baseline_token(state, token)?;
+            self.__get_best_baseline_token_uniswap_v2(state, token)?;
 
         let token_balance =
-            self.__get_token_balance(state, token, best_pool)?;
+            self.__get_token_balance_uniswap_v2(state, token, best_pool)?;
 
         let bs_token_balance_in_pool1 =
             self.get_erc20_balance(state, best_bs_token, best_pool)?;
@@ -129,8 +110,11 @@ where
                 best_liquidity,
             ))
         } else {
-            let bc_pool =
-                self.__get_pair_address(state, best_bs_token, *WETH)?;
+            let bc_pool = self.__get_pair_address_uniswap_v2(
+                state,
+                best_bs_token,
+                *WETH,
+            )?;
 
             let bs_token_balance_in_pool2 =
                 self.get_erc20_balance(state, best_bs_token, bc_pool)?;
@@ -149,7 +133,7 @@ where
         }
     }
 
-    fn __get_best_baseline_token(
+    fn __get_best_baseline_token_uniswap_v2(
         &mut self,
         state: &mut S,
         token: Address,
@@ -164,13 +148,13 @@ where
         // a shortcut for mainstream tokens
         if mainstream_tokens.contains(&token) {
             // this cannot be WETH
-            pool = self.__get_pair_address(state, token, *WETH)?;
+            pool = self.__get_pair_address_uniswap_v2(state, token, *WETH)?;
             bs_token = *WETH;
             liquidity = self.get_erc20_balance(state, token, pool)?;
         } else {
             for ms_token in mainstream_tokens.iter() {
-                let cur_pool =
-                    self.__get_pair_address(state, token, *ms_token)?;
+                let cur_pool = self
+                    .__get_pair_address_uniswap_v2(state, token, *ms_token)?;
 
                 if cur_pool == Address::from(0) {
                     continue;
@@ -198,7 +182,7 @@ where
         }
     }
 
-    fn __get_token_balance(
+    fn __get_token_balance_uniswap_v2(
         &mut self,
         state: &mut S,
         token: Address,
@@ -230,7 +214,7 @@ where
         Ok(token_balance)
     }
 
-    fn __get_pair_address(
+    fn __get_pair_address_uniswap_v2(
         &mut self,
         state: &mut S,
         token1: Address,
@@ -261,14 +245,144 @@ where
     fn _query_uniswap_v3(
         &mut self,
         state: &mut S,
-        _token: Address,
+        token: Address,
     ) -> Result<(U256, U256), SoflError<E>> {
         // check whether uniswap v3 exists
-        let func = UNISWAP_V3_FACTORY_ABI
-            .function("owner")
-            .expect("bug: cannot find owner function in UniswapV3Factory ABI");
-        let _ = self.cheat_read(state, *UNISWAP_V3_FACTORY, func, &[])?;
+        {
+            let func = UNISWAP_V3_FACTORY_ABI.function("owner").expect(
+                "bug: cannot find owner function in UniswapV3Factory ABI",
+            );
+            let _ = self.cheat_read(state, *UNISWAP_V3_FACTORY, func, &[])?;
+        }
+
+        if token == *WETH {
+            return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
+        }
+
+        let (best_pool, best_bs_token, best_liquidity) =
+            self.__get_best_baseline_token_uniswap_v3(state, token)?;
+
+        if best_bs_token == *WETH {
+            let func = UNISWAP_V3_POOL_ABI
+                .function("slot0")
+                .expect("bug: cannot find slot0 function in UniswapV3Pool ABI");
+            let xxx = self.cheat_read(state, best_pool, func, &[])?;
+            println!("{:?}", xxx);
+            println!("{:?}", best_liquidity);
+        }
 
         todo!()
+    }
+
+    fn __get_best_baseline_token_uniswap_v3(
+        &mut self,
+        state: &mut S,
+        token: Address,
+    ) -> Result<(Address, Address, U256), SoflError<E>> {
+        let mainstream_tokens = &[*WETH, *USDT, *USDC, *DAI];
+        let fees = &[500u64, 3000u64, 10000u64];
+
+        // iterate through all main stream tokens and fees
+        let mut pool = Address::default();
+        let mut bs_token = Address::default();
+        let mut liquidity = U256::ZERO;
+
+        // a shortcut for mainstream tokens
+        if mainstream_tokens.contains(&token) {
+            // this cannot be WETH
+            pool =
+                self.__get_pair_address_uniswap_v3(state, token, *WETH, 500)?;
+            bs_token = *WETH;
+            liquidity = self.get_erc20_balance(state, token, pool)?;
+        } else {
+            for ms_token in mainstream_tokens.iter() {
+                for fee in fees.iter() {
+                    let cur_pool = self.__get_pair_address_uniswap_v3(
+                        state, token, *ms_token, *fee,
+                    )?;
+
+                    if cur_pool == Address::from(0) {
+                        continue;
+                    }
+
+                    if let Ok(token_liquidity) =
+                        self.get_erc20_balance(state, token, cur_pool)
+                    {
+                        if token_liquidity > liquidity {
+                            liquidity = token_liquidity;
+                            pool = cur_pool;
+                            bs_token = *ms_token;
+                        }
+                    }
+                }
+            }
+        }
+
+        // if no pool found, return error
+        if pool == Address::default() {
+            Err(SoflError::Custom(
+                "No pool found for uniswap v3".to_string(),
+            ))
+        } else {
+            Ok((pool, bs_token, liquidity))
+        }
+    }
+
+    fn __get_token_balance_uniswap_v3(
+        &mut self,
+        state: &mut S,
+        token: Address,
+        pool: Address,
+    ) -> Result<U256, SoflError<E>> {
+        let token_decimals = self.get_erc20_decimals(state, token)?;
+        let raw_balance = self.get_erc20_balance(state, token, pool)?;
+
+        let token_balance = match token_decimals.cmp(&U256::from(18)) {
+            Ordering::Less => {
+                raw_balance
+                    * U256::from(10).pow(
+                        U256::from(18)
+                            .checked_sub(U256::from(token_decimals))
+                            .unwrap(),
+                    )
+            }
+            Ordering::Equal => raw_balance,
+            Ordering::Greater => {
+                raw_balance
+                    / U256::from(10).pow(
+                        U256::from(token_decimals)
+                            .checked_sub(U256::from(18))
+                            .unwrap(),
+                    )
+            }
+        };
+
+        Ok(token_balance)
+    }
+
+    fn __get_pair_address_uniswap_v3(
+        &mut self,
+        state: &mut S,
+        token1: Address,
+        token2: Address,
+        fee: u64,
+    ) -> Result<Address, SoflError<E>> {
+        let func = UNISWAP_V3_FACTORY_ABI.function("getPool").expect(
+            "bug: cannot find getPool function in UniswapV3Factory ABI",
+        );
+        let token_pair = self.cheat_read(
+            state,
+            *UNISWAP_V3_FACTORY,
+            func,
+            &[
+                Token::Address(token1.into()),
+                Token::Address(token2.into()),
+                Token::Uint(fee.into()),
+            ],
+        )?;
+
+        Ok(ToPrimitive::cvt(
+            token_pair[0].clone().into_address().expect("cannot fail"),
+        ))
     }
 }

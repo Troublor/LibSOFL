@@ -201,12 +201,11 @@ impl<
         }
 
         self.inspector.disable_access_recording();
-        HighLevelCaller::default().bypass_check().invoke(
+        HighLevelCaller::default().bypass_check().view(
             state,
             to,
             func,
             args,
-            None,
             &mut self.inspector,
         )
     }

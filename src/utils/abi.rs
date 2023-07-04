@@ -33,3 +33,4 @@ define_contract!(
     UNISWAP_V3_FACTORY_ABI,
     "../../assets/uniswap_v3_factory.abi.json"
 );
+define_contract!(UNISWAP_V3_POOL_ABI, "../../assets/uniswap_v3_pool.abi.json");

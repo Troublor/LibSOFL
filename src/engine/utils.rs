@@ -72,6 +72,7 @@ impl HighLevelCaller {
         let tx = TxBuilder::new()
             .set_from(self.address)
             .set_to(callee)
+            .set_gas_limit(self.gas_limit)
             .set_input(calldata)
             .build();
         let spec = self.spec_builder.clone().append_tx(tx.from(), tx).build();
