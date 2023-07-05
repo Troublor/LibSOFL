@@ -47,7 +47,7 @@ pub mod macros {
     macro_rules! unwrap_first_token_value {
         (Address, $v:expr) => {
             convert_to_primitive!(
-                $v.swap_remove(0)
+                $v.remove(0)
                     .into_address()
                     .expect("impossible: return value is not address"),
                 ethers::types::Address,
@@ -55,7 +55,7 @@ pub mod macros {
             )
         };
         (Vec<u8>, $v:expr) => {
-            (match $v.swap_remove(0) {
+            (match $v.remove(0) {
                 ethers::abi::Token::FixedBytes(v) => Some(v),
                 ethers::abi::Token::Bytes(v) => Some(v),
                 _ => panic!(
@@ -65,13 +65,13 @@ pub mod macros {
             .expect("impossible: return value is not fixed_byte")
         };
         (Int, $v:expr) => {
-            $v.swap_remove(0)
+            $v.remove(0)
                 .into_int()
                 .expect("impossible: return value is not int")
         };
         (Uint, $v:expr) => {
             convert_to_primitive!(
-                $v.swap_remove(0)
+                $v.remove(0)
                     .into_uint()
                     .expect("impossible: return value is not uint"),
                 ethers::types::U256,
@@ -79,17 +79,17 @@ pub mod macros {
             )
         };
         (bool, $v:expr) => {
-            $v.swap_remove(0)
+            $v.remove(0)
                 .into_bool()
                 .expect("impossible: return value is not bool")
         };
         (String, $v:expr) => {
-            $v.swap_remove(0)
+            $v.remove(0)
                 .into_string()
                 .expect("impossible: return value is not string")
         };
         (Vec<Token>, $v:expr) => {
-            (match $v.swap_remove(0) {
+            (match $v.remove(0) {
                 ethers::abi::Token::Array(v) => Some(v),
                 ethers::abi::Token::Tuple(v) => Some(v),
                 _ => panic!("impossible: return value is not array"),
