@@ -34,3 +34,106 @@ define_contract!(
     "../../assets/uniswap_v3_factory.abi.json"
 );
 define_contract!(UNISWAP_V3_POOL_ABI, "../../assets/uniswap_v3_pool.abi.json");
+
+#[macro_use]
+pub mod macros {
+
+    macro_rules! convert_to_primitive {
+        ($v: expr, $f: ty, $t: ty) => {
+            <crate::utils::conversion::ToPrimitive as crate::utils::conversion::Convert<$f, $t>>::cvt($v)
+        };
+    }
+
+    macro_rules! unwrap_first_token_value {
+        (Address, $v:expr) => {
+            convert_to_primitive!(
+                $v.swap_remove(0)
+                    .into_address()
+                    .expect("impossible: return value is not address"),
+                ethers::types::Address,
+                reth_primitives::Address
+            )
+        };
+        (Vec<u8>, $v:expr) => {
+            (match $v.swap_remove(0) {
+                ethers::abi::Token::FixedBytes(v) => Some(v),
+                ethers::abi::Token::Bytes(v) => Some(v),
+                _ => panic!(
+                    "impossible: return value is not bytes or fixed_bytes"
+                ),
+            })
+            .expect("impossible: return value is not fixed_byte")
+        };
+        (Int, $v:expr) => {
+            $v.swap_remove(0)
+                .into_int()
+                .expect("impossible: return value is not int")
+        };
+        (Uint, $v:expr) => {
+            convert_to_primitive!(
+                $v.swap_remove(0)
+                    .into_uint()
+                    .expect("impossible: return value is not uint"),
+                ethers::types::U256,
+                revm_primitives::U256
+            )
+        };
+        (bool, $v:expr) => {
+            $v.swap_remove(0)
+                .into_bool()
+                .expect("impossible: return value is not bool")
+        };
+        (String, $v:expr) => {
+            $v.swap_remove(0)
+                .into_string()
+                .expect("impossible: return value is not string")
+        };
+        (Vec<Token>, $v:expr) => {
+            (match $v.swap_remove(0) {
+                ethers::abi::Token::Array(v) => Some(v),
+                ethers::abi::Token::Tuple(v) => Some(v),
+                _ => panic!("impossible: return value is not array"),
+            })
+            .expect("impossible: return value is not array or tuple")
+        };
+    }
+
+    macro_rules! unwrap_token_values {
+        ($v: expr, $($t:tt),*) => {
+            (
+                $(
+                    unwrap_first_token_value!($t, $v),
+                )*
+            )
+        };
+    }
+
+    pub(crate) use convert_to_primitive;
+    pub(crate) use unwrap_first_token_value;
+    pub(crate) use unwrap_token_values;
+
+    #[cfg(test)]
+    mod tests_nodep {
+        use ethers::abi::Token;
+        use reth_primitives::Address;
+        use revm_primitives::U256;
+
+        #[test]
+        fn test_unwrap_single() {
+            let mut ret = vec![Token::Address(ethers::types::H160::zero())];
+            let (addr,) = unwrap_token_values!(ret, Address);
+            assert_eq!(addr, Address::zero());
+        }
+
+        #[test]
+        fn test_unwrap_multiple() {
+            let mut ret = vec![
+                Token::Address(ethers::types::H160::zero()),
+                Token::Uint(ethers::types::U256::zero()),
+            ];
+            let (addr, value) = unwrap_token_values!(ret, Address, Uint);
+            assert_eq!(addr, Address::zero());
+            assert_eq!(value, U256::ZERO);
+        }
+    }
+}
