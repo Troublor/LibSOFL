@@ -2,26 +2,17 @@ use std::ops::{Div, DivAssign, Mul, MulAssign};
 
 use revm_primitives::{ruint::Uint, U256};
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Default)]
 pub struct HPMultipler {
     numerator: Vec<U256>,
     denominator: Vec<U256>,
-}
-
-impl Default for HPMultipler {
-    fn default() -> Self {
-        Self {
-            numerator: vec![U256::from(1)],
-            denominator: vec![U256::from(1)],
-        }
-    }
 }
 
 impl From<U256> for HPMultipler {
     fn from(value: U256) -> Self {
         Self {
             numerator: vec![value],
-            denominator: vec![U256::from(1)],
+            denominator: vec![],
         }
     }
 }
@@ -102,15 +93,68 @@ impl<const BITS: usize, const LIMBS: usize> From<HPMultipler>
             }
         }
 
+        // sort and reverse
+        value.numerator.sort();
+        value.numerator.reverse();
+        value.denominator.sort();
+
+        let mut numerators: Vec<Uint<BITS, LIMBS>> = value
+            .numerator
+            .into_iter()
+            .map(|num| Self::from_limbs_slice(num.into_limbs().as_slice()))
+            .collect::<Vec<_>>();
+        let mut denominators: Vec<Uint<BITS, LIMBS>> = value
+            .denominator
+            .into_iter()
+            .map(|num| Self::from_limbs_slice(num.into_limbs().as_slice()))
+            .collect::<Vec<_>>();
+
         let mut result = Uint::<BITS, LIMBS>::from(1);
-        for numerator in value.numerator.iter() {
-            result *= Self::from_limbs_slice(numerator.into_limbs().as_slice());
+
+        // dynamically calculate the result, to avoid overflow and precision loss
+        while !numerators.is_empty() {
+            let numerator = numerators[0];
+            while numerator * result / numerator != result {
+                // there is an overflow, let's try to reduce the result a bit
+                // let's it implicitly panic if there is not enough denominators
+                result /= denominators.remove(0);
+            }
+            result *= numerators.remove(0);
         }
-        for denominator in value.denominator.iter() {
-            result /=
-                Self::from_limbs_slice(denominator.into_limbs().as_slice());
+        while !denominators.is_empty() {
+            result /= denominators.remove(0);
         }
 
+        result
+    }
+}
+
+impl HPMultipler {
+    pub fn new() -> Self {
+        Self::default()
+    }
+
+    // power
+    pub fn pow(self, exp: u64) -> Self {
+        // quick pow algorithm
+        let mut exp = exp;
+        let mut base = self;
+        let mut result = Self::default();
+        while exp > 0 {
+            if exp & 1 == 1 {
+                result *= base.clone();
+            }
+            exp >>= 1;
+            base *= base.clone();
+        }
+
+        result
+    }
+
+    // reciprocal
+    pub fn reciprocal(self) -> Self {
+        let mut result = Self::default();
+        result /= self;
         result
     }
 }
