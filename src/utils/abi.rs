@@ -45,17 +45,17 @@ pub mod macros {
     }
 
     macro_rules! unwrap_first_token_value {
-        (Address, $ret:ident) => {
+        (Address, $v:expr) => {
             convert_to_primitive!(
-                $ret.swap_remove(0)
+                $v.swap_remove(0)
                     .into_address()
                     .expect("impossible: return value is not address"),
                 ethers::types::Address,
                 reth_primitives::Address
             )
         };
-        (Vec<u8>, $ret:ident) => {
-            (match $ret.swap_remove(0) {
+        (Vec<u8>, $v:expr) => {
+            (match $v.swap_remove(0) {
                 ethers::abi::Token::FixedBytes(v) => Some(v),
                 ethers::abi::Token::Bytes(v) => Some(v),
                 _ => panic!(
@@ -64,32 +64,32 @@ pub mod macros {
             })
             .expect("impossible: return value is not fixed_byte")
         };
-        (Int, $ret:ident) => {
-            $ret.swap_remove(0)
+        (Int, $v:expr) => {
+            $v.swap_remove(0)
                 .into_int()
                 .expect("impossible: return value is not int")
         };
-        (Uint, $ret:ident) => {
+        (Uint, $v:expr) => {
             convert_to_primitive!(
-                $ret.swap_remove(0)
+                $v.swap_remove(0)
                     .into_uint()
                     .expect("impossible: return value is not uint"),
                 ethers::types::U256,
                 revm_primitives::U256
             )
         };
-        (bool, $ret:ident) => {
-            $ret.swap_remove(0)
+        (bool, $v:expr) => {
+            $v.swap_remove(0)
                 .into_bool()
                 .expect("impossible: return value is not bool")
         };
-        (String, $ret:ident) => {
-            $ret.swap_remove(0)
+        (String, $v:expr) => {
+            $v.swap_remove(0)
                 .into_string()
                 .expect("impossible: return value is not string")
         };
-        (Vec<Token>, $ret:ident) => {
-            (match $ret.swap_remove(0) {
+        (Vec<Token>, $v:expr) => {
+            (match $v.swap_remove(0) {
                 ethers::abi::Token::Array(v) => Some(v),
                 ethers::abi::Token::Tuple(v) => Some(v),
                 _ => panic!("impossible: return value is not array"),
@@ -99,7 +99,7 @@ pub mod macros {
     }
 
     macro_rules! unwrap_token_values {
-        ($v: ident, $($t:tt),*) => {
+        ($v: expr, $($t:tt),*) => {
             (
                 $(
                     unwrap_first_token_value!($t, $v),
