@@ -35,18 +35,19 @@ define_contract!(
 );
 define_contract!(UNISWAP_V3_POOL_ABI, "../../assets/uniswap_v3_pool.abi.json");
 
-#[macro_use]
-pub mod macros {
+pub(crate) mod macros {
 
+    #[macro_export]
     macro_rules! convert_to_primitive {
         ($v: expr, $f: ty, $t: ty) => {
-            <crate::utils::conversion::ToPrimitive as crate::utils::conversion::Convert<$f, $t>>::cvt($v)
+            <$crate::utils::conversion::ToPrimitive as $crate::utils::conversion::Convert<$f, $t>>::cvt($v)
         };
     }
 
+    #[macro_export]
     macro_rules! unwrap_first_token_value {
         (Address, $v:expr) => {
-            convert_to_primitive!(
+            $crate::convert_to_primitive!(
                 $v.remove(0)
                     .into_address()
                     .expect("impossible: return value is not address"),
@@ -70,7 +71,7 @@ pub mod macros {
                 .expect("impossible: return value is not int")
         };
         (Uint, $v:expr) => {
-            convert_to_primitive!(
+            $crate::convert_to_primitive!(
                 $v.remove(0)
                     .into_uint()
                     .expect("impossible: return value is not uint"),
@@ -98,19 +99,16 @@ pub mod macros {
         };
     }
 
+    #[macro_export]
     macro_rules! unwrap_token_values {
         ($v: expr, $($t:tt),*) => {
             (
                 $(
-                    unwrap_first_token_value!($t, $v),
+                    $crate::unwrap_first_token_value!($t, $v),
                 )*
             )
         };
     }
-
-    pub(crate) use convert_to_primitive;
-    pub(crate) use unwrap_first_token_value;
-    pub(crate) use unwrap_token_values;
 
     #[cfg(test)]
     mod tests_nodep {

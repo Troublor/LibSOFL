@@ -5,20 +5,16 @@ use reth_primitives::Address;
 use revm::{Database, DatabaseCommit};
 use revm_primitives::U256;
 
-use crate::{
-    engine::state::DatabaseEditable,
-    error::SoflError,
-    utils::{
-        abi::{
-            UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
-        },
-        addresses::{
-            DAI, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY, USDC, USDT, WETH,
-        },
-        conversion::{Convert, ToPrimitive},
-        math::HPMultipler,
-    },
+use crate::engine::state::DatabaseEditable;
+use crate::error::SoflError;
+use crate::unwrap_first_token_value;
+use crate::utils::abi::{
+    UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
 };
+use crate::utils::addresses::{
+    DAI, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY, USDC, USDT, WETH,
+};
+use crate::utils::math::HPMultipler;
 
 use super::{CheatCodes, ERC20Cheat};
 
@@ -206,16 +202,14 @@ where
         let func = UNISWAP_V2_FACTORY_ABI.function("getPair").expect(
             "bug: cannot find getPair function in UniswapV2Factory ABI",
         );
-        let token_pair = self.cheat_read(
+        let mut token_pair = self.cheat_read(
             state,
             *UNISWAP_V2_FACTORY,
             func,
             &[Token::Address(token1.into()), Token::Address(token2.into())],
         )?;
 
-        Ok(ToPrimitive::cvt(
-            token_pair[0].clone().into_address().expect("cannot fail"),
-        ))
+        Ok(unwrap_first_token_value!(Address, token_pair))
     }
 }
 
@@ -288,12 +282,8 @@ where
             .expect("bug: cannot find slot0 function in UniswapV3Pool ABI");
 
         // price is Q64.96
-        let sqrt_price_x96 = ToPrimitive::cvt(
-            self.cheat_read(state, pool, func, &[])?[0]
-                .clone()
-                .into_uint()
-                .expect("cannot fail"),
-        );
+        let mut res = self.cheat_read(state, pool, func, &[])?;
+        let sqrt_price_x96 = unwrap_first_token_value!(Uint, res);
 
         let mut result = HPMultipler::from(sqrt_price_x96);
 
@@ -388,7 +378,7 @@ where
         let func = UNISWAP_V3_FACTORY_ABI.function("getPool").expect(
             "bug: cannot find getPool function in UniswapV3Factory ABI",
         );
-        let token_pair = self.cheat_read(
+        let mut token_pair = self.cheat_read(
             state,
             *UNISWAP_V3_FACTORY,
             func,
@@ -399,8 +389,6 @@ where
             ],
         )?;
 
-        Ok(ToPrimitive::cvt(
-            token_pair[0].clone().into_address().expect("cannot fail"),
-        ))
+        Ok(unwrap_first_token_value!(Address, token_pair))
     }
 }
