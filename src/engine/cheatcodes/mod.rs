@@ -298,10 +298,9 @@ impl<
     }
 }
 
-// cheatcodes: get functions
+// Functions that does not need to access cache
 impl<S: DatabaseEditable + Database> CheatCodes<S> {
     pub fn get_balance(
-        &self,
         state: &mut S,
         account: Address,
     ) -> Result<U256, SoflError<<S as Database>::Error>> {
@@ -312,7 +311,6 @@ impl<S: DatabaseEditable + Database> CheatCodes<S> {
     }
 
     pub fn get_code_hash(
-        &self,
         state: &mut S,
         account: Address,
     ) -> Result<B256, SoflError<<S as Database>::Error>> {
@@ -323,7 +321,6 @@ impl<S: DatabaseEditable + Database> CheatCodes<S> {
     }
 
     pub fn get_code(
-        &self,
         state: &mut S,
         account: Address,
     ) -> Result<Bytecode, SoflError<<S as Database>::Error>> {
@@ -334,13 +331,12 @@ impl<S: DatabaseEditable + Database> CheatCodes<S> {
         {
             Ok(code)
         } else {
-            let code_hash = self.get_code_hash(state, account)?;
+            let code_hash = Self::get_code_hash(state, account)?;
             state.code_by_hash(code_hash).map_err(SoflError::Db)
         }
     }
 
     pub fn set_balance(
-        &self,
         state: &mut S,
         address: Address,
         balance: U256,

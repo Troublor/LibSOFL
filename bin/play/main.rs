@@ -27,8 +27,8 @@ fn main() {
             Address::from_str("0x004375Dff511095CC5A197A54140a24eFEF3A416")
                 .unwrap();
 
-        let usdc_code = cheatcode.get_code(&mut state, udsc_v2).unwrap();
-        let wbtc_code = cheatcode.get_code(&mut state, wbtc_v2).unwrap();
+        let usdc_code = CheatCodes::get_code(&mut state, udsc_v2).unwrap();
+        let wbtc_code = CheatCodes::get_code(&mut state, wbtc_v2).unwrap();
 
         println!("{} {}", usdc_code.bytecode.len(), wbtc_code.bytecode.len());
         println!("{} {}", usdc_code.len(), wbtc_code.len());
@@ -71,8 +71,8 @@ fn main() {
             Address::from_str("0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36")
                 .unwrap();
 
-        let dai_code = cheatcode.get_code(&mut state, dai_v3).unwrap();
-        let usdt_code = cheatcode.get_code(&mut state, usdt_v3).unwrap();
+        let dai_code = CheatCodes::get_code(&mut state, dai_v3).unwrap();
+        let usdt_code = CheatCodes::get_code(&mut state, usdt_v3).unwrap();
 
         let equal_amount = dai_code
             .bytecode
@@ -90,6 +90,9 @@ fn main() {
             );
 
         println!("FUCK {}", (equal_amount as f64) / (usdt_code.len() as f64));
+
+        println!("{:?}", dai_code.original_bytes());
+        panic!();
     }
 
     let account =

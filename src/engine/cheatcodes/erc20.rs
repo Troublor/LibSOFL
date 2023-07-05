@@ -123,7 +123,7 @@ impl<
             let total_supply = self.get_erc20_total_supply(state, token)?;
 
             if token == *WETH {
-                self.set_balance(
+                Self::set_balance(
                     state,
                     *WETH,
                     total_supply + balance - old_balance,
