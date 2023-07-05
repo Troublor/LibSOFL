@@ -477,4 +477,18 @@ mod tests_with_jsonrpc {
         let transfers = &insp.transfers[0];
         assert_eq!(transfers.len(), 6);
     }
+
+    #[test]
+    fn test_snood_spend_allowance_attack() {
+        // attack tx: 0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e
+        let provider = JsonRpcBcProvider::default();
+        let state = BcStateBuilder::fork_at(&provider, 14983664).unwrap();
+        let tx: TxHash = ToPrimitive::cvt("0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e");
+        let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
+        let mut insp = AssetFlowInspector::new();
+        let _ = BcState::transit(state, spec, &mut insp).unwrap();
+        assert_eq!(insp.transfers.len(), 1);
+        let transfers = &insp.transfers[0];
+        assert_eq!(transfers.len(), 11);
+    }
 }

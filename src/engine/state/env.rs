@@ -3,6 +3,7 @@ use reth_primitives::{
 };
 use reth_provider::{EvmEnvProvider, TransactionsProvider};
 use reth_revm::env::fill_tx_env;
+
 use revm_primitives::{BlockEnv, CfgEnv, TxEnv};
 
 use crate::{engine::transactions::position::TxPosition, error::SoflError};

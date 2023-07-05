@@ -158,3 +158,27 @@ impl HPMultipler {
         result
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct UFixed256 {
+    pub raw_value: U256,
+    pub decimals: u8,
+}
+
+impl UFixed256 {
+    pub fn new(decimals: u8) -> Self {
+        if decimals > 80 {
+            panic!("decimals must be <= 80")
+        }
+        Self {
+            raw_value: U256::ZERO,
+            decimals,
+        }
+    }
+}
+
+impl UFixed256 {
+    pub fn denominator(&self) -> U256 {
+        U256::from(10).pow(U256::from(self.decimals))
+    }
+}
