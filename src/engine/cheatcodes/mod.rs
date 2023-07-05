@@ -6,7 +6,7 @@ use crate::error::SoflError;
 use ethers::abi::{self, Function, ParamType, Token};
 use reth_primitives::{Address, Bytes, U256};
 use revm::{Database, DatabaseCommit};
-use revm_primitives::B256;
+use revm_primitives::{Bytecode, B256};
 
 mod inspector;
 use inspector::CheatcodeInspector;
@@ -309,6 +309,34 @@ impl<S: DatabaseEditable + Database> CheatCodes<S> {
             .basic(account)
             .map_err(SoflError::Db)?
             .map_or(Ok(U256::from(0)), |info| Ok(info.balance))
+    }
+
+    pub fn get_code_hash(
+        &self,
+        state: &mut S,
+        account: Address,
+    ) -> Result<B256, SoflError<<S as Database>::Error>> {
+        state
+            .basic(account)
+            .map_err(SoflError::Db)?
+            .map_or(Ok(B256::zero()), |info| Ok(info.code_hash))
+    }
+
+    pub fn get_code(
+        &self,
+        state: &mut S,
+        account: Address,
+    ) -> Result<Bytecode, SoflError<<S as Database>::Error>> {
+        if let Some(code) = state
+            .basic(account)
+            .map_err(SoflError::Db)?
+            .and_then(|info| info.code)
+        {
+            Ok(code)
+        } else {
+            let code_hash = self.get_code_hash(state, account)?;
+            state.code_by_hash(code_hash).map_err(SoflError::Db)
+        }
     }
 
     pub fn set_balance(

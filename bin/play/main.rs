@@ -19,6 +19,79 @@ fn main() {
 
     let mut cheatcode = CheatCodes::new();
 
+    {
+        let udsc_v2 =
+            Address::from_str("0xB4e16d0168e52d35CaCD2c6185b44281Ec28C9Dc")
+                .unwrap();
+        let wbtc_v2 =
+            Address::from_str("0x004375Dff511095CC5A197A54140a24eFEF3A416")
+                .unwrap();
+
+        let usdc_code = cheatcode.get_code(&mut state, udsc_v2).unwrap();
+        let wbtc_code = cheatcode.get_code(&mut state, wbtc_v2).unwrap();
+
+        println!("{} {}", usdc_code.bytecode.len(), wbtc_code.bytecode.len());
+        println!("{} {}", usdc_code.len(), wbtc_code.len());
+
+        // let mut equal_amount = 0;
+        // for i in 0..usdc_code.len() {
+        //     if usdc_code.bytecode[i] == wbtc_code.bytecode[i] {
+        //         equal_amount += 1;
+        //     }
+        // }
+
+        let equal_amount = usdc_code
+            .original_bytes()
+            .iter()
+            .zip(wbtc_code.original_bytes().iter())
+            .map(
+                |(usdc_byte, wbtc_byte)| {
+                    if usdc_byte == wbtc_byte {
+                        1
+                    } else {
+                        0
+                    }
+                },
+            )
+            .sum::<u64>();
+
+        println!(
+            "FUCK {} = {} / {}",
+            (equal_amount as f64) / (wbtc_code.len() as f64),
+            equal_amount,
+            wbtc_code.len()
+        );
+    }
+
+    {
+        let dai_v3 =
+            Address::from_str("0x60594a405d53811d3bc4766596efd80fd545a270")
+                .unwrap();
+        let usdt_v3 =
+            Address::from_str("0x4e68Ccd3E89f51C3074ca5072bbAC773960dFa36")
+                .unwrap();
+
+        let dai_code = cheatcode.get_code(&mut state, dai_v3).unwrap();
+        let usdt_code = cheatcode.get_code(&mut state, usdt_v3).unwrap();
+
+        let equal_amount = dai_code
+            .bytecode
+            .iter()
+            .zip(usdt_code.bytecode.iter())
+            .fold(
+                0u64,
+                |acc, (dai_byte, usdt_byte)| {
+                    if dai_byte == usdt_byte {
+                        acc + 1
+                    } else {
+                        acc
+                    }
+                },
+            );
+
+        println!("FUCK {}", (equal_amount as f64) / (usdt_code.len() as f64));
+    }
+
     let account =
         Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
             .unwrap();
