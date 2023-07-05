@@ -6,7 +6,9 @@ use revm::{Database, DatabaseCommit};
 use revm_primitives::U256;
 
 use crate::{
-    engine::state::DatabaseEditable, error::SoflError, utils::abi::ERC20_ABI,
+    engine::state::DatabaseEditable,
+    error::SoflError,
+    utils::{abi::ERC20_ABI, addresses::WETH},
 };
 
 use super::CheatCodes;
@@ -120,17 +122,25 @@ impl<
             // we need to update total supply
             let total_supply = self.get_erc20_total_supply(state, token)?;
 
-            // signature: totalSupply() -> 0x18160ddd
-            let func = ERC20_ABI
-                .function("totalSupply")
-                .expect("bug: cannot find totalSupply function in ERC20 ABI");
-            self.cheat_write(
-                state,
-                token,
-                func,
-                &[],
-                total_supply + balance - old_balance,
-            )?;
+            if token == *WETH {
+                self.set_balance(
+                    state,
+                    *WETH,
+                    total_supply + balance - old_balance,
+                )?;
+            } else {
+                // signature: totalSupply() -> 0x18160ddd
+                let func = ERC20_ABI.function("totalSupply").expect(
+                    "bug: cannot find totalSupply function in ERC20 ABI",
+                );
+                self.cheat_write(
+                    state,
+                    token,
+                    func,
+                    &[],
+                    total_supply + balance - old_balance,
+                )?;
+            }
 
             Ok(Some(old_balance))
         } else {

@@ -24,10 +24,48 @@ fn main() {
             .unwrap();
 
     {
+        let weth =
+            Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+                .unwrap();
+        {
+            let balance = cheatcode
+                .get_erc20_balance(&mut state, weth, account)
+                .unwrap();
+            println!("balance: {} {} : {}", weth, account, balance);
+
+            let total_supply =
+                cheatcode.get_erc20_total_supply(&mut state, weth).unwrap();
+            println!("total supply: {} : {}", weth, total_supply);
+
+            let decimals =
+                cheatcode.get_erc20_decimals(&mut state, weth).unwrap();
+            println!("decimals: {} : {}", weth, decimals);
+        }
+
+        cheatcode
+            .set_erc20_balance(&mut state, weth, account, U256::from(1234567))
+            .unwrap();
+        {
+            let balance = cheatcode
+                .get_erc20_balance(&mut state, weth, account)
+                .unwrap();
+            println!("balance: {} {} : {}", weth, account, balance);
+
+            let total_supply =
+                cheatcode.get_erc20_total_supply(&mut state, weth).unwrap();
+            println!("total supply: {} : {}", weth, total_supply);
+
+            let decimals =
+                cheatcode.get_erc20_decimals(&mut state, weth).unwrap();
+            println!("decimals: {} : {}", weth, decimals);
+        }
+    }
+
+    {
         let usdc =
             Address::from_str("0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48")
                 .unwrap();
-        if false {
+        {
             let balance = cheatcode
                 .get_erc20_balance(&mut state, usdc, account)
                 .unwrap();
