@@ -35,7 +35,6 @@ use crate::{
     },
     unwrap_token_values,
     utils::{
-        abi::macros::*,
         abi::{UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI},
         addresses,
         conversion::{Convert, ToEthers, ToPrimitive},
@@ -217,7 +216,7 @@ impl NaivePriceOracleManipulator {
         // get current reserves
         let get_reserves_func = UNISWAP_V2_PAIR_ABI.function("getReserves")?;
         let caller = HighLevelCaller::default().bypass_check();
-        let mut ret = caller.view(
+        let mut et = caller.view(
             state,
             swap_pool,
             get_reserves_func,
@@ -248,10 +247,10 @@ impl NaivePriceOracleManipulator {
         // get token contracts
         let token0_func = UNISWAP_V2_PAIR_ABI.function("token0")?;
         let token1_func = UNISWAP_V2_PAIR_ABI.function("token1")?;
-        let mut ret =
+        let ret =
             caller.view(state, swap_pool, token0_func, &[], no_inspector())?;
         let (token0,) = unwrap_token_values!(ret, Address);
-        let mut ret =
+        let ret =
             caller.view(state, swap_pool, token1_func, &[], no_inspector())?;
         let (token1,) = unwrap_token_values!(ret, Address);
 
@@ -284,7 +283,7 @@ pub fn get_uniswap_v2_pair_address<
     let get_pair_func = UNISWAP_V2_FACTORY_ABI
         .function("getPair")
         .expect("impossible: getPair is not a function");
-    let mut pair = caller
+    let pair = caller
         .view(
             state,
             *addresses::UNISWAP_V2_FACTORY,
