@@ -36,6 +36,12 @@ pub trait DatabaseEditable {
 
 pub type StateProviderDB<'a> = WrappedDB<StateProviderBox<'a>>;
 
+pub type ForkedState<'a> = CacheDB<StateProviderDB<'a>>;
+
+pub type ForkedStateDbError = reth_interfaces::Error;
+
+pub type FreshState = CacheDB<EmptyDB>;
+
 pub struct BcStateBuilder;
 
 impl BcStateBuilder {

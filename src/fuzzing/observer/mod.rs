@@ -203,10 +203,12 @@ where
     ) -> Result<(), libafl::Error>;
 }
 
-impl<S, BS> DifferentialEvmObserverTuple<S, BS, (), ()> for ()
+impl<S, BS, OTA, OTB> DifferentialEvmObserverTuple<S, BS, OTA, OTB> for ()
 where
     S: UsesInput,
     BS: Database,
+    OTA: EvmObserversTuple<S, BS>,
+    OTB: EvmObserversTuple<S, BS>,
 {
     type FirstInspector = ();
     type SecondInspector = ();

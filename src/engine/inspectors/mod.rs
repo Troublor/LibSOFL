@@ -1,4 +1,5 @@
 pub mod asset_flow;
+pub mod call_extract;
 pub mod combined;
 pub mod static_call;
 
