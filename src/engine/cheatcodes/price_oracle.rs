@@ -202,14 +202,16 @@ where
         let func = UNISWAP_V2_FACTORY_ABI.function("getPair").expect(
             "bug: cannot find getPair function in UniswapV2Factory ABI",
         );
-        let mut token_pair = self.cheat_read(
-            state,
-            *UNISWAP_V2_FACTORY,
-            func,
-            &[Token::Address(token1.into()), Token::Address(token2.into())],
-        )?;
 
-        Ok(unwrap_first_token_value!(Address, token_pair))
+        Ok(unwrap_first_token_value!(
+            Address,
+            self.cheat_read(
+                state,
+                *UNISWAP_V2_FACTORY,
+                func,
+                &[Token::Address(token1.into()), Token::Address(token2.into())],
+            )?
+        ))
     }
 }
 
@@ -282,8 +284,10 @@ where
             .expect("bug: cannot find slot0 function in UniswapV3Pool ABI");
 
         // price is Q64.96
-        let mut res = self.cheat_read(state, pool, func, &[])?;
-        let sqrt_price_x96 = unwrap_first_token_value!(Uint, res);
+        let sqrt_price_x96 = unwrap_first_token_value!(
+            Uint,
+            self.cheat_read(state, pool, func, &[])?
+        );
 
         let mut result = HPMultipler::from(sqrt_price_x96);
 
@@ -378,17 +382,19 @@ where
         let func = UNISWAP_V3_FACTORY_ABI.function("getPool").expect(
             "bug: cannot find getPool function in UniswapV3Factory ABI",
         );
-        let mut token_pair = self.cheat_read(
-            state,
-            *UNISWAP_V3_FACTORY,
-            func,
-            &[
-                Token::Address(token1.into()),
-                Token::Address(token2.into()),
-                Token::Uint(fee.into()),
-            ],
-        )?;
 
-        Ok(unwrap_first_token_value!(Address, token_pair))
+        Ok(unwrap_first_token_value!(
+            Address,
+            self.cheat_read(
+                state,
+                *UNISWAP_V3_FACTORY,
+                func,
+                &[
+                    Token::Address(token1.into()),
+                    Token::Address(token2.into()),
+                    Token::Uint(fee.into()),
+                ],
+            )?
+        ))
     }
 }

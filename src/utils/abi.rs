@@ -101,13 +101,14 @@ pub(crate) mod macros {
 
     #[macro_export]
     macro_rules! unwrap_token_values {
-        ($v: expr, $($t:tt),*) => {
+        ($v: expr, $($t:tt),*) => {{
+            let mut ret = { $v };
             (
                 $(
-                    $crate::unwrap_first_token_value!($t, $v),
+                    $crate::unwrap_first_token_value!($t, ret),
                 )*
             )
-        };
+        }};
     }
 
     #[cfg(test)]
@@ -118,14 +119,14 @@ pub(crate) mod macros {
 
         #[test]
         fn test_unwrap_single() {
-            let mut ret = vec![Token::Address(ethers::types::H160::zero())];
+            let ret = vec![Token::Address(ethers::types::H160::zero())];
             let (addr,) = unwrap_token_values!(ret, Address);
             assert_eq!(addr, Address::zero());
         }
 
         #[test]
         fn test_unwrap_multiple() {
-            let mut ret = vec![
+            let ret = vec![
                 Token::Address(ethers::types::H160::zero()),
                 Token::Uint(ethers::types::U256::zero()),
             ];
