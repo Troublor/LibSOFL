@@ -216,7 +216,7 @@ impl NaivePriceOracleManipulator {
         // get current reserves
         let get_reserves_func = UNISWAP_V2_PAIR_ABI.function("getReserves")?;
         let caller = HighLevelCaller::default().bypass_check();
-        let mut et = caller.view(
+        let ret = caller.view(
             state,
             swap_pool,
             get_reserves_func,
