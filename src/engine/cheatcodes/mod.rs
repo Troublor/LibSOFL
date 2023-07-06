@@ -406,3 +406,46 @@ mod tests_with_db {
         assert_eq!(balance2, U256::from(1299267380));
     }
 }
+
+#[cfg(test)]
+mod tests_with_jsonrpc {
+    use std::str::FromStr;
+
+    use reth_primitives::Address;
+    use revm_primitives::U256;
+
+    use crate::engine::cheatcodes::ERC20Cheat;
+    use crate::engine::providers::rpc::JsonRpcBcProvider;
+    use crate::engine::state::BcStateBuilder;
+    use crate::engine::transactions::position::TxPosition;
+
+    use super::CheatCodes;
+
+    #[test]
+    fn test_get_token_balance() {
+        let bp = JsonRpcBcProvider::default();
+
+        let fork_at = TxPosition::new(17000001, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let mut cheatcode = CheatCodes::new();
+
+        let token =
+            Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")
+                .unwrap();
+        let account =
+            Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
+                .unwrap();
+
+        let balance1 = cheatcode
+            .get_erc20_balance(&mut state, token, account)
+            .unwrap();
+
+        let balance2 = cheatcode
+            .get_erc20_balance(&mut state, token, account)
+            .unwrap();
+
+        assert_eq!(balance1, U256::from(1299267380));
+        assert_eq!(balance2, U256::from(1299267380));
+    }
+}

@@ -115,3 +115,50 @@ mod tests_with_db {
         );
     }
 }
+
+#[cfg(test)]
+mod tests_with_jsonrpc {
+    use std::str::FromStr;
+
+    use reth_primitives::Address;
+
+    use crate::engine::providers::rpc::JsonRpcBcProvider;
+    use crate::engine::state::BcStateBuilder;
+    use crate::engine::transactions::position::TxPosition;
+    use crate::fuzzing::executor::utils::contract_matching::{
+        match_contract_type, ContractType,
+    };
+
+    #[test]
+    fn test_match_contract_type() {
+        let bp = JsonRpcBcProvider::default();
+
+        let fork_at = TxPosition::new(17000001, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let uniswap_v2 =
+            Address::from_str("0x004375Dff511095CC5A197A54140a24eFEF3A416")
+                .unwrap();
+        let uniswap_v3 =
+            Address::from_str("0x7668B2Ea8490955F68F5c33E77FE150066c94fb9")
+                .unwrap();
+        let random =
+            Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
+                .unwrap();
+
+        assert_eq!(
+            match_contract_type(&mut state, uniswap_v2, None).unwrap(),
+            Some(ContractType::UniswapV2)
+        );
+
+        assert_eq!(
+            match_contract_type(&mut state, uniswap_v3, None).unwrap(),
+            Some(ContractType::UniswapV3)
+        );
+
+        assert_eq!(
+            match_contract_type(&mut state, random, None).unwrap(),
+            None,
+        );
+    }
+}

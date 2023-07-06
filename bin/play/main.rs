@@ -2,7 +2,7 @@ use std::path::Path;
 use std::str::FromStr;
 
 use libsofl::config::flags::SoflConfig;
-use libsofl::engine::cheatcodes::{CheatCodes, ERC20Cheat, PriceOracleCheat};
+use libsofl::engine::cheatcodes::{CheatCodes, ERC20Cheat};
 use libsofl::engine::providers::BcProviderBuilder;
 use libsofl::engine::state::BcStateBuilder;
 use libsofl::engine::transactions::position::TxPosition;

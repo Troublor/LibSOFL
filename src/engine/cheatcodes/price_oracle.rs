@@ -513,3 +513,89 @@ mod tests_with_db {
         assert!(delta * U256::from(100) < prices[0]);
     }
 }
+
+#[cfg(test)]
+mod tests_with_jsonrpc {
+    use std::str::FromStr;
+
+    use reth_primitives::Address;
+    use revm_primitives::U256;
+
+    use crate::engine::cheatcodes::{CheatCodes, PriceOracleCheat};
+    use crate::engine::providers::rpc::JsonRpcBcProvider;
+    use crate::engine::state::BcStateBuilder;
+    use crate::engine::transactions::position::TxPosition;
+
+    #[test]
+    fn test_price_oracle_weth() {
+        let bp = JsonRpcBcProvider::default();
+
+        let fork_at = TxPosition::new(17000001, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let mut cheatcode = CheatCodes::new();
+
+        let weth =
+            Address::from_str("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
+                .unwrap();
+        let price = cheatcode.get_price_in_ether(&mut state, weth).unwrap();
+
+        assert!(price == U256::from(10).pow(U256::from(18)));
+    }
+
+    #[test]
+    fn test_price_oracle_wbtc() {
+        let bp = JsonRpcBcProvider::default();
+
+        let fork_at = TxPosition::new(17000001, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let mut cheatcode = CheatCodes::new();
+
+        let wbtc =
+            Address::from_str("0x2260fac5e5542a773aa44fbcfedf7c193bc2c599")
+                .unwrap();
+        let price = cheatcode.get_price_in_ether(&mut state, wbtc).unwrap();
+
+        // BTC should be at least 5 ETH
+        assert!(price > U256::from(5) * U256::from(10).pow(U256::from(18)));
+    }
+
+    #[test]
+    fn test_price_oracle_stablecoins() {
+        let bp = JsonRpcBcProvider::default();
+
+        let fork_at = TxPosition::new(17000001, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let mut cheatcode = CheatCodes::new();
+
+        let usdc: Address =
+            Address::from_str("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
+                .unwrap();
+        let price0 = cheatcode.get_price_in_ether(&mut state, usdc).unwrap();
+
+        let dai: Address =
+            Address::from_str("0x6b175474e89094c44da98b954eedeac495271d0f")
+                .unwrap();
+        let price1 = cheatcode.get_price_in_ether(&mut state, dai).unwrap();
+
+        let usdt: Address =
+            Address::from_str("0xdac17f958d2ee523a2206206994597c13d831ec7")
+                .unwrap();
+        let price2 = cheatcode.get_price_in_ether(&mut state, usdt).unwrap();
+
+        let busd: Address =
+            Address::from_str("0x4fabb145d64652a948d72533023f6e7a623c7c53")
+                .unwrap();
+        let price3 = cheatcode.get_price_in_ether(&mut state, busd).unwrap();
+
+        let mut prices = vec![price0, price1, price2, price3];
+        prices.sort();
+
+        let delta = prices[3] - prices[0];
+
+        // delta / min_price < 0.01
+        assert!(delta * U256::from(100) < prices[0]);
+    }
+}
