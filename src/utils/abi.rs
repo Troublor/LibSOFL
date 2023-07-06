@@ -34,6 +34,17 @@ define_contract!(
     "../../assets/uniswap_v3_factory.abi.json"
 );
 define_contract!(UNISWAP_V3_POOL_ABI, "../../assets/uniswap_v3_pool.abi.json");
+define_contract!(CURVE_REGISTRY_ABI, "../../assets/curve_registry.abi.json");
+define_contract!(
+    CURVE_CRYPTO_REGISTRY_ABI,
+    "../../assets/curve_crypto_registry.abi.json"
+);
+define_contract!(CURVE_POOL_ABI, "../../assets/curve_pool.abi.json");
+define_contract!(
+    CURVE_CRYPTO_POOL_ABI,
+    "../../assets/curve_crypto_pool.abi.json"
+);
+define_contract!(CURVE_EXCHANGE_ABI, "../../assets/curve_exchange.abi.json");
 
 pub(crate) mod macros {
 
@@ -66,9 +77,11 @@ pub(crate) mod macros {
             .expect("impossible: return value is not fixed_byte")
         };
         (Int, $v:expr) => {
-            $v.remove(0)
-                .into_int()
-                .expect("impossible: return value is not int")
+            ethers::types::I256::from_raw(
+                $v.remove(0)
+                    .into_int()
+                    .expect("impossible: return value is not int"),
+            )
         };
         (Uint, $v:expr) => {
             $crate::convert_to_primitive!(

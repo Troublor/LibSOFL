@@ -1,6 +1,10 @@
-use reth_primitives::Address;
+use reth_primitives::{Address, BlockHashOrNumber};
+use reth_provider::EvmEnvProvider;
 use revm::{Database, DatabaseCommit};
-use revm_primitives::{BlockEnv, Bytes, CfgEnv, ExecutionResult, Output, U256};
+use revm_primitives::{
+    hex::{self, ToHex},
+    BlockEnv, Bytes, CfgEnv, ExecutionResult, Output, U256,
+};
 
 use crate::{engine::transactions::builder::TxBuilder, error::SoflError};
 
@@ -46,6 +50,15 @@ impl HighLevelCaller {
         self
     }
 
+    pub fn at_block<P: EvmEnvProvider, B: Into<BlockHashOrNumber>>(
+        mut self,
+        p: P,
+        block: B,
+    ) -> Self {
+        self.spec_builder = self.spec_builder.at_block(p, block);
+        self
+    }
+
     pub fn set_gas_limit(mut self, gas_limit: u64) -> Self {
         self.gas_limit = gas_limit;
         self
@@ -76,6 +89,10 @@ impl HighLevelCaller {
             .set_input(calldata)
             .build();
         let spec = self.spec_builder.clone().append_tx(tx.from(), tx).build();
+        println!(
+            "input: {:?}",
+            hex::encode(spec.txs.get(0).unwrap().data.as_ref())
+        );
         let (_, mut result) = BcState::transit(
             state,
             spec,

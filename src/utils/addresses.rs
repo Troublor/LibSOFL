@@ -11,6 +11,9 @@ macro_rules! define_address {
     };
 }
 
+// Convensions
+define_address!(ETH, "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE");
+
 // Tokens
 define_address!(WETH, "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2");
 define_address!(USDC, "0xA0b86991c6218b36c1d19D4a2e9Eb0cE3606eB48");
@@ -25,4 +28,19 @@ define_address!(
 define_address!(
     UNISWAP_V2_FACTORY,
     "0x5c69bee701ef814a2b6a3edd4b1652cb9cc5aa6f"
+);
+
+// Curve.FI
+define_address!(
+    CURVE_ADDRESS_PROVIDER,
+    "0x0000000022D53366457F9d5E68Ec105046FC4383"
+);
+// The main registry contract. Used to locate pools and query information about them.
+define_address!(CURVE_REGISTRY, "0x90E00ACe148ca3b23Ac1bC8C240C2a7Dd9c2d7f5");
+// Generalized swap contract. Used for finding rates and performing exchanges.
+define_address!(CURVE_EXCHANGE, "0x8e764bE4288B842791989DB5b8ec067279829809");
+// The cryptoswap factory.
+define_address!(
+    CURVE_CRYPTO_REGISTRY,
+    "0x8F942C20D02bEfc377D41445793068908E2250D0"
 );

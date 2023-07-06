@@ -12,6 +12,8 @@ use reth_provider::{providers::BlockchainProvider, ProviderFactory};
 use reth_revm::Factory;
 use std::sync::Mutex;
 
+use crate::config::flags::SoflConfig;
+
 use super::BcProviderBuilder;
 
 type BcDB = Arc<Env<WriteMap>>;
@@ -23,6 +25,12 @@ pub type RethBcProvider = BlockchainProvider<BcDB, BcTree>;
 static DB_ENV_SINGLETON: Mutex<Option<Arc<Env<WriteMap>>>> = Mutex::new(None);
 
 impl BcProviderBuilder {
+    pub fn default_db() -> Result<RethBcProvider, rethError> {
+        let cfg = SoflConfig::load().unwrap();
+        let datadir = Path::new(cfg.reth.datadir.as_str());
+        Ok(BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap())
+    }
+
     pub fn with_mainnet_reth_db(
         datadir: &Path,
     ) -> Result<RethBcProvider, rethError> {

@@ -41,6 +41,10 @@ pub enum JsonRpcError {
 }
 
 impl BcProviderBuilder {
+    pub fn default_jsonrpc() -> Result<JsonRpcBcProvider<Http>, JsonRpcError> {
+        Ok(JsonRpcBcProvider::default())
+    }
+
     pub fn with_jsonrpc_via_http(
         url: String,
     ) -> Result<JsonRpcBcProvider<Http>, JsonRpcError> {
@@ -772,27 +776,27 @@ impl<P: JsonRpcClient> AccountReader for JsonRpcStateProvider<P> {
     #[doc = ""]
     #[doc = " Returns `None` if the account doesn\'t exist."]
     fn basic_account(&self, address: Address) -> rethResult<Option<Account>> {
+        let address: ethers::types::Address = ToEthers::cvt(&address);
         let nonce = self
             .runtime
-            .block_on(self.provider.get_transaction_count(
-                ToEthers::cvt(&address),
-                self.get_ethers_block_id(),
-            ))
+            .block_on(
+                self.provider
+                    .get_transaction_count(address, self.get_ethers_block_id()),
+            )
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         let balance = self
             .runtime
-            .block_on(self.provider.get_balance(
-                ToEthers::cvt(&address),
-                self.get_ethers_block_id(),
-            ))
+            .block_on(
+                self.provider
+                    .get_balance(address, self.get_ethers_block_id()),
+            )
             .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
-        let code =
-            self.runtime
-                .block_on(self.provider.get_code(
-                    ToEthers::cvt(&address),
-                    self.get_ethers_block_id(),
-                ))
-                .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
+        let code = self
+            .runtime
+            .block_on(
+                self.provider.get_code(address, self.get_ethers_block_id()),
+            )
+            .map_err(|_| rethError::Network(NetworkError::ChannelClosed))?;
         let code_hash;
         if code.len() == 0 {
             code_hash = None;
@@ -830,10 +834,11 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
         account: Address,
         storage_key: StorageKey,
     ) -> rethResult<Option<StorageValue>> {
+        let account: ethers::types::Address = ToEthers::cvt(&account);
         let value = self
             .runtime
             .block_on(self.provider.get_storage_at(
-                ToEthers::cvt(&account),
+                account,
                 ToEthers::cvt(&storage_key),
                 self.get_ethers_block_id(),
             ))

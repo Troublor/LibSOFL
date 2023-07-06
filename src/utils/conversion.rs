@@ -1,6 +1,6 @@
 use std::ops::{RangeBounds, RangeInclusive};
 
-use ethers::abi::RawLog as ethersRawLog;
+use ethers::abi::{RawLog as ethersRawLog, Token};
 use ethers::types::{
     Address as ethersAddress, Block as ethersBlock, BlockId as ethersBlockId,
     BlockNumber as ethersBlockNumber, Bytes as ethersBytes, Log as ethersLog,
@@ -8,6 +8,7 @@ use ethers::types::{
     TxHash as ethersTxHash, H256 as ethersH256, U256 as ethersU256,
     U64 as ethersU64,
 };
+
 use reth_primitives::{
     Address, BlockHash, BlockHashOrNumber, Bloom, Bytecode, Bytes, Header, Log,
     Receipt, SealedHeader, TransactionSigned, TxType,
@@ -243,6 +244,12 @@ impl Convert<Bytes, ethersBytes> for ToEthers {
     }
 }
 
+impl Convert<U256, ethersU256> for ToEthers {
+    fn cvt(v: U256) -> ethersU256 {
+        ethersU256::from(v)
+    }
+}
+
 impl Convert<B256, ethersH256> for ToEthers {
     fn cvt(v: B256) -> ethersH256 {
         ethersH256::from_slice(&v.0)
@@ -252,6 +259,12 @@ impl Convert<B256, ethersH256> for ToEthers {
 impl Convert<u64, ethersU64> for ToEthers {
     fn cvt(v: u64) -> ethersU64 {
         ethersU64::from(v)
+    }
+}
+
+impl Convert<u128, ethersU256> for ToEthers {
+    fn cvt(v: u128) -> ethersU256 {
+        ethersU256::from(v)
     }
 }
 
@@ -290,6 +303,24 @@ impl Convert<Log, ethersRawLog> for ToEthers {
             topics: v.topics.iter().map(ToEthers::cvt).collect(),
             data: v.data.to_vec(),
         }
+    }
+}
+
+impl Convert<Address, Token> for ToEthers {
+    fn cvt(v: Address) -> Token {
+        Token::Address(ToEthers::cvt(v))
+    }
+}
+
+impl Convert<U256, Token> for ToEthers {
+    fn cvt(v: U256) -> Token {
+        Token::Uint(ToEthers::cvt(v))
+    }
+}
+
+impl Convert<u128, Token> for ToEthers {
+    fn cvt(v: u128) -> Token {
+        Token::Uint(ToEthers::cvt(v))
     }
 }
 
