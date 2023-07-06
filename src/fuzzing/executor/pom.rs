@@ -1,4 +1,7 @@
-use ethers::abi;
+use ethers::{
+    abi::{self, Token},
+    types::I256,
+};
 use libafl::{
     prelude::{
         Executor, HasObservers, ObserversTuple, UsesInput, UsesObservers,
@@ -9,15 +12,13 @@ use reth_primitives::Address;
 use reth_provider::{
     EvmEnvProvider, StateProviderFactory, TransactionsProvider,
 };
-use revm::{Database, DatabaseCommit};
-use revm_primitives::{
-    db::DatabaseRef, hex::ToHex, ruint::aliases::U512, U256,
-};
+use revm::{interpreter::OpCode, Database, DatabaseCommit, Inspector};
+use revm_primitives::{db::DatabaseRef, ruint::aliases::U512, U256};
 
 use crate::{
     engine::{
         cheatcodes::{CheatCodes, ERC20Cheat},
-        inspectors::{self, no_inspector},
+        inspectors::{self, no_inspector, MultiTxInspector},
         state::{
             env::TransitionSpecBuilder, BcState, BcStateBuilder,
             DatabaseEditable, ForkedState, ForkedStateDbError,
@@ -35,10 +36,14 @@ use crate::{
     },
     unwrap_token_values,
     utils::{
-        abi::{UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI},
-        addresses,
+        abi::{
+            CURVE_CRYPTO_POOL_ABI, CURVE_CRYPTO_REGISTRY_ABI,
+            CURVE_EXCHANGE_ABI, CURVE_POOL_ABI, CURVE_REGISTRY_ABI, ERC20_ABI,
+            UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI,
+        },
+        addresses::{self, CURVE_CRYPTO_REGISTRY},
         conversion::{Convert, ToEthers, ToPrimitive},
-        math::UFixed256,
+        math::{HPMultipler, UFixed256},
     },
 };
 
@@ -194,28 +199,37 @@ impl<S: UsesInput<Input = TxInput>, BS> HasObservers for PomExecutor<S, BS> {
     }
 }
 
-pub enum SlippageDirection {
-    Up(UFixed256),
-    Down(UFixed256),
+pub enum Flation {
+    Inflation(UFixed256),
+    Deflation(UFixed256),
 }
 
 #[derive(Debug, Clone, Default)]
-pub struct NaivePriceOracleManipulator {}
+pub struct NaivePriceOracleManipulator {
+    caller: HighLevelCaller,
+}
 
 impl NaivePriceOracleManipulator {
-    fn manipulate<
+    pub fn new(caller: HighLevelCaller) -> Self {
+        Self { caller }
+    }
+}
+
+impl NaivePriceOracleManipulator {
+    #[allow(unused)]
+    fn manipulate_uniswap_v2<
         E: std::fmt::Debug,
         BS: Database<Error = E> + DatabaseCommit + DatabaseEditable<Error = E>,
     >(
         &mut self,
         state: &mut BS,
         swap_pool: Address,
-        direction: SlippageDirection,
+        direction: Flation,
     ) -> Result<(), SoflError<E>> {
         // UniswapV2-like AMM
         // get current reserves
         let get_reserves_func = UNISWAP_V2_PAIR_ABI.function("getReserves")?;
-        let caller = HighLevelCaller::default().bypass_check();
+        let caller = self.caller.clone();
         let ret = caller.view(
             state,
             swap_pool,
@@ -224,25 +238,37 @@ impl NaivePriceOracleManipulator {
             no_inspector(),
         )?;
         let (reserve0, reserve1) = unwrap_token_values!(ret, Uint, Uint);
-        let reserve0 = reserve0.to::<U512>();
-        let reserve1 = reserve1.to::<U512>();
         let k = reserve0 * reserve1;
 
         // calculate new reserves
-        let reserve1 = match direction {
-            SlippageDirection::Up(slippage) => {
-                let changes1 = reserve1 * slippage.raw_value.to::<U512>()
-                    / slippage.denominator().to::<U512>();
-                reserve1 + changes1
+        let (reserve0, reserve1) = match direction {
+            Flation::Inflation(slippage) => {
+                let r1: U256 = (HPMultipler::default()
+                    * (slippage.denominator() + slippage.raw_value)
+                    * reserve1
+                    / slippage.denominator())
+                .into();
+                let r0: U256 = (HPMultipler::default()
+                    * reserve0
+                    * slippage.denominator()
+                    / (slippage.denominator() + slippage.raw_value))
+                    .into();
+                (r0, r1)
             }
-            SlippageDirection::Down(slippage) => {
-                let changes1 = reserve1 * slippage.raw_value.to::<U512>()
-                    / slippage.denominator().to::<U512>();
-                reserve1 - changes1
+            Flation::Deflation(slippage) => {
+                let r1: U256 = (HPMultipler::default()
+                    * (slippage.denominator() - slippage.raw_value)
+                    * reserve1
+                    / slippage.denominator())
+                .into();
+                let r0: U256 = (HPMultipler::default()
+                    * reserve0
+                    * slippage.denominator()
+                    / (slippage.denominator() - slippage.raw_value))
+                    .into();
+                (r0, r1)
             }
         };
-        let reserve0 = U256::wrapping_from(k / reserve1);
-        let reserve1 = U256::wrapping_from(reserve1);
 
         // get token contracts
         let token0_func = UNISWAP_V2_PAIR_ABI.function("token0")?;
@@ -256,8 +282,6 @@ impl NaivePriceOracleManipulator {
 
         // cheat: set pool token balance to new reserves
         let mut cheatcode = CheatCodes::new();
-        println!("token0: {:?}", token0);
-        println!("token1: {:?}", token1);
         cheatcode.set_erc20_balance(state, token0, swap_pool, reserve0)?;
         cheatcode.set_erc20_balance(state, token1, swap_pool, reserve1)?;
 
@@ -265,8 +289,234 @@ impl NaivePriceOracleManipulator {
         let sync_func = UNISWAP_V2_PAIR_ABI
             .function("sync")
             .expect("impossible: sync is not a function");
-        caller.view(state, swap_pool, sync_func, &[], no_inspector())?;
+        caller.invoke(
+            state,
+            swap_pool,
+            sync_func,
+            &[],
+            None,
+            no_inspector(),
+        )?;
 
+        Ok(())
+    }
+
+    ///
+    /// inflation: swap the first token by % of its reserve.
+    /// deflation: swap the second token by % of its reserve.
+    pub fn manipulate_curve_pool<
+        E: std::fmt::Debug,
+        BS: Database<Error = E> + DatabaseCommit + DatabaseEditable<Error = E>,
+    >(
+        &mut self,
+        state: &mut BS,
+        pair: (Address, Address),
+        flation: Flation,
+    ) -> Result<(), SoflError<E>> {
+        let mut cheatcode = CheatCodes::new();
+        let caller = self.caller.clone();
+        // manipulate curve plain pool price by performing an exchange
+        let mut manipulate = |state: &mut BS,
+                              pool: Address,
+                              is_crypto_pool: bool|
+         -> Result<(), SoflError<E>> {
+            println!("before manipulate");
+            // mainipulate pool
+            let registry: Address;
+            let registry_abi: &ethers::abi::Contract;
+            let pool_abi: &ethers::abi::Contract;
+            let idx0: U256;
+            let idx1: U256;
+            if is_crypto_pool {
+                registry = *addresses::CURVE_CRYPTO_REGISTRY;
+                registry_abi = &CURVE_CRYPTO_REGISTRY_ABI;
+                pool_abi = &CURVE_CRYPTO_POOL_ABI;
+                (idx0, idx1) = unwrap_token_values!(
+                caller.view(
+                    state,
+                    registry,
+                    registry_abi.function("get_coin_indices").expect(
+                        "impossible: get_coin_indices function does not exist"
+                    ),
+                    &[
+                        ToEthers::cvt(pool),
+                        ToEthers::cvt(pair.0),
+                        ToEthers::cvt(pair.1),
+                    ],
+                    no_inspector()
+                )?,
+                Uint,
+                Uint
+            );
+            } else {
+                registry = *addresses::CURVE_REGISTRY;
+                registry_abi = &CURVE_REGISTRY_ABI;
+                pool_abi = &CURVE_POOL_ABI;
+                let (i0, i1) = unwrap_token_values!(
+                    caller.view(
+                        state,
+                        registry,
+                        registry_abi.function("get_coin_indices").expect(
+                            "impossible: get_coin_indices function does not exist"
+                        ),
+                        &[
+                            ToEthers::cvt(pool),
+                            ToEthers::cvt(pair.0),
+                            ToEthers::cvt(pair.1),
+                        ],
+                        no_inspector()
+                    )?,
+                    Int,
+                    Int
+                );
+                idx0 = ToPrimitive::cvt(
+                    ethers::types::U256::try_from(i0)
+                        .expect("impossible: i0 is not a U256"),
+                );
+                idx1 = ToPrimitive::cvt(
+                    ethers::types::U256::try_from(i1)
+                        .expect("impossible: i1 is not a U256"),
+                );
+            }
+            println!("before flation");
+            let (token_in, _token_out, idx_in, idx_out, amount_in) =
+                match flation {
+                    Flation::Inflation(percent) => {
+                        let (in_reserve,) = unwrap_token_values!(
+                        caller.view(
+                            state,
+                            pool,
+                            pool_abi.function("balances").expect(
+                                "impossible: balances function does not exist"
+                            ),
+                            &[ToEthers::cvt(idx0)],
+                            no_inspector()
+                        )?,
+                        Uint
+                    );
+                        let amount_in: U256 = (HPMultipler::default()
+                            * in_reserve
+                            * (percent.denominator() + percent.raw_value)
+                            / percent.denominator())
+                        .into();
+                        (pair.0, pair.1, idx0, idx1, amount_in)
+                    }
+                    Flation::Deflation(percent) => {
+                        let (in_reserve,) = unwrap_token_values!(
+                            caller.view(
+                                state,
+                                pool,
+                                pool_abi.function("balances").expect(
+                                    "impossible: balances function does not exist"
+                                ),
+                                &[ToEthers::cvt(idx1)],
+                                no_inspector()
+                            )?,
+                            Uint
+                        );
+                        let amount_in: U256 = (HPMultipler::default()
+                            * in_reserve
+                            * (percent.denominator() + percent.raw_value)
+                            / percent.denominator())
+                        .into();
+                        (pair.1, pair.0, idx1, idx0, amount_in)
+                    }
+                };
+            let value;
+            if token_in == *addresses::ETH {
+                value = Some(amount_in);
+            } else {
+                value = None;
+                // faucet tokens for caller
+                cheatcode.set_erc20_balance(
+                    state,
+                    token_in,
+                    caller.address,
+                    amount_in,
+                )?;
+                // approve
+                caller.invoke(
+                    state,
+                    token_in,
+                    ERC20_ABI
+                        .function("approve")
+                        .expect("impossible: approve function does not exist"),
+                    &[ToEthers::cvt(pool), ToEthers::cvt(amount_in)],
+                    None,
+                    no_inspector(),
+                )?;
+            }
+            let mut pool_args: Vec<Token> = Vec::new();
+            if is_crypto_pool {
+                pool_args.push(ToEthers::cvt(idx_in));
+                pool_args.push(ToEthers::cvt(idx_out));
+                pool_args.push(ToEthers::cvt(amount_in));
+                pool_args.push(ToEthers::cvt(0));
+            } else {
+                pool_args.push(Token::Int(ToEthers::cvt(idx_in)));
+                pool_args.push(Token::Int(ToEthers::cvt(idx_out)));
+                pool_args.push(ToEthers::cvt(amount_in));
+                pool_args.push(ToEthers::cvt(0));
+            }
+            println!("where");
+            // exchange
+            caller.invoke(
+                state,
+                pool,
+                pool_abi
+                    .function("exchange")
+                    .expect("impossible: exchange function does not exist"),
+                &pool_args,
+                value,
+                &mut TestInsp {},
+            )?;
+            Ok(())
+        };
+
+        // StableSwap pools
+        for i in 0..=u16::MAX {
+            // manipulate all available pools
+            let (pool,) = unwrap_token_values!(caller.view(
+                state,
+                *addresses::CURVE_REGISTRY,
+                CURVE_REGISTRY_ABI.functions_by_name("find_pool_for_coins").expect(
+                    "impossible: find_pool_for_coins function does not exist",
+                ).get(1).expect("impossible: find_pool_for_coins function does not exist"),
+                &[
+                    ToEthers::cvt(pair.0),
+                    ToEthers::cvt(pair.1),
+                    ToEthers::cvt(i as u128),
+                ],
+                no_inspector(),
+            )?, Address);
+            if pool == Address::zero() {
+                break;
+            }
+            manipulate(state, pool, false)?;
+        }
+
+        println!("crypto swap");
+        // CryptoSwap pools
+        for i in 0..=u16::MAX {
+            // manipulate all available pools
+            let (pool,) = unwrap_token_values!(caller.view(
+                state,
+                *addresses::CURVE_CRYPTO_REGISTRY,
+                CURVE_CRYPTO_REGISTRY_ABI.functions_by_name("find_pool_for_coins").expect(
+                    "impossible: find_pool_for_coins function does not exist",
+                ).get(1).expect("impossible: find_pool_for_coins function does not exist"),
+                &[
+                    ToEthers::cvt(pair.0),
+                    ToEthers::cvt(pair.1),
+                    ToEthers::cvt(i as u128),
+                ],
+                no_inspector(),
+            )?, Address);
+            if pool == Address::zero() {
+                break;
+            }
+            manipulate(state, pool, true)?;
+        }
         Ok(())
     }
 }
@@ -311,7 +561,7 @@ pub fn get_uniswap_v2_reserves<
     let get_reserves_func = UNISWAP_V2_PAIR_ABI
         .function("getReserves")
         .expect("impossible: getReserves is not a function");
-    let mut ret = caller
+    let ret = caller
         .view(
             state,
             pair,
@@ -326,28 +576,35 @@ pub fn get_uniswap_v2_reserves<
 
 #[cfg(test)]
 mod tests_with_jsonrpc {
-    use ethers::abi::{self, Token};
-    use revm_primitives::U256;
+
+    use ethers::abi::Token;
+    use reth_primitives::Address;
+    use revm::{interpreter::OpCode, Database, Inspector};
+    use revm_primitives::{hex, U256};
 
     use crate::{
         engine::{
-            inspectors::{self, no_inspector},
+            cheatcodes::{self, CheatCodes, ERC20Cheat},
+            inspectors::{no_inspector, MultiTxInspector},
             providers::rpc::JsonRpcBcProvider,
             state::BcStateBuilder,
             utils::HighLevelCaller,
         },
+        unwrap_token_values,
         utils::{
-            abi::UNISWAP_V2_FACTORY_ABI,
+            abi::{CURVE_POOL_ABI, ERC20_ABI},
             addresses,
-            conversion::{Convert, ToEthers},
+            conversion::{Convert, ToEthers, ToPrimitive},
             math::UFixed256,
         },
     };
 
-    use super::{get_uniswap_v2_pair_address, get_uniswap_v2_reserves};
+    use super::{
+        get_uniswap_v2_pair_address, get_uniswap_v2_reserves, Flation,
+    };
 
     #[test]
-    fn test_manipulate_eth_usdc_price() {
+    fn test_manipulate_uniswap_v2_eth_usdc_price() {
         let provider = JsonRpcBcProvider::default();
         let mut state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
         let pair = get_uniswap_v2_pair_address(
@@ -356,31 +613,138 @@ mod tests_with_jsonrpc {
             *addresses::USDC,
         )
         .unwrap();
-        println!("pair: {:?}", pair);
-        let (r0, r1) = get_uniswap_v2_reserves(&mut state, pair).unwrap();
-        println!(
-            "before manipulation => r0: {:?}, r1: {:?}, k: {:?}",
-            r0,
-            r1,
-            r0 * r1
-        );
+        let (_r0, r1) = get_uniswap_v2_reserves(&mut state, pair).unwrap();
         let mut manipulator = super::NaivePriceOracleManipulator::default();
         manipulator
-            .manipulate(
+            .manipulate_uniswap_v2(
                 &mut state,
                 pair,
-                super::SlippageDirection::Up(UFixed256 {
+                super::Flation::Inflation(UFixed256 {
                     raw_value: U256::from(1),
                     decimals: 1,
                 }),
             )
             .unwrap();
-        let (r0, r1) = get_uniswap_v2_reserves(&mut state, pair).unwrap();
-        println!(
-            "after manipulation => r0: {:?}, r1: {:?}, k: {:?}",
-            r0,
-            r1,
-            r0 * r1,
+        let (_r0_, r1_) = get_uniswap_v2_reserves(&mut state, pair).unwrap();
+        assert_eq!(r1 * U256::from(3) / U256::from(2), r1_);
+        // assert_eq!(r0 * r1, r0_ * r1_);
+    }
+
+    #[test]
+    fn test_manipualte_curve_usdc_usdt_price() {
+        let provider = JsonRpcBcProvider::default();
+        let mut state = BcStateBuilder::fork_at(&provider, 14972421).unwrap();
+        let caller = HighLevelCaller::new(ToPrimitive::cvt(1))
+            .bypass_check()
+            .at_block(&provider, 14972421);
+        let pair = (*addresses::USDC, *addresses::USDT);
+        let pool: Address =
+            ToPrimitive::cvt("0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7");
+        let usdc_idx: u128 = 1;
+        let usdt_idx: u128 = 2;
+        let test_amount_in = U256::from(1_000_000u128);
+        let (amount_out_before,) = unwrap_token_values!(
+            caller
+                .view(
+                    &mut state,
+                    pool,
+                    CURVE_POOL_ABI.function("get_dy").unwrap(),
+                    &[
+                        Token::Int(ToEthers::cvt(usdc_idx)),
+                        Token::Int(ToEthers::cvt(usdt_idx)),
+                        ToEthers::cvt(test_amount_in),
+                    ],
+                    no_inspector(),
+                )
+                .unwrap(),
+            Uint
         );
+        let mut manipulator =
+            super::NaivePriceOracleManipulator::new(caller.clone());
+        manipulator
+            .manipulate_curve_pool(
+                &mut state,
+                pair,
+                Flation::Inflation(UFixed256 {
+                    raw_value: U256::from(1),
+                    decimals: 1,
+                }),
+            )
+            .unwrap();
+        let (amount_out_after,) = unwrap_token_values!(
+            caller
+                .view(
+                    &mut state,
+                    pool,
+                    CURVE_POOL_ABI.function("get_dy").unwrap(),
+                    &[
+                        ToEthers::cvt(usdc_idx),
+                        ToEthers::cvt(usdt_idx),
+                        ToEthers::cvt(test_amount_in),
+                    ],
+                    no_inspector()
+                )
+                .unwrap(),
+            Uint
+        );
+        println!("{:?} => {:?}", amount_out_before, amount_out_after);
+        assert!(amount_out_before > amount_out_after);
     }
 }
+
+struct TestInsp {}
+
+impl<BS: Database> Inspector<BS> for TestInsp {
+    fn call(
+        &mut self,
+        _data: &mut revm::EVMData<'_, BS>,
+        _inputs: &mut revm::interpreter::CallInputs,
+        _is_static: bool,
+    ) -> (
+        revm::interpreter::InstructionResult,
+        revm::interpreter::Gas,
+        revm_primitives::Bytes,
+    ) {
+        println!("call: {:?}", _inputs.context);
+        (
+            revm::interpreter::InstructionResult::Continue,
+            revm::interpreter::Gas::new(0),
+            revm_primitives::Bytes::new(),
+        )
+    }
+
+    fn step(
+        &mut self,
+        _interp: &mut revm::interpreter::Interpreter,
+        _data: &mut revm::EVMData<'_, BS>,
+        _is_static: bool,
+    ) -> revm::interpreter::InstructionResult {
+        println!(
+            "step: {:?} {:?}",
+            OpCode::try_from_u8(_interp.current_opcode())
+                .unwrap()
+                .to_string(),
+            _interp.contract().address
+        );
+        revm::interpreter::InstructionResult::Continue
+    }
+
+    fn call_end(
+        &mut self,
+        _data: &mut revm::EVMData<'_, BS>,
+        _inputs: &revm::interpreter::CallInputs,
+        remaining_gas: revm::interpreter::Gas,
+        ret: revm::interpreter::InstructionResult,
+        out: revm_primitives::Bytes,
+        _is_static: bool,
+    ) -> (
+        revm::interpreter::InstructionResult,
+        revm::interpreter::Gas,
+        revm_primitives::Bytes,
+    ) {
+        println!("call_end: {:?}", _inputs.context);
+        (ret, remaining_gas, out)
+    }
+}
+
+impl<BS: Database> MultiTxInspector<BS> for TestInsp {}

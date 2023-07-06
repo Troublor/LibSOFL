@@ -179,6 +179,6 @@ impl UFixed256 {
 
 impl UFixed256 {
     pub fn denominator(&self) -> U256 {
-        U256::from(10).pow(U256::from(self.decimals))
+        U256::from(2).pow(U256::from(self.decimals))
     }
 }
