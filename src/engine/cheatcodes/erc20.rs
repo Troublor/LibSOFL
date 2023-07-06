@@ -8,6 +8,7 @@ use revm_primitives::U256;
 use crate::{
     engine::state::DatabaseEditable,
     error::SoflError,
+    unwrap_first_token_value,
     utils::{abi::ERC20_ABI, addresses::WETH},
 };
 
@@ -37,12 +38,29 @@ pub trait ERC20Cheat<
         token: Address,
     ) -> Result<U256, SoflError<E>>;
 
+    fn get_erc20_allowance(
+        &mut self,
+        state: &mut S,
+        token: Address,
+        owner: Address,
+        spender: Address,
+    ) -> Result<U256, SoflError<E>>;
+
     fn set_erc20_balance(
         &mut self,
         state: &mut S,
         token: Address,
         account: Address,
         balance: U256,
+    ) -> Result<Option<U256>, SoflError<E>>;
+
+    fn set_erc20_allowance(
+        &mut self,
+        state: &mut S,
+        token: Address,
+        owner: Address,
+        spender: Address,
+        allowance: U256,
     ) -> Result<Option<U256>, SoflError<E>>;
 }
 
@@ -62,14 +80,15 @@ impl<
         let func = ERC20_ABI
             .function("balanceOf")
             .expect("bug: cannot find balanceOf function in ERC20 ABI");
-        let result = self.cheat_read(
-            state,
-            token,
-            func,
-            &[Token::Address(account.into())],
-        )?;
-
-        Ok(result[0].clone().into_uint().expect("cannot fail").into())
+        Ok(unwrap_first_token_value!(
+            Uint,
+            self.cheat_read(
+                state,
+                token,
+                func,
+                &[Token::Address(account.into())],
+            )?
+        ))
     }
 
     fn get_erc20_total_supply(
@@ -81,9 +100,10 @@ impl<
         let func = ERC20_ABI
             .function("totalSupply")
             .expect("bug: cannot find totalSupply function in ERC20 ABI");
-        let result = self.cheat_read(state, token, func, &[])?;
-
-        Ok(result[0].clone().into_uint().expect("cannot fail").into())
+        Ok(unwrap_first_token_value!(
+            Uint,
+            self.cheat_read(state, token, func, &[])?
+        ))
     }
 
     fn get_erc20_decimals(
@@ -95,9 +115,54 @@ impl<
         let func = ERC20_ABI
             .function("decimals")
             .expect("bug: cannot find decimals function in ERC20 ABI");
-        let result = self.cheat_read(state, token, func, &[])?;
+        Ok(unwrap_first_token_value!(
+            Uint,
+            self.cheat_read(state, token, func, &[])?
+        ))
+    }
 
-        Ok(result[0].clone().into_uint().expect("cannot fail").into())
+    fn get_erc20_allowance(
+        &mut self,
+        state: &mut S,
+        token: Address,
+        owner: Address,
+        spender: Address,
+    ) -> Result<U256, SoflError<E>> {
+        // signature: allowance(address,address) -> 0xdd62ed3e
+        let func = ERC20_ABI
+            .function("allowance")
+            .expect("bug: cannot find allowance function in ERC20 ABI");
+        Ok(unwrap_first_token_value!(
+            Uint,
+            self.cheat_read(
+                state,
+                token,
+                func,
+                &[Token::Address(owner.into()), Token::Address(spender.into())],
+            )?
+        ))
+    }
+
+    // return the old allowance if updated
+    fn set_erc20_allowance(
+        &mut self,
+        state: &mut S,
+        token: Address,
+        owner: Address,
+        spender: Address,
+        allowance: U256,
+    ) -> Result<Option<U256>, SoflError<E>> {
+        // signature: allowance(address,address) -> 0xdd62ed3e
+        let func = ERC20_ABI
+            .function("allowance")
+            .expect("bug: cannot find allowance function in ERC20 ABI");
+        self.cheat_write(
+            state,
+            token,
+            func,
+            &[Token::Address(owner.into()), Token::Address(spender.into())],
+            allowance,
+        )
     }
 
     // return the old balance if updated
@@ -202,6 +267,23 @@ mod tests_with_db {
             total_supply_after
                 == total_supply_before - balance_before + balance_after
         );
+
+        let spender =
+            Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
+                .unwrap();
+        cheatcode
+            .set_erc20_allowance(
+                &mut state,
+                token,
+                account,
+                spender,
+                U256::from(7654321),
+            )
+            .unwrap();
+        let allowance_after = cheatcode
+            .get_erc20_allowance(&mut state, token, account, spender)
+            .unwrap();
+        assert!(allowance_after == U256::from(7654321));
     }
 
     #[test]
@@ -278,6 +360,23 @@ mod tests_with_jsonrpc {
             total_supply_after
                 == total_supply_before - balance_before + balance_after
         );
+
+        let spender =
+            Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
+                .unwrap();
+        cheatcode
+            .set_erc20_allowance(
+                &mut state,
+                token,
+                account,
+                spender,
+                U256::from(7654321),
+            )
+            .unwrap();
+        let allowance_after = cheatcode
+            .get_erc20_allowance(&mut state, token, account, spender)
+            .unwrap();
+        assert!(allowance_after == U256::from(7654321));
     }
 
     #[test]
