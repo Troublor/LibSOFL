@@ -2,7 +2,7 @@ use reth_primitives::{Address, BlockHashOrNumber};
 use reth_provider::EvmEnvProvider;
 use revm::{Database, DatabaseCommit};
 use revm_primitives::{
-    hex::{self, ToHex},
+    hex::{self},
     BlockEnv, Bytes, CfgEnv, ExecutionResult, Output, U256,
 };
 
@@ -176,6 +176,7 @@ impl HighLevelCaller {
     ) -> Result<Vec<ethers::abi::Token>, SoflError<BS::Error>> {
         let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
         let ret = self.call(state, callee, &calldata, value, inspector)?;
+        println!("ret: {:?}", hex::encode(ret.clone()));
         func.decode_output(ret.to_vec().as_slice())
             .map_err(SoflError::Abi)
     }
