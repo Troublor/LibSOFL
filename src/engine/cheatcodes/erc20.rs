@@ -12,77 +12,25 @@ use crate::{
     utils::{abi::ERC20_ABI, addresses::WETH},
 };
 
-use super::CheatCodes;
+use super::{global_cheatcodes_unsafe, CheatCodes};
 
-pub trait ERC20Cheat<
-    E,
-    S: DatabaseEditable<Error = E> + Database<Error = E> + Database,
->
-{
-    fn get_erc20_balance(
-        &mut self,
+impl CheatCodes {
+    pub fn get_erc20_balance<E, S>(
         state: &mut S,
         token: Address,
         account: Address,
-    ) -> Result<U256, SoflError<E>>;
-
-    fn get_erc20_total_supply(
-        &mut self,
-        state: &mut S,
-        token: Address,
-    ) -> Result<U256, SoflError<E>>;
-
-    fn get_erc20_decimals(
-        &mut self,
-        state: &mut S,
-        token: Address,
-    ) -> Result<U256, SoflError<E>>;
-
-    fn get_erc20_allowance(
-        &mut self,
-        state: &mut S,
-        token: Address,
-        owner: Address,
-        spender: Address,
-    ) -> Result<U256, SoflError<E>>;
-
-    fn set_erc20_balance(
-        &mut self,
-        state: &mut S,
-        token: Address,
-        account: Address,
-        balance: U256,
-    ) -> Result<Option<U256>, SoflError<E>>;
-
-    fn set_erc20_allowance(
-        &mut self,
-        state: &mut S,
-        token: Address,
-        owner: Address,
-        spender: Address,
-        allowance: U256,
-    ) -> Result<Option<U256>, SoflError<E>>;
-}
-
-// cheatcodes: get functions
-impl<
+    ) -> Result<U256, SoflError<E>>
+    where
         E: Debug,
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
-    > ERC20Cheat<E, S> for CheatCodes<S>
-{
-    fn get_erc20_balance(
-        &mut self,
-        state: &mut S,
-        token: Address,
-        account: Address,
-    ) -> Result<U256, SoflError<E>> {
+    {
         // signature: balanceOf(address) -> 0x70a08231
         let func = ERC20_ABI
             .function("balanceOf")
             .expect("bug: cannot find balanceOf function in ERC20 ABI");
         Ok(unwrap_first_token_value!(
             Uint,
-            self.cheat_read(
+            global_cheatcodes_unsafe().cheat_read(
                 state,
                 token,
                 func,
@@ -91,50 +39,59 @@ impl<
         ))
     }
 
-    fn get_erc20_total_supply(
-        &mut self,
+    pub fn get_erc20_total_supply<E, S>(
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<E>> {
+    ) -> Result<U256, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         // signature: totalSupply() -> 0x18160ddd
         let func = ERC20_ABI
             .function("totalSupply")
             .expect("bug: cannot find totalSupply function in ERC20 ABI");
         Ok(unwrap_first_token_value!(
             Uint,
-            self.cheat_read(state, token, func, &[])?
+            global_cheatcodes_unsafe().cheat_read(state, token, func, &[])?
         ))
     }
 
-    fn get_erc20_decimals(
-        &mut self,
+    pub fn get_erc20_decimals<E, S>(
         state: &mut S,
         token: Address,
-    ) -> Result<U256, SoflError<E>> {
+    ) -> Result<U256, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         // signature: decimals() -> 0x313ce567
         let func = ERC20_ABI
             .function("decimals")
             .expect("bug: cannot find decimals function in ERC20 ABI");
         Ok(unwrap_first_token_value!(
             Uint,
-            self.cheat_read(state, token, func, &[])?
+            global_cheatcodes_unsafe().cheat_read(state, token, func, &[])?
         ))
     }
 
-    fn get_erc20_allowance(
-        &mut self,
+    pub fn get_erc20_allowance<E, S>(
         state: &mut S,
         token: Address,
         owner: Address,
         spender: Address,
-    ) -> Result<U256, SoflError<E>> {
+    ) -> Result<U256, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         // signature: allowance(address,address) -> 0xdd62ed3e
         let func = ERC20_ABI
             .function("allowance")
             .expect("bug: cannot find allowance function in ERC20 ABI");
         Ok(unwrap_first_token_value!(
             Uint,
-            self.cheat_read(
+            global_cheatcodes_unsafe().cheat_read(
                 state,
                 token,
                 func,
@@ -144,19 +101,22 @@ impl<
     }
 
     // return the old allowance if updated
-    fn set_erc20_allowance(
-        &mut self,
+    pub fn set_erc20_allowance<E, S>(
         state: &mut S,
         token: Address,
         owner: Address,
         spender: Address,
         allowance: U256,
-    ) -> Result<Option<U256>, SoflError<E>> {
+    ) -> Result<Option<U256>, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         // signature: allowance(address,address) -> 0xdd62ed3e
         let func = ERC20_ABI
             .function("allowance")
             .expect("bug: cannot find allowance function in ERC20 ABI");
-        self.cheat_write(
+        global_cheatcodes_unsafe().cheat_write(
             state,
             token,
             func,
@@ -166,18 +126,21 @@ impl<
     }
 
     // return the old balance if updated
-    fn set_erc20_balance(
-        &mut self,
+    pub fn set_erc20_balance<E, S>(
         state: &mut S,
         token: Address,
         account: Address,
         balance: U256,
-    ) -> Result<Option<U256>, SoflError<E>> {
+    ) -> Result<Option<U256>, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         // signature: balanceOf(address) -> 0x70a08231
         let func = ERC20_ABI
             .function("balanceOf")
             .expect("bug: cannot find balanceOf function in ERC20 ABI");
-        if let Some(old_balance) = self.cheat_write(
+        if let Some(old_balance) = global_cheatcodes_unsafe().cheat_write(
             state,
             token,
             func,
@@ -185,7 +148,7 @@ impl<
             balance,
         )? {
             // we need to update total supply
-            let total_supply = self.get_erc20_total_supply(state, token)?;
+            let total_supply = Self::get_erc20_total_supply(state, token)?;
 
             if token == *WETH {
                 Self::set_balance(
@@ -198,7 +161,7 @@ impl<
                 let func = ERC20_ABI.function("totalSupply").expect(
                     "bug: cannot find totalSupply function in ERC20 ABI",
                 );
-                self.cheat_write(
+                global_cheatcodes_unsafe().cheat_write(
                     state,
                     token,
                     func,
@@ -221,7 +184,7 @@ mod tests_with_db {
     use reth_primitives::Address;
     use revm_primitives::U256;
 
-    use crate::engine::cheatcodes::{CheatCodes, ERC20Cheat};
+    use crate::engine::cheatcodes::CheatCodes;
     use crate::engine::state::BcStateBuilder;
     use crate::{
         config::flags::SoflConfig,
@@ -238,29 +201,29 @@ mod tests_with_db {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-        let mut cheatcode = CheatCodes::new();
-
-        let balance_before = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        let balance_before =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
         let total_supply_before =
-            cheatcode.get_erc20_total_supply(&mut state, token).unwrap();
+            CheatCodes::get_erc20_total_supply(&mut state, token).unwrap();
 
         assert!(
-            cheatcode.get_erc20_decimals(&mut state, token).unwrap()
+            CheatCodes::get_erc20_decimals(&mut state, token).unwrap()
                 == decimals
         );
 
-        cheatcode
-            .set_erc20_balance(&mut state, token, account, U256::from(1234567))
-            .unwrap();
-        let balance_after = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        CheatCodes::set_erc20_balance(
+            &mut state,
+            token,
+            account,
+            U256::from(1234567),
+        )
+        .unwrap();
+        let balance_after =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
         let total_supply_after =
-            cheatcode.get_erc20_total_supply(&mut state, token).unwrap();
+            CheatCodes::get_erc20_total_supply(&mut state, token).unwrap();
 
         assert!(balance_after == U256::from(1234567));
         assert!(
@@ -271,18 +234,18 @@ mod tests_with_db {
         let spender =
             Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
                 .unwrap();
-        cheatcode
-            .set_erc20_allowance(
-                &mut state,
-                token,
-                account,
-                spender,
-                U256::from(7654321),
-            )
-            .unwrap();
-        let allowance_after = cheatcode
-            .get_erc20_allowance(&mut state, token, account, spender)
-            .unwrap();
+        CheatCodes::set_erc20_allowance(
+            &mut state,
+            token,
+            account,
+            spender,
+            U256::from(7654321),
+        )
+        .unwrap();
+        let allowance_after = CheatCodes::get_erc20_allowance(
+            &mut state, token, account, spender,
+        )
+        .unwrap();
         assert!(allowance_after == U256::from(7654321));
     }
 
@@ -320,7 +283,7 @@ mod tests_with_jsonrpc {
     use reth_primitives::Address;
     use revm_primitives::U256;
 
-    use crate::engine::cheatcodes::{CheatCodes, ERC20Cheat};
+    use crate::engine::cheatcodes::CheatCodes;
     use crate::engine::providers::rpc::JsonRpcBcProvider;
     use crate::engine::state::BcStateBuilder;
     use crate::engine::transactions::position::TxPosition;
@@ -331,29 +294,29 @@ mod tests_with_jsonrpc {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-        let mut cheatcode = CheatCodes::new();
-
-        let balance_before = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        let balance_before =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
         let total_supply_before =
-            cheatcode.get_erc20_total_supply(&mut state, token).unwrap();
+            CheatCodes::get_erc20_total_supply(&mut state, token).unwrap();
 
         assert!(
-            cheatcode.get_erc20_decimals(&mut state, token).unwrap()
+            CheatCodes::get_erc20_decimals(&mut state, token).unwrap()
                 == decimals
         );
 
-        cheatcode
-            .set_erc20_balance(&mut state, token, account, U256::from(1234567))
-            .unwrap();
-        let balance_after = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        CheatCodes::set_erc20_balance(
+            &mut state,
+            token,
+            account,
+            U256::from(1234567),
+        )
+        .unwrap();
+        let balance_after =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
         let total_supply_after =
-            cheatcode.get_erc20_total_supply(&mut state, token).unwrap();
+            CheatCodes::get_erc20_total_supply(&mut state, token).unwrap();
 
         assert!(balance_after == U256::from(1234567));
         assert!(
@@ -364,18 +327,18 @@ mod tests_with_jsonrpc {
         let spender =
             Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
                 .unwrap();
-        cheatcode
-            .set_erc20_allowance(
-                &mut state,
-                token,
-                account,
-                spender,
-                U256::from(7654321),
-            )
-            .unwrap();
-        let allowance_after = cheatcode
-            .get_erc20_allowance(&mut state, token, account, spender)
-            .unwrap();
+        CheatCodes::set_erc20_allowance(
+            &mut state,
+            token,
+            account,
+            spender,
+            U256::from(7654321),
+        )
+        .unwrap();
+        let allowance_after = CheatCodes::get_erc20_allowance(
+            &mut state, token, account, spender,
+        )
+        .unwrap();
         assert!(allowance_after == U256::from(7654321));
     }
 

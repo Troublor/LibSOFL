@@ -1,6 +1,10 @@
 // A set of cheatcodes that can directly modify the environments
 
-use std::{collections::BTreeMap, fmt::Debug, marker::PhantomData};
+use std::{
+    collections::BTreeMap,
+    fmt::Debug,
+    sync::{Mutex, MutexGuard},
+};
 
 use crate::error::SoflError;
 use ethers::abi::{self, Function, ParamType, Token};
@@ -12,10 +16,10 @@ mod inspector;
 use inspector::CheatcodeInspector;
 
 mod erc20;
-pub use erc20::ERC20Cheat;
-
 mod price_oracle;
-pub use price_oracle::PriceOracleCheat;
+
+mod contract_type;
+pub use contract_type::ContractType;
 
 use super::{state::DatabaseEditable, utils::HighLevelCaller};
 
@@ -31,6 +35,15 @@ macro_rules! get_the_first_uint {
     };
 }
 
+lazy_static! {
+    pub static ref GLOBAL_CHEATCODES: Mutex<CheatCodes> =
+        Mutex::new(CheatCodes::new());
+}
+
+fn global_cheatcodes_unsafe() -> MutexGuard<'static, CheatCodes> {
+    GLOBAL_CHEATCODES.lock().expect("data race")
+}
+
 #[derive(Debug, Clone)]
 enum SlotQueryResult {
     NotFound,
@@ -38,10 +51,7 @@ enum SlotQueryResult {
 }
 
 #[derive(Debug, Default)]
-pub struct CheatCodes<S: DatabaseEditable> {
-    // phantom
-    phantom: PhantomData<S>,
-
+pub struct CheatCodes {
     // runtime env
     inspector: CheatcodeInspector,
 
@@ -55,26 +65,25 @@ fn pack_calldata(fsig: [u8; 4], args: &[Token]) -> Bytes {
 }
 
 // basic functionality
-impl<
-        E: Debug,
-        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
-    > CheatCodes<S>
-{
-    pub fn new() -> Self {
+impl CheatCodes {
+    fn new() -> Self {
         Self {
-            phantom: PhantomData,
             inspector: CheatcodeInspector::default(),
             slots: BTreeMap::new(),
         }
     }
 
-    fn find_slot(
+    fn find_slot<E, S>(
         &mut self,
         state: &mut S,
         to: Address,
         func: &Function,
         args: &[Token],
-    ) -> Option<U256> {
+    ) -> Option<U256>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         // staticcall to get the slot, where we force the return type as u256
         self.inspector.reset_access_recording();
         let caller = HighLevelCaller::default().bypass_check();
@@ -148,23 +157,23 @@ impl<
 }
 
 // cheatcode: cheat_read
-impl<
-        E: Debug,
-        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
-    > CheatCodes<S>
-{
+impl CheatCodes {
     // staticcall with slot lookup
     // this function can only work if the target function:
     //  1) is a view function (i.e. does not modify the state)
     //  2) returns a single primitive value (e.g., uint256, address, etc.)
     //  3) is derived from a public storage variable
-    pub fn cheat_read(
+    fn cheat_read<E, S>(
         &mut self,
         state: &mut S,
         to: Address,
         func: &Function,
         args: &[Token],
-    ) -> Result<Vec<Token>, SoflError<E>> {
+    ) -> Result<Vec<Token>, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         let rtypes: Vec<ParamType> =
             func.outputs.iter().map(|p| p.kind.clone()).collect();
         let rtypes = rtypes.as_slice();
@@ -210,12 +219,16 @@ impl<
         )
     }
 
-    fn decode_from_storage(
+    fn decode_from_storage<E, S>(
         state: &mut S,
         to: Address,
         slot: U256,
         rtypes: &[ParamType],
-    ) -> Result<Vec<Token>, SoflError<E>> {
+    ) -> Result<Vec<Token>, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E>,
+    {
         let mut rdata = state
             .storage(to, slot)
             .map_err(SoflError::Db)?
@@ -228,19 +241,19 @@ impl<
 }
 
 // cheatcode: cheat_write
-impl<
-        E: Debug,
-        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
-    > CheatCodes<S>
-{
-    pub fn cheat_write(
+impl CheatCodes {
+    fn cheat_write<E, S>(
         &mut self,
         state: &mut S,
         to: Address,
         func: &Function,
         args: &[Token],
         data: U256,
-    ) -> Result<Option<U256>, SoflError<E>> {
+    ) -> Result<Option<U256>, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
         let account_info = state.basic(to).map_err(SoflError::Db)?.ok_or(
             SoflError::Custom("account does not have code".to_string()),
         )?;
@@ -279,12 +292,16 @@ impl<
         }
     }
 
-    fn write_or_err(
+    fn write_or_err<E, S>(
         state: &mut S,
         to: Address,
         slot: U256,
         data: U256,
-    ) -> Result<Option<U256>, SoflError<E>> {
+    ) -> Result<Option<U256>, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E>,
+    {
         let rdata = state.storage(to, slot).map_err(SoflError::Db)?;
 
         if rdata != data {
@@ -299,8 +316,8 @@ impl<
 }
 
 // Functions that does not need to access cache
-impl<S: DatabaseEditable + Database> CheatCodes<S> {
-    pub fn get_balance(
+impl CheatCodes {
+    pub fn get_balance<S: DatabaseEditable + Database>(
         state: &mut S,
         account: Address,
     ) -> Result<U256, SoflError<<S as Database>::Error>> {
@@ -310,7 +327,7 @@ impl<S: DatabaseEditable + Database> CheatCodes<S> {
             .map_or(Ok(U256::from(0)), |info| Ok(info.balance))
     }
 
-    pub fn get_code_hash(
+    pub fn get_code_hash<S: DatabaseEditable + Database>(
         state: &mut S,
         account: Address,
     ) -> Result<B256, SoflError<<S as Database>::Error>> {
@@ -320,7 +337,7 @@ impl<S: DatabaseEditable + Database> CheatCodes<S> {
             .map_or(Ok(B256::zero()), |info| Ok(info.code_hash))
     }
 
-    pub fn get_code(
+    pub fn get_code<S: DatabaseEditable + Database>(
         state: &mut S,
         account: Address,
     ) -> Result<Bytecode, SoflError<<S as Database>::Error>> {
@@ -336,7 +353,7 @@ impl<S: DatabaseEditable + Database> CheatCodes<S> {
         }
     }
 
-    pub fn set_balance(
+    pub fn set_balance<S: DatabaseEditable + Database>(
         state: &mut S,
         address: Address,
         balance: U256,
@@ -365,7 +382,6 @@ mod tests_with_db {
     use reth_primitives::Address;
     use revm_primitives::U256;
 
-    use crate::engine::cheatcodes::ERC20Cheat;
     use crate::engine::state::BcStateBuilder;
     use crate::{
         config::flags::SoflConfig,
@@ -385,8 +401,6 @@ mod tests_with_db {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-        let mut cheatcode = CheatCodes::new();
-
         let token =
             Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")
                 .unwrap();
@@ -394,13 +408,11 @@ mod tests_with_db {
             Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
                 .unwrap();
 
-        let balance1 = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        let balance1 =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
-        let balance2 = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        let balance2 =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
         assert_eq!(balance1, U256::from(1299267380));
         assert_eq!(balance2, U256::from(1299267380));
@@ -414,7 +426,6 @@ mod tests_with_jsonrpc {
     use reth_primitives::Address;
     use revm_primitives::U256;
 
-    use crate::engine::cheatcodes::ERC20Cheat;
     use crate::engine::providers::rpc::JsonRpcBcProvider;
     use crate::engine::state::BcStateBuilder;
     use crate::engine::transactions::position::TxPosition;
@@ -428,8 +439,6 @@ mod tests_with_jsonrpc {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
-        let mut cheatcode = CheatCodes::new();
-
         let token =
             Address::from_str("0xdAC17F958D2ee523a2206206994597C13D831ec7")
                 .unwrap();
@@ -437,13 +446,11 @@ mod tests_with_jsonrpc {
             Address::from_str("0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a")
                 .unwrap();
 
-        let balance1 = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        let balance1 =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
-        let balance2 = cheatcode
-            .get_erc20_balance(&mut state, token, account)
-            .unwrap();
+        let balance2 =
+            CheatCodes::get_erc20_balance(&mut state, token, account).unwrap();
 
         assert_eq!(balance1, U256::from(1299267380));
         assert_eq!(balance2, U256::from(1299267380));
