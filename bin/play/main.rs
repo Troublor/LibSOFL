@@ -12,6 +12,8 @@ fn main() {
     let fork_at = TxPosition::new(17000001, 0);
     let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+    let mut cheatcodes = CheatCodes::new();
+
     let uniswap_v2 =
         Address::from_str("0x004375Dff511095CC5A197A54140a24eFEF3A416")
             .unwrap();
@@ -26,23 +28,30 @@ fn main() {
             .unwrap();
 
     assert_eq!(
-        CheatCodes::get_contract_type(&mut state, uniswap_v2).unwrap(),
+        cheatcodes
+            .get_contract_type(&mut state, uniswap_v2)
+            .unwrap(),
         Some(ContractType::UniswapV2Pair)
     );
     println!("2");
 
     assert_eq!(
-        CheatCodes::get_contract_type(&mut state, uniswap_v3).unwrap(),
+        cheatcodes
+            .get_contract_type(&mut state, uniswap_v3)
+            .unwrap(),
         Some(ContractType::UniswapV3Pool)
     );
     println!("3");
     assert_eq!(
-        CheatCodes::get_contract_type(&mut state, curve_stable_swap).unwrap(),
+        cheatcodes
+            .get_contract_type(&mut state, curve_stable_swap)
+            .unwrap(),
         Some(ContractType::CurveStableSwap)
     );
     println!("4");
 
-    assert!(CheatCodes::get_contract_type(&mut state, random)
+    assert!(cheatcodes
+        .get_contract_type(&mut state, random)
         .unwrap()
         .is_none());
     println!("5");

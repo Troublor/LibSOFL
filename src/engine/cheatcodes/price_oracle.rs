@@ -8,6 +8,7 @@ use tracing::trace;
 
 use crate::engine::state::DatabaseEditable;
 use crate::error::SoflError;
+use crate::unwrap_first_token_value;
 use crate::utils::abi::{
     UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
 };
@@ -15,12 +16,12 @@ use crate::utils::addresses::{
     DAI, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY, USDC, USDT, WETH,
 };
 use crate::utils::math::HPMultipler;
-use crate::{global_cheatcodes, unwrap_first_token_value};
 
 use super::CheatCodes;
 
 impl CheatCodes {
     pub fn get_price_in_ether<E, S>(
+        &mut self,
         state: &mut S,
         token: Address,
     ) -> Result<U256, SoflError<E>>
@@ -32,7 +33,7 @@ impl CheatCodes {
         let mut liquidity = U256::ZERO;
 
         if let Ok((price_v2, liquidity_v2)) =
-            Self::query_uniswap_v2(state, token)
+            self.query_uniswap_v2(state, token)
         {
             trace!("price_v2: {}, liquidity_v2: {}", price_v2, liquidity_v2);
             if liquidity_v2 > liquidity {
@@ -42,7 +43,7 @@ impl CheatCodes {
         }
 
         if let Ok((price_v3, liquidity_v3)) =
-            Self::query_uniswap_v3(state, token)
+            self.query_uniswap_v3(state, token)
         {
             trace!("price_v3: {}, liquidity_v3: {}", price_v3, liquidity_v3);
             if liquidity_v3 > liquidity {
@@ -62,6 +63,7 @@ impl CheatCodes {
 // Uniswap V2
 impl CheatCodes {
     fn query_uniswap_v2<E, S>(
+        &mut self,
         state: &mut S,
         token: Address,
     ) -> Result<(U256, U256), SoflError<E>>
@@ -73,25 +75,20 @@ impl CheatCodes {
         let func = UNISWAP_V2_FACTORY_ABI.function("feeToSetter").expect(
             "bug: cannot find feeToSetter function in UniswapV2Factory ABI",
         );
-        let _ = global_cheatcodes!(cheat_read(
-            state,
-            *UNISWAP_V2_FACTORY,
-            func,
-            &[]
-        ))?;
+        let _ = self.cheat_read(state, *UNISWAP_V2_FACTORY, func, &[])?;
 
         if token == *WETH {
             return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
         }
 
         let (best_pool, best_bs_token, best_liquidity) =
-            Self::__get_best_pool_uniswap_v2(state, token)?;
+            self.__get_best_pool_uniswap_v2(state, token)?;
 
         let token_balance =
-            Self::__get_token_balance_uniswap_v2(state, token, best_pool)?;
+            self.__get_token_balance_uniswap_v2(state, token, best_pool)?;
 
         let bs_token_balance_in_pool1 =
-            Self::get_erc20_balance(state, best_bs_token, best_pool)?;
+            self.get_erc20_balance(state, best_bs_token, best_pool)?;
 
         // we need to update the decimals of the token to 18
         let mut price = HPMultipler::from(U256::from(10).pow(U256::from(18)));
@@ -101,16 +98,16 @@ impl CheatCodes {
         price /= token_balance;
 
         if best_bs_token != *WETH {
-            let bc_pool = Self::__get_pair_address_uniswap_v2(
+            let bc_pool = self.__get_pair_address_uniswap_v2(
                 state,
                 best_bs_token,
                 *WETH,
             )?;
 
             let bs_token_balance_in_pool2 =
-                Self::get_erc20_balance(state, best_bs_token, bc_pool)?;
+                self.get_erc20_balance(state, best_bs_token, bc_pool)?;
 
-            let weth_balance = Self::get_erc20_balance(state, *WETH, bc_pool)?;
+            let weth_balance = self.get_erc20_balance(state, *WETH, bc_pool)?;
 
             let bs_price =
                 HPMultipler::from(weth_balance) / bs_token_balance_in_pool2;
@@ -122,6 +119,7 @@ impl CheatCodes {
     }
 
     fn __get_best_pool_uniswap_v2<E, S>(
+        &mut self,
         state: &mut S,
         token: Address,
     ) -> Result<(Address, Address, U256), SoflError<E>>
@@ -139,21 +137,20 @@ impl CheatCodes {
         // a shortcut for mainstream tokens
         if mainstream_tokens.contains(&token) {
             // this cannot be WETH
-            pool = Self::__get_pair_address_uniswap_v2(state, token, *WETH)?;
+            pool = self.__get_pair_address_uniswap_v2(state, token, *WETH)?;
             bs_token = *WETH;
-            liquidity = Self::get_erc20_balance(state, token, pool)?;
+            liquidity = self.get_erc20_balance(state, token, pool)?;
         } else {
             for ms_token in mainstream_tokens.iter() {
-                let cur_pool = Self::__get_pair_address_uniswap_v2(
-                    state, token, *ms_token,
-                )?;
+                let cur_pool = self
+                    .__get_pair_address_uniswap_v2(state, token, *ms_token)?;
 
                 if cur_pool == Address::from(0) {
                     continue;
                 }
 
                 if let Ok(token_liquidity) =
-                    Self::get_erc20_balance(state, token, cur_pool)
+                    self.get_erc20_balance(state, token, cur_pool)
                 {
                     if token_liquidity > liquidity {
                         liquidity = token_liquidity;
@@ -175,6 +172,7 @@ impl CheatCodes {
     }
 
     fn __get_token_balance_uniswap_v2<E, S>(
+        &mut self,
         state: &mut S,
         token: Address,
         pool: Address,
@@ -183,8 +181,8 @@ impl CheatCodes {
         E: Debug,
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
-        let token_decimals = Self::get_erc20_decimals(state, token)?;
-        let raw_balance = Self::get_erc20_balance(state, token, pool)?;
+        let token_decimals = self.get_erc20_decimals(state, token)?;
+        let raw_balance = self.get_erc20_balance(state, token, pool)?;
 
         let token_balance = match token_decimals.cmp(&U256::from(18)) {
             Ordering::Less => {
@@ -210,6 +208,7 @@ impl CheatCodes {
     }
 
     fn __get_pair_address_uniswap_v2<E, S>(
+        &mut self,
         state: &mut S,
         token1: Address,
         token2: Address,
@@ -224,12 +223,12 @@ impl CheatCodes {
 
         Ok(unwrap_first_token_value!(
             Address,
-            global_cheatcodes!(cheat_read(
+            self.cheat_read(
                 state,
                 *UNISWAP_V2_FACTORY,
                 func,
                 &[Token::Address(token1.into()), Token::Address(token2.into())]
-            ))?
+            )?
         ))
     }
 }
@@ -237,6 +236,7 @@ impl CheatCodes {
 // Uniswap v3
 impl CheatCodes {
     fn query_uniswap_v3<E, S>(
+        &mut self,
         state: &mut S,
         token: Address,
     ) -> Result<(U256, U256), SoflError<E>>
@@ -249,26 +249,21 @@ impl CheatCodes {
             let func = UNISWAP_V3_FACTORY_ABI.function("owner").expect(
                 "bug: cannot find owner function in UniswapV3Factory ABI",
             );
-            let _ = global_cheatcodes!(cheat_read(
-                state,
-                *UNISWAP_V3_FACTORY,
-                func,
-                &[]
-            ))?;
+            let _ = self.cheat_read(state, *UNISWAP_V3_FACTORY, func, &[])?;
         }
 
         if token == *WETH {
             return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
         }
 
-        let (best_pool, best_bs_token, best_liquidity) =
-            Self::__get_best_pool_uniswap_v3(
+        let (best_pool, best_bs_token, best_liquidity) = self
+            .__get_best_pool_uniswap_v3(
                 state,
                 token,
                 &[*WETH, *USDT, *USDC, *DAI],
             )?;
 
-        let mut price = Self::__get_token_price_uniswap_v3(
+        let mut price = self.__get_token_price_uniswap_v3(
             state,
             token,
             best_bs_token,
@@ -276,13 +271,13 @@ impl CheatCodes {
         )?;
 
         if best_bs_token != *WETH {
-            let (best_bs_pool, _, _) = Self::__get_best_pool_uniswap_v3(
+            let (best_bs_pool, _, _) = self.__get_best_pool_uniswap_v3(
                 state,
                 best_bs_token,
                 &[*WETH],
             )?;
 
-            let bs_price = Self::__get_token_price_uniswap_v3(
+            let bs_price = self.__get_token_price_uniswap_v3(
                 state,
                 best_bs_token,
                 *WETH,
@@ -297,6 +292,7 @@ impl CheatCodes {
     }
 
     fn __get_token_price_uniswap_v3<E, S>(
+        &mut self,
         state: &mut S,
         token: Address,
         bs_token: Address,
@@ -313,7 +309,7 @@ impl CheatCodes {
         // price is Q64.96
         let sqrt_price_x96 = unwrap_first_token_value!(
             Uint,
-            global_cheatcodes!(cheat_read(state, pool, func, &[]))?
+            self.cheat_read(state, pool, func, &[])?
         );
 
         let mut result = HPMultipler::from(sqrt_price_x96);
@@ -330,8 +326,8 @@ impl CheatCodes {
         result = result.pow(2);
 
         // consider the decimal
-        let token_decimals = Self::get_erc20_decimals(state, token)?;
-        let bs_token_decimals = Self::get_erc20_decimals(state, bs_token)?;
+        let token_decimals = self.get_erc20_decimals(state, token)?;
+        let bs_token_decimals = self.get_erc20_decimals(state, bs_token)?;
         result = match token_decimals.cmp(&bs_token_decimals) {
             Ordering::Less => {
                 result / U256::from(10).pow(bs_token_decimals - token_decimals)
@@ -346,6 +342,7 @@ impl CheatCodes {
     }
 
     fn __get_best_pool_uniswap_v3<E, S>(
+        &mut self,
         state: &mut S,
         token: Address,
         baseline_tokens: &[Address],
@@ -365,13 +362,13 @@ impl CheatCodes {
         if baseline_tokens.contains(&token) {
             // this cannot be WETH
             pool =
-                Self::__get_pool_address_uniswap_v3(state, token, *WETH, 500)?;
+                self.__get_pool_address_uniswap_v3(state, token, *WETH, 500)?;
             bs_token = *WETH;
-            liquidity = Self::get_erc20_balance(state, token, pool)?;
+            liquidity = self.get_erc20_balance(state, token, pool)?;
         } else {
             for ms_token in baseline_tokens.iter() {
                 for fee in fees.iter() {
-                    let cur_pool = Self::__get_pool_address_uniswap_v3(
+                    let cur_pool = self.__get_pool_address_uniswap_v3(
                         state, token, *ms_token, *fee,
                     )?;
 
@@ -380,7 +377,7 @@ impl CheatCodes {
                     }
 
                     if let Ok(token_liquidity) =
-                        Self::get_erc20_balance(state, token, cur_pool)
+                        self.get_erc20_balance(state, token, cur_pool)
                     {
                         if token_liquidity > liquidity {
                             liquidity = token_liquidity;
@@ -403,6 +400,7 @@ impl CheatCodes {
     }
 
     fn __get_pool_address_uniswap_v3<E, S>(
+        &mut self,
         state: &mut S,
         token1: Address,
         token2: Address,
@@ -418,7 +416,7 @@ impl CheatCodes {
 
         Ok(unwrap_first_token_value!(
             Address,
-            global_cheatcodes!(cheat_read(
+            self.cheat_read(
                 state,
                 *UNISWAP_V3_FACTORY,
                 func,
@@ -427,7 +425,7 @@ impl CheatCodes {
                     Token::Address(token2.into()),
                     Token::Uint(fee.into()),
                 ]
-            ))?
+            )?
         ))
     }
 }
@@ -457,10 +455,12 @@ mod tests_with_db {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+        let mut cheatcodes = CheatCodes::new();
+
         let weth =
             Address::from_str("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
                 .unwrap();
-        let price = CheatCodes::get_price_in_ether(&mut state, weth).unwrap();
+        let price = cheatcodes.get_price_in_ether(&mut state, weth).unwrap();
 
         assert!(price == U256::from(10).pow(U256::from(18)));
     }
@@ -474,10 +474,12 @@ mod tests_with_db {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+        let mut cheatcodes = CheatCodes::new();
+
         let wbtc =
             Address::from_str("0x2260fac5e5542a773aa44fbcfedf7c193bc2c599")
                 .unwrap();
-        let price = CheatCodes::get_price_in_ether(&mut state, wbtc).unwrap();
+        let price = cheatcodes.get_price_in_ether(&mut state, wbtc).unwrap();
 
         // BTC should be at least 5 ETH
         assert!(price > U256::from(5) * U256::from(10).pow(U256::from(18)));
@@ -492,25 +494,27 @@ mod tests_with_db {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+        let mut cheatcodes = CheatCodes::new();
+
         let usdc: Address =
             Address::from_str("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
                 .unwrap();
-        let price0 = CheatCodes::get_price_in_ether(&mut state, usdc).unwrap();
+        let price0 = cheatcodes.get_price_in_ether(&mut state, usdc).unwrap();
 
         let dai: Address =
             Address::from_str("0x6b175474e89094c44da98b954eedeac495271d0f")
                 .unwrap();
-        let price1 = CheatCodes::get_price_in_ether(&mut state, dai).unwrap();
+        let price1 = cheatcodes.get_price_in_ether(&mut state, dai).unwrap();
 
         let usdt: Address =
             Address::from_str("0xdac17f958d2ee523a2206206994597c13d831ec7")
                 .unwrap();
-        let price2 = CheatCodes::get_price_in_ether(&mut state, usdt).unwrap();
+        let price2 = cheatcodes.get_price_in_ether(&mut state, usdt).unwrap();
 
         let busd: Address =
             Address::from_str("0x4fabb145d64652a948d72533023f6e7a623c7c53")
                 .unwrap();
-        let price3 = CheatCodes::get_price_in_ether(&mut state, busd).unwrap();
+        let price3 = cheatcodes.get_price_in_ether(&mut state, busd).unwrap();
 
         let mut prices = vec![price0, price1, price2, price3];
         prices.sort();
@@ -541,10 +545,12 @@ mod tests_with_jsonrpc {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+        let mut cheatcodes = CheatCodes::new();
+
         let weth =
             Address::from_str("0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2")
                 .unwrap();
-        let price = CheatCodes::get_price_in_ether(&mut state, weth).unwrap();
+        let price = cheatcodes.get_price_in_ether(&mut state, weth).unwrap();
 
         assert!(price == U256::from(10).pow(U256::from(18)));
     }
@@ -556,10 +562,12 @@ mod tests_with_jsonrpc {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+        let mut cheatcodes = CheatCodes::new();
+
         let wbtc =
             Address::from_str("0x2260fac5e5542a773aa44fbcfedf7c193bc2c599")
                 .unwrap();
-        let price = CheatCodes::get_price_in_ether(&mut state, wbtc).unwrap();
+        let price = cheatcodes.get_price_in_ether(&mut state, wbtc).unwrap();
 
         // BTC should be at least 5 ETH
         assert!(price > U256::from(5) * U256::from(10).pow(U256::from(18)));
@@ -572,25 +580,27 @@ mod tests_with_jsonrpc {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+        let mut cheatcodes = CheatCodes::new();
+
         let usdc: Address =
             Address::from_str("0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48")
                 .unwrap();
-        let price0 = CheatCodes::get_price_in_ether(&mut state, usdc).unwrap();
+        let price0 = cheatcodes.get_price_in_ether(&mut state, usdc).unwrap();
 
         let dai: Address =
             Address::from_str("0x6b175474e89094c44da98b954eedeac495271d0f")
                 .unwrap();
-        let price1 = CheatCodes::get_price_in_ether(&mut state, dai).unwrap();
+        let price1 = cheatcodes.get_price_in_ether(&mut state, dai).unwrap();
 
         let usdt: Address =
             Address::from_str("0xdac17f958d2ee523a2206206994597c13d831ec7")
                 .unwrap();
-        let price2 = CheatCodes::get_price_in_ether(&mut state, usdt).unwrap();
+        let price2 = cheatcodes.get_price_in_ether(&mut state, usdt).unwrap();
 
         let busd: Address =
             Address::from_str("0x4fabb145d64652a948d72533023f6e7a623c7c53")
                 .unwrap();
-        let price3 = CheatCodes::get_price_in_ether(&mut state, busd).unwrap();
+        let price3 = cheatcodes.get_price_in_ether(&mut state, busd).unwrap();
 
         let mut prices = vec![price0, price1, price2, price3];
         prices.sort();

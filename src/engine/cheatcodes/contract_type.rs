@@ -5,7 +5,7 @@ use std::fmt::Debug;
 use crate::{
     engine::state::DatabaseEditable,
     error::SoflError,
-    global_cheatcodes, unwrap_first_token_value,
+    unwrap_first_token_value,
     utils::{
         abi::{CURVE_POOL_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V3_POOL_ABI},
         addresses::{CURVE_POOL_OWNER, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY},
@@ -23,6 +23,7 @@ pub enum ContractType {
 
 impl CheatCodes {
     pub fn get_contract_type<E, S>(
+        &mut self,
         state: &mut S,
         address: Address,
     ) -> Result<Option<ContractType>, SoflError<E>>
@@ -35,9 +36,7 @@ impl CheatCodes {
                 "bug: cannot find factory function in UniswapV2Pair ABI",
             );
 
-            if let Ok(mut tokens) =
-                global_cheatcodes!(cheat_read(state, address, func, &[]))
-            {
+            if let Ok(mut tokens) = self.cheat_read(state, address, func, &[]) {
                 if unwrap_first_token_value!(Address, tokens)
                     == *UNISWAP_V2_FACTORY
                 {
@@ -51,9 +50,7 @@ impl CheatCodes {
                 "bug: cannot find factory function in UniswapV3Pool ABI",
             );
 
-            if let Ok(mut tokens) =
-                global_cheatcodes!(cheat_read(state, address, func, &[]))
-            {
+            if let Ok(mut tokens) = self.cheat_read(state, address, func, &[]) {
                 if unwrap_first_token_value!(Address, tokens)
                     == *UNISWAP_V3_FACTORY
                 {
@@ -66,9 +63,7 @@ impl CheatCodes {
             let func = CURVE_POOL_ABI.function("owner").expect(
                 "bug: cannot find owner function in CurveStableSwap ABI",
             );
-            if let Ok(mut tokens) =
-                global_cheatcodes!(cheat_read(state, address, func, &[]))
-            {
+            if let Ok(mut tokens) = self.cheat_read(state, address, func, &[]) {
                 if unwrap_first_token_value!(Address, tokens)
                     == *CURVE_POOL_OWNER
                 {
@@ -99,6 +94,8 @@ mod tests_with_jsonrpc {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
 
+        let mut cheatcodes = CheatCodes::new();
+
         let uniswap_v2 =
             Address::from_str("0x004375Dff511095CC5A197A54140a24eFEF3A416")
                 .unwrap();
@@ -113,22 +110,28 @@ mod tests_with_jsonrpc {
                 .unwrap();
 
         assert_eq!(
-            CheatCodes::get_contract_type(&mut state, uniswap_v2).unwrap(),
+            cheatcodes
+                .get_contract_type(&mut state, uniswap_v2)
+                .unwrap(),
             Some(ContractType::UniswapV2Pair)
         );
 
         assert_eq!(
-            CheatCodes::get_contract_type(&mut state, uniswap_v3).unwrap(),
+            cheatcodes
+                .get_contract_type(&mut state, uniswap_v3)
+                .unwrap(),
             Some(ContractType::UniswapV3Pool)
         );
 
         assert_eq!(
-            CheatCodes::get_contract_type(&mut state, curve_stable_swap)
+            cheatcodes
+                .get_contract_type(&mut state, curve_stable_swap)
                 .unwrap(),
             Some(ContractType::CurveStableSwap)
         );
 
-        assert!(CheatCodes::get_contract_type(&mut state, random)
+        assert!(cheatcodes
+            .get_contract_type(&mut state, random)
             .unwrap()
             .is_none());
     }

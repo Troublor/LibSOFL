@@ -223,6 +223,8 @@ impl NaivePriceOracleManipulator {
         swap_pool: Address,
         direction: Flation,
     ) -> Result<(), SoflError<E>> {
+        let mut cheatcodes = CheatCodes::new();
+
         // UniswapV2-like AMM
         // get current reserves
         let get_reserves_func = UNISWAP_V2_PAIR_ABI.function("getReserves")?;
@@ -278,8 +280,8 @@ impl NaivePriceOracleManipulator {
         let (token1,) = unwrap_token_values!(ret, Address);
 
         // cheat: set pool token balance to new reserves
-        CheatCodes::set_erc20_balance(state, token0, swap_pool, reserve0)?;
-        CheatCodes::set_erc20_balance(state, token1, swap_pool, reserve1)?;
+        cheatcodes.set_erc20_balance(state, token0, swap_pool, reserve0)?;
+        cheatcodes.set_erc20_balance(state, token1, swap_pool, reserve1)?;
 
         // sync pool
         let sync_func = UNISWAP_V2_PAIR_ABI
@@ -312,6 +314,7 @@ impl NaivePriceOracleManipulator {
         flation: Flation,
     ) -> Result<(), SoflError<E>> {
         let caller = self.caller.clone();
+        let mut cheatcodes = CheatCodes::new();
         // manipulate curve plain pool price by performing an exchange
         println!("before manipulate");
         // mainipulate pool
@@ -425,7 +428,7 @@ impl NaivePriceOracleManipulator {
         } else {
             value = None;
             // faucet tokens for caller
-            CheatCodes::set_erc20_balance(
+            cheatcodes.set_erc20_balance(
                 state,
                 token_in,
                 caller.address,
