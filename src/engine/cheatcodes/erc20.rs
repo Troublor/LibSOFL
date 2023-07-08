@@ -8,11 +8,11 @@ use revm_primitives::U256;
 use crate::{
     engine::state::DatabaseEditable,
     error::SoflError,
-    unwrap_first_token_value,
+    global_cheatcodes, unwrap_first_token_value,
     utils::{abi::ERC20_ABI, addresses::WETH},
 };
 
-use super::{global_cheatcodes_unsafe, CheatCodes};
+use super::CheatCodes;
 
 impl CheatCodes {
     pub fn get_erc20_balance<E, S>(
@@ -28,15 +28,14 @@ impl CheatCodes {
         let func = ERC20_ABI
             .function("balanceOf")
             .expect("bug: cannot find balanceOf function in ERC20 ABI");
-        Ok(unwrap_first_token_value!(
-            Uint,
-            global_cheatcodes_unsafe().cheat_read(
+        Ok(unwrap_first_token_value!(Uint, {
+            global_cheatcodes!(cheat_read(
                 state,
                 token,
                 func,
-                &[Token::Address(account.into())],
-            )?
-        ))
+                &[Token::Address(account.into())]
+            ))?
+        }))
     }
 
     pub fn get_erc20_total_supply<E, S>(
@@ -53,7 +52,7 @@ impl CheatCodes {
             .expect("bug: cannot find totalSupply function in ERC20 ABI");
         Ok(unwrap_first_token_value!(
             Uint,
-            global_cheatcodes_unsafe().cheat_read(state, token, func, &[])?
+            global_cheatcodes!(cheat_read(state, token, func, &[]))?
         ))
     }
 
@@ -71,7 +70,7 @@ impl CheatCodes {
             .expect("bug: cannot find decimals function in ERC20 ABI");
         Ok(unwrap_first_token_value!(
             Uint,
-            global_cheatcodes_unsafe().cheat_read(state, token, func, &[])?
+            global_cheatcodes!(cheat_read(state, token, func, &[]))?
         ))
     }
 
@@ -91,12 +90,12 @@ impl CheatCodes {
             .expect("bug: cannot find allowance function in ERC20 ABI");
         Ok(unwrap_first_token_value!(
             Uint,
-            global_cheatcodes_unsafe().cheat_read(
+            global_cheatcodes!(cheat_read(
                 state,
                 token,
                 func,
-                &[Token::Address(owner.into()), Token::Address(spender.into())],
-            )?
+                &[Token::Address(owner.into()), Token::Address(spender.into())]
+            ))?
         ))
     }
 
@@ -116,13 +115,13 @@ impl CheatCodes {
         let func = ERC20_ABI
             .function("allowance")
             .expect("bug: cannot find allowance function in ERC20 ABI");
-        global_cheatcodes_unsafe().cheat_write(
+        global_cheatcodes!(cheat_write(
             state,
             token,
             func,
             &[Token::Address(owner.into()), Token::Address(spender.into())],
-            allowance,
-        )
+            allowance
+        ))
     }
 
     // return the old balance if updated
@@ -140,13 +139,13 @@ impl CheatCodes {
         let func = ERC20_ABI
             .function("balanceOf")
             .expect("bug: cannot find balanceOf function in ERC20 ABI");
-        if let Some(old_balance) = global_cheatcodes_unsafe().cheat_write(
+        if let Some(old_balance) = global_cheatcodes!(cheat_write(
             state,
             token,
             func,
             &[Token::Address(account.into())],
-            balance,
-        )? {
+            balance
+        ))? {
             // we need to update total supply
             let total_supply = Self::get_erc20_total_supply(state, token)?;
 
@@ -161,13 +160,13 @@ impl CheatCodes {
                 let func = ERC20_ABI.function("totalSupply").expect(
                     "bug: cannot find totalSupply function in ERC20 ABI",
                 );
-                global_cheatcodes_unsafe().cheat_write(
+                global_cheatcodes!(cheat_write(
                     state,
                     token,
                     func,
                     &[],
-                    total_supply + balance - old_balance,
-                )?;
+                    total_supply + balance - old_balance
+                ))?;
             }
 
             Ok(Some(old_balance))
@@ -335,10 +334,12 @@ mod tests_with_jsonrpc {
             U256::from(7654321),
         )
         .unwrap();
+
         let allowance_after = CheatCodes::get_erc20_allowance(
             &mut state, token, account, spender,
         )
         .unwrap();
+
         assert!(allowance_after == U256::from(7654321));
     }
 

@@ -1,10 +1,6 @@
 // A set of cheatcodes that can directly modify the environments
 
-use std::{
-    collections::BTreeMap,
-    fmt::Debug,
-    sync::{Mutex, MutexGuard},
-};
+use std::{collections::BTreeMap, fmt::Debug, sync::Mutex};
 
 use crate::error::SoflError;
 use ethers::abi::{self, Function, ParamType, Token};
@@ -36,12 +32,18 @@ macro_rules! get_the_first_uint {
 }
 
 lazy_static! {
-    pub static ref GLOBAL_CHEATCODES: Mutex<CheatCodes> =
+    static ref GLOBAL_CHEATCODES: Mutex<CheatCodes> =
         Mutex::new(CheatCodes::new());
 }
 
-fn global_cheatcodes_unsafe() -> MutexGuard<'static, CheatCodes> {
-    GLOBAL_CHEATCODES.lock().expect("data race")
+#[macro_export]
+macro_rules! global_cheatcodes {
+    ($func:ident ($($tokens:expr),+)) => {{
+        let mut cheatcode = $crate::engine::cheatcodes::GLOBAL_CHEATCODES.lock().unwrap();
+        let result = cheatcode.$func($($tokens),+);
+        drop(cheatcode);
+        result
+    }};
 }
 
 #[derive(Debug, Clone)]
@@ -50,13 +52,16 @@ enum SlotQueryResult {
     Found(U256),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct CheatCodes {
     // runtime env
     inspector: CheatcodeInspector,
 
     // slot info: (codehash, calldata) -> slot_state
     slots: BTreeMap<(B256, Bytes), SlotQueryResult>,
+
+    // high-level caller
+    caller: HighLevelCaller,
 }
 
 fn pack_calldata(fsig: [u8; 4], args: &[Token]) -> Bytes {
@@ -64,10 +69,17 @@ fn pack_calldata(fsig: [u8; 4], args: &[Token]) -> Bytes {
     [fsig.as_slice(), args.as_slice()].concat().into()
 }
 
+impl Default for CheatCodes {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 // basic functionality
 impl CheatCodes {
     fn new() -> Self {
         Self {
+            caller: HighLevelCaller::default().bypass_check(),
             inspector: CheatcodeInspector::default(),
             slots: BTreeMap::new(),
         }
@@ -86,8 +98,8 @@ impl CheatCodes {
     {
         // staticcall to get the slot, where we force the return type as u256
         self.inspector.reset_access_recording();
-        let caller = HighLevelCaller::default().bypass_check();
-        let ret = caller
+        let ret = self
+            .caller
             .invoke(state, to, func, args, None, &mut self.inspector)
             .ok()?;
         let cdata = get_the_first_uint!(ret);
@@ -127,8 +139,8 @@ impl CheatCodes {
                     // we have to do another call to check if the slot is correct,
                     // because changing the slot might change the program flow
                     self.inspector.disable_access_recording();
-                    let caller = HighLevelCaller::default().bypass_check();
-                    let ret = caller
+                    let ret = self
+                        .caller
                         .invoke(
                             state,
                             to,
@@ -210,13 +222,7 @@ impl CheatCodes {
         }
 
         self.inspector.disable_access_recording();
-        HighLevelCaller::default().bypass_check().view(
-            state,
-            to,
-            func,
-            args,
-            &mut self.inspector,
-        )
+        self.caller.view(state, to, func, args, &mut self.inspector)
     }
 
     fn decode_from_storage<E, S>(

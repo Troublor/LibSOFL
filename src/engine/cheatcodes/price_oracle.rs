@@ -8,7 +8,6 @@ use tracing::trace;
 
 use crate::engine::state::DatabaseEditable;
 use crate::error::SoflError;
-use crate::unwrap_first_token_value;
 use crate::utils::abi::{
     UNISWAP_V2_FACTORY_ABI, UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
 };
@@ -16,8 +15,9 @@ use crate::utils::addresses::{
     DAI, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY, USDC, USDT, WETH,
 };
 use crate::utils::math::HPMultipler;
+use crate::{global_cheatcodes, unwrap_first_token_value};
 
-use super::{global_cheatcodes_unsafe, CheatCodes};
+use super::CheatCodes;
 
 impl CheatCodes {
     pub fn get_price_in_ether<E, S>(
@@ -73,12 +73,12 @@ impl CheatCodes {
         let func = UNISWAP_V2_FACTORY_ABI.function("feeToSetter").expect(
             "bug: cannot find feeToSetter function in UniswapV2Factory ABI",
         );
-        let _ = global_cheatcodes_unsafe().cheat_read(
+        let _ = global_cheatcodes!(cheat_read(
             state,
             *UNISWAP_V2_FACTORY,
             func,
-            &[],
-        )?;
+            &[]
+        ))?;
 
         if token == *WETH {
             return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
@@ -224,12 +224,12 @@ impl CheatCodes {
 
         Ok(unwrap_first_token_value!(
             Address,
-            global_cheatcodes_unsafe().cheat_read(
+            global_cheatcodes!(cheat_read(
                 state,
                 *UNISWAP_V2_FACTORY,
                 func,
-                &[Token::Address(token1.into()), Token::Address(token2.into())],
-            )?
+                &[Token::Address(token1.into()), Token::Address(token2.into())]
+            ))?
         ))
     }
 }
@@ -249,12 +249,12 @@ impl CheatCodes {
             let func = UNISWAP_V3_FACTORY_ABI.function("owner").expect(
                 "bug: cannot find owner function in UniswapV3Factory ABI",
             );
-            let _ = global_cheatcodes_unsafe().cheat_read(
+            let _ = global_cheatcodes!(cheat_read(
                 state,
                 *UNISWAP_V3_FACTORY,
                 func,
-                &[],
-            )?;
+                &[]
+            ))?;
         }
 
         if token == *WETH {
@@ -313,7 +313,7 @@ impl CheatCodes {
         // price is Q64.96
         let sqrt_price_x96 = unwrap_first_token_value!(
             Uint,
-            global_cheatcodes_unsafe().cheat_read(state, pool, func, &[])?
+            global_cheatcodes!(cheat_read(state, pool, func, &[]))?
         );
 
         let mut result = HPMultipler::from(sqrt_price_x96);
@@ -418,7 +418,7 @@ impl CheatCodes {
 
         Ok(unwrap_first_token_value!(
             Address,
-            global_cheatcodes_unsafe().cheat_read(
+            global_cheatcodes!(cheat_read(
                 state,
                 *UNISWAP_V3_FACTORY,
                 func,
@@ -426,8 +426,8 @@ impl CheatCodes {
                     Token::Address(token1.into()),
                     Token::Address(token2.into()),
                     Token::Uint(fee.into()),
-                ],
-            )?
+                ]
+            ))?
         ))
     }
 }

@@ -14,7 +14,7 @@ use revm_primitives::{db::DatabaseRef, U256};
 
 use crate::{
     engine::{
-        cheatcodes::{CheatCodes, ERC20Cheat},
+        cheatcodes::CheatCodes,
         inspectors::{self, no_inspector},
         state::{
             env::TransitionSpecBuilder, BcState, BcStateBuilder,
@@ -278,9 +278,8 @@ impl NaivePriceOracleManipulator {
         let (token1,) = unwrap_token_values!(ret, Address);
 
         // cheat: set pool token balance to new reserves
-        let mut cheatcode = CheatCodes::new();
-        cheatcode.set_erc20_balance(state, token0, swap_pool, reserve0)?;
-        cheatcode.set_erc20_balance(state, token1, swap_pool, reserve1)?;
+        CheatCodes::set_erc20_balance(state, token0, swap_pool, reserve0)?;
+        CheatCodes::set_erc20_balance(state, token1, swap_pool, reserve1)?;
 
         // sync pool
         let sync_func = UNISWAP_V2_PAIR_ABI
@@ -312,7 +311,6 @@ impl NaivePriceOracleManipulator {
         pair: (Address, Address),
         flation: Flation,
     ) -> Result<(), SoflError<E>> {
-        let mut cheatcode = CheatCodes::new();
         let caller = self.caller.clone();
         // manipulate curve plain pool price by performing an exchange
         println!("before manipulate");
@@ -427,7 +425,7 @@ impl NaivePriceOracleManipulator {
         } else {
             value = None;
             // faucet tokens for caller
-            cheatcode.set_erc20_balance(
+            CheatCodes::set_erc20_balance(
                 state,
                 token_in,
                 caller.address,
@@ -556,7 +554,7 @@ mod tests_with_jsonrpc {
         },
         unwrap_token_values,
         utils::{
-            abi::{CURVE_CRYPTO_POOL_ABI, CURVE_POOL_ABI},
+            abi::CURVE_POOL_ABI,
             addresses,
             conversion::{Convert, ToEthers, ToPrimitive},
             math::UFixed256,
