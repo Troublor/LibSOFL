@@ -102,10 +102,30 @@ pub(crate) mod macros {
                 .into_string()
                 .expect("impossible: return value is not string")
         };
+        (Vec<Address>, $v:expr) => {
+            (match $v.remove(0) {
+                ethers::abi::Token::Array(arr)
+                | ethers::abi::Token::FixedArray(arr)
+                | ethers::abi::Token::Tuple(arr) => arr
+                    .into_iter()
+                    .map(|v| {
+                        $crate::convert_to_primitive!(
+                            v.into_address().expect(
+                                "impossible: return value is not address"
+                            ),
+                            ethers::types::Address,
+                            reth_primitives::Address
+                        )
+                    })
+                    .collect::<Vec<revm_primitives::Address>>(),
+                _ => panic!("impossible: return value is not array"),
+            })
+        };
         (Vec<Token>, $v:expr) => {
             (match $v.remove(0) {
-                ethers::abi::Token::Array(v) => Some(v),
-                ethers::abi::Token::Tuple(v) => Some(v),
+                ethers::abi::Token::Array(v)
+                | ethers::abi::Token::FixedArray(v)
+                | ethers::abi::Token::Tuple(v) => Some(v),
                 _ => panic!("impossible: return value is not array"),
             })
             .expect("impossible: return value is not array or tuple")

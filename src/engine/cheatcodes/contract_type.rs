@@ -1,3 +1,4 @@
+use ethers::abi::Token;
 use revm::{Database, DatabaseCommit};
 use revm_primitives::Address;
 use std::fmt::Debug;
@@ -7,8 +8,15 @@ use crate::{
     error::SoflError,
     unwrap_first_token_value,
     utils::{
-        abi::{CURVE_POOL_ABI, UNISWAP_V2_PAIR_ABI, UNISWAP_V3_POOL_ABI},
-        addresses::{CURVE_POOL_OWNER, UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY},
+        abi::{
+            CURVE_CRYPTO_REGISTRY_ABI, CURVE_REGISTRY_ABI,
+            UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI,
+            UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
+        },
+        addresses::{
+            CURVE_CRYPTO_REGISTRY, CURVE_REGISTRY, UNISWAP_V2_FACTORY,
+            UNISWAP_V3_FACTORY,
+        },
     },
 };
 
@@ -19,6 +27,7 @@ pub enum ContractType {
     UniswapV2Pair,
     UniswapV3Pool,
     CurveStableSwap,
+    CurveCryptoSwap,
 }
 
 impl CheatCodes {
@@ -31,48 +40,197 @@ impl CheatCodes {
         E: Debug,
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
-        {
-            let func = UNISWAP_V2_PAIR_ABI.function("factory").expect(
-                "bug: cannot find factory function in UniswapV2Pair ABI",
-            );
-
-            if let Ok(mut tokens) = self.cheat_read(state, address, func, &[]) {
-                if unwrap_first_token_value!(Address, tokens)
-                    == *UNISWAP_V2_FACTORY
-                {
-                    return Ok(Some(ContractType::UniswapV2Pair));
-                }
-            }
+        if let Some(ty) = self.__check_uniswap_v2(state, address) {
+            return Ok(Some(ty));
         }
 
-        {
-            let func = UNISWAP_V3_POOL_ABI.function("factory").expect(
-                "bug: cannot find factory function in UniswapV3Pool ABI",
-            );
-
-            if let Ok(mut tokens) = self.cheat_read(state, address, func, &[]) {
-                if unwrap_first_token_value!(Address, tokens)
-                    == *UNISWAP_V3_FACTORY
-                {
-                    return Ok(Some(ContractType::UniswapV3Pool));
-                }
-            }
+        if let Some(ty) = self.__check_uniswap_v3(state, address) {
+            return Ok(Some(ty));
         }
 
-        {
-            let func = CURVE_POOL_ABI.function("owner").expect(
-                "bug: cannot find owner function in CurveStableSwap ABI",
-            );
-            if let Ok(mut tokens) = self.cheat_read(state, address, func, &[]) {
-                if unwrap_first_token_value!(Address, tokens)
-                    == *CURVE_POOL_OWNER
-                {
-                    return Ok(Some(ContractType::CurveStableSwap));
-                }
-            }
+        if let Some(ty) = self.__check_curve_stableswap(state, address) {
+            return Ok(Some(ty));
+        }
+
+        if let Some(ty) = self.__check_curve_cryptoswap(state, address) {
+            return Ok(Some(ty));
         }
 
         Ok(None)
+    }
+
+    fn __check_uniswap_v2<E, S>(
+        &mut self,
+        state: &mut S,
+        address: Address,
+    ) -> Option<ContractType>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        // check token info
+        let token0 = {
+            let func = UNISWAP_V2_PAIR_ABI.function("token0").expect(
+                "bug: cannot find token0 function in UniswapV2Pair ABI",
+            );
+            unwrap_first_token_value!(
+                Address,
+                self.cheat_read(state, address, func, &[]).ok()?
+            )
+        };
+
+        let token1 = {
+            let func = UNISWAP_V2_PAIR_ABI.function("token1").expect(
+                "bug: cannot find token1 function in UniswapV2Pair ABI",
+            );
+            unwrap_first_token_value!(
+                Address,
+                self.cheat_read(state, address, func, &[]).ok()?
+            )
+        };
+
+        // check from the perspective of factory
+        let func = UNISWAP_V2_FACTORY_ABI.function("getPair").expect(
+            "bug: cannot find getPair function in UniswapV2Factory ABI",
+        );
+        if unwrap_first_token_value!(
+            Address,
+            self.cheat_read(
+                state,
+                *UNISWAP_V2_FACTORY,
+                func,
+                &[Token::Address(token0.into()), Token::Address(token1.into())]
+            )
+            .ok()?
+        ) == address
+        {
+            Some(ContractType::UniswapV2Pair)
+        } else {
+            None
+        }
+    }
+
+    fn __check_uniswap_v3<E, S>(
+        &mut self,
+        state: &mut S,
+        address: Address,
+    ) -> Option<ContractType>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        // get token and fee info
+        let token0 = {
+            let func = UNISWAP_V3_POOL_ABI.function("token0").expect(
+                "bug: cannot find token0 function in UniswapV3Pool ABI",
+            );
+            unwrap_first_token_value!(
+                Address,
+                self.cheat_read(state, address, func, &[]).ok()?
+            )
+        };
+
+        let token1 = {
+            let func = UNISWAP_V3_POOL_ABI.function("token1").expect(
+                "bug: cannot find token1 function in UniswapV3Pool ABI",
+            );
+            unwrap_first_token_value!(
+                Address,
+                self.cheat_read(state, address, func, &[]).ok()?
+            )
+        };
+
+        let fee = {
+            let func = UNISWAP_V3_POOL_ABI
+                .function("fee")
+                .expect("bug: cannot find fee function in UniswapV3Pool ABI");
+            unwrap_first_token_value!(
+                Uint,
+                self.cheat_read(state, address, func, &[]).ok()?
+            )
+        };
+
+        // check with factory
+        let func = UNISWAP_V3_FACTORY_ABI.function("getPool").expect(
+            "bug: cannot find getPool function in UniswapV3Factory ABI",
+        );
+        if unwrap_first_token_value!(
+            Address,
+            self.cheat_read(
+                state,
+                *UNISWAP_V3_FACTORY,
+                func,
+                &[
+                    Token::Address(token0.into()),
+                    Token::Address(token1.into()),
+                    Token::Uint(fee.into())
+                ]
+            )
+            .ok()?
+        ) == address
+        {
+            Some(ContractType::UniswapV3Pool)
+        } else {
+            None
+        }
+    }
+
+    fn __check_curve_stableswap<E, S>(
+        &mut self,
+        state: &mut S,
+        address: Address,
+    ) -> Option<ContractType>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        let func = CURVE_REGISTRY_ABI
+            .function("get_coins")
+            .expect("bug: cannot find get_coins function in CurveRegistry ABI");
+
+        let mut tokens = self
+            .cheat_read(
+                state,
+                *CURVE_REGISTRY,
+                func,
+                &[Token::Address(address.into())],
+            )
+            .ok()?;
+        let coins = unwrap_first_token_value!(Vec<Address>, tokens);
+        if !coins.is_empty() && coins[0] != Address::zero() {
+            return Some(ContractType::CurveStableSwap);
+        }
+
+        None
+    }
+
+    fn __check_curve_cryptoswap<E, S>(
+        &mut self,
+        state: &mut S,
+        address: Address,
+    ) -> Option<ContractType>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        let func = CURVE_CRYPTO_REGISTRY_ABI
+            .function("get_coins")
+            .expect("bug: cannot find get_coins function in CurveRegistry ABI");
+
+        let mut tokens = self
+            .cheat_read(
+                state,
+                *CURVE_CRYPTO_REGISTRY,
+                func,
+                &[Token::Address(address.into())],
+            )
+            .ok()?;
+        let coins = unwrap_first_token_value!(Vec<Address>, tokens);
+        if !coins.is_empty() && coins[0] != Address::zero() {
+            return Some(ContractType::CurveCryptoSwap);
+        }
+
+        None
     }
 }
 
@@ -105,6 +263,9 @@ mod tests_with_jsonrpc {
         let curve_stable_swap =
             Address::from_str("0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7")
                 .unwrap();
+        let curve_crypto_swap =
+            Address::from_str("0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC")
+                .unwrap();
         let random =
             Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
                 .unwrap();
@@ -128,6 +289,13 @@ mod tests_with_jsonrpc {
                 .get_contract_type(&mut state, curve_stable_swap)
                 .unwrap(),
             Some(ContractType::CurveStableSwap)
+        );
+
+        assert_eq!(
+            cheatcodes
+                .get_contract_type(&mut state, curve_crypto_swap)
+                .unwrap(),
+            Some(ContractType::CurveCryptoSwap)
         );
 
         assert!(cheatcodes
