@@ -176,8 +176,42 @@ impl HighLevelCaller {
     ) -> Result<Vec<ethers::abi::Token>, SoflError<BS::Error>> {
         let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
         let ret = self.call(state, callee, &calldata, value, inspector)?;
-        println!("ret: {:?}", hex::encode(ret.clone()));
         func.decode_output(ret.to_vec().as_slice())
             .map_err(SoflError::Abi)
+    }
+
+    pub fn view_ignore_return<
+        'a,
+        BS: Database + DatabaseCommit,
+        I: MultiTxInspector<&'a mut BS>,
+    >(
+        &self,
+        state: &'a mut BS,
+        callee: Address,
+        func: &ethers::abi::Function,
+        args: &[ethers::abi::Token],
+        inspector: &mut I,
+    ) -> Result<(), SoflError<BS::Error>> {
+        let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
+        self.static_call(state, callee, &calldata, inspector)?;
+        Ok(())
+    }
+
+    pub fn invoke_ignore_return<
+        'a,
+        BS: Database + DatabaseCommit,
+        I: MultiTxInspector<&'a mut BS>,
+    >(
+        &self,
+        state: &'a mut BS,
+        callee: Address,
+        func: &ethers::abi::Function,
+        args: &[ethers::abi::Token],
+        value: Option<U256>,
+        inspector: &mut I,
+    ) -> Result<(), SoflError<BS::Error>> {
+        let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
+        self.call(state, callee, &calldata, value, inspector)?;
+        Ok(())
     }
 }

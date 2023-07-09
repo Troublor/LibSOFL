@@ -24,6 +24,8 @@ define_contract!(ERC721_ABI, "../../assets/erc721.abi.json");
 define_contract!(ERC777_ABI, "../../assets/erc777.abi.json");
 define_contract!(ERC1155_ABI, "../../assets/erc1155.abi.json");
 define_contract!(WETH_ABI, "../../assets/weth.abi.json");
+
+// Uniswap
 define_contract!(UNISWAP_V2_PAIR_ABI, "../../assets/uniswap_v2_pair.abi.json");
 define_contract!(
     UNISWAP_V2_FACTORY_ABI,
@@ -35,6 +37,8 @@ define_contract!(
 );
 define_contract!(UNISWAP_V3_POOL_ABI, "../../assets/uniswap_v3_pool.abi.json");
 define_contract!(CURVE_REGISTRY_ABI, "../../assets/curve_registry.abi.json");
+
+// Curve.FI
 define_contract!(
     CURVE_CRYPTO_REGISTRY_ABI,
     "../../assets/curve_crypto_registry.abi.json"
@@ -45,6 +49,16 @@ define_contract!(
     "../../assets/curve_crypto_pool.abi.json"
 );
 define_contract!(CURVE_EXCHANGE_ABI, "../../assets/curve_exchange.abi.json");
+
+// Inverse Finance
+define_contract!(
+    INVERSE_LENDING_POOL_ABI,
+    "../../assets/inverse_lending_pool.abi.json"
+);
+define_contract!(
+    INVERSE_LENDING_COMPTROLLER_ABI,
+    "../../assets/inverse_lending_comptroller.abi.json"
+);
 
 pub(crate) mod macros {
 
