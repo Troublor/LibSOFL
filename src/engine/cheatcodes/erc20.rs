@@ -390,6 +390,9 @@ mod tests_with_jsonrpc {
         let account1 =
             Address::from_str("0xF977814e90dA44bFA03b6295A0616a897441acee")
                 .unwrap();
+        let account2 =
+            Address::from_str("0xD51a44d3FaE010294C616388b506AcdA1bfAAE45")
+                .unwrap();
 
         let bp = JsonRpcBcProvider::default();
 
@@ -416,11 +419,18 @@ mod tests_with_jsonrpc {
             .unwrap();
         assert_eq!(balance2, U256::from(10u64.pow(12)));
 
-        let account2 =
-            Address::from_str("0xD51a44d3FaE010294C616388b506AcdA1bfAAE45")
-                .unwrap();
-        let func = ERC20_ABI.function("transfer").unwrap();
-        let caller = HighLevelCaller::new(account1)
+        cheatcodes
+            .set_erc20_allowance(
+                &mut state,
+                *USDT,
+                account1,
+                account2,
+                U256::MAX,
+            )
+            .unwrap();
+
+        let func = ERC20_ABI.function("transferFrom").unwrap();
+        let caller = HighLevelCaller::new(account2)
             .bypass_check()
             .at_block(&bp, fork_at.block);
         caller
@@ -429,6 +439,7 @@ mod tests_with_jsonrpc {
                 *USDT,
                 func,
                 &[
+                    Token::Address(account1.into()),
                     Token::Address(account2.into()),
                     Token::Uint((10u64.pow(11)).into()),
                 ],

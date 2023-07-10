@@ -6,19 +6,34 @@ use revm_primitives::{
     BlockEnv, Bytes, CfgEnv, ExecutionResult, Output, U256,
 };
 
-use crate::{engine::transactions::builder::TxBuilder, error::SoflError};
+use crate::{
+    engine::transactions::builder::TxBuilder,
+    error::SoflError,
+    utils::conversion::{Convert, ToPrimitive},
+};
 
 use super::{
     inspectors::{static_call::StaticCallEnforceInspector, MultiTxInspector},
     state::{env::TransitionSpecBuilder, BcState},
 };
 
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct HighLevelCaller {
     pub address: Address,
     pub nonce: u64,
     pub gas_limit: u64,
     pub spec_builder: TransitionSpecBuilder,
+}
+
+impl Default for HighLevelCaller {
+    fn default() -> Self {
+        Self {
+            address: ToPrimitive::cvt(1234567890),
+            nonce: 0,
+            gas_limit: 0,
+            spec_builder: TransitionSpecBuilder::default(),
+        }
+    }
 }
 
 impl From<Address> for HighLevelCaller {

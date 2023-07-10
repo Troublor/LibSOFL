@@ -443,57 +443,14 @@ impl NaivePriceOracleManipulator {
                 caller.address,
                 amount_in,
             )?;
-            let (balance,) = unwrap_token_values!(
-                caller.invoke(
-                    state,
-                    token_in,
-                    ERC20_ABI.function("balanceOf").expect(
-                        "impossible: balanceOf function does not exist"
-                    ),
-                    &[ToEthers::cvt(caller.address)],
-                    None,
-                    no_inspector()
-                )?,
-                Uint
-            );
-            assert_eq!(balance, amount_in);
             // approve
-            caller.invoke_ignore_return(
+            cheatcodes.set_erc20_allowance(
                 state,
                 token_in,
-                ERC20_ABI
-                    .function("approve")
-                    .expect("impossible: approve function does not exist"),
-                &[ToEthers::cvt(pool), ToEthers::cvt(U256::MAX)],
-                None,
-                no_inspector(),
+                caller.address,
+                pool,
+                U256::MAX,
             )?;
-            let (allowance,) = unwrap_token_values!(
-                caller.invoke(
-                    state,
-                    token_in,
-                    ERC20_ABI.function("allowance").expect(
-                        "impossible: balanceOf function does not exist"
-                    ),
-                    &[ToEthers::cvt(caller.address), ToEthers::cvt(pool)],
-                    None,
-                    no_inspector()
-                )?,
-                Uint
-            );
-            println!("allowance: {:?}", allowance);
-            // caller.address =
-            // ToPrimitive::cvt("0xF977814e90dA44bFA03b6295A0616a897441aceC");
-            caller
-                .invoke_ignore_return(
-                    state,
-                    token_in,
-                    ERC20_ABI.function("transfer").unwrap(),
-                    &[ToEthers::cvt(pool), ToEthers::cvt(amount_in)],
-                    None,
-                    no_inspector(),
-                )
-                .unwrap();
         }
         let mut pool_args: Vec<Token> = Vec::new();
         if is_crypto_pool {
@@ -609,13 +566,17 @@ mod tests_with_jsonrpc {
             state::{env::TransitionSpecBuilder, BcState, BcStateBuilder},
             utils::HighLevelCaller,
         },
-        fuzzing::observer::{
-            asset_flow::DifferentialAssetFlowObserver, DifferentialEvmObserver,
+        fuzzing::{
+            executor::pom::TestInsp,
+            observer::{
+                asset_flow::DifferentialAssetFlowObserver,
+                DifferentialEvmObserver,
+            },
         },
         unwrap_token_values,
         utils::{
             abi::{
-                CURVE_CRYPTO_POOL_ABI, CURVE_POOL_ABI,
+                CURVE_CRYPTO_POOL_ABI, CURVE_POOL_ABI, ERC20_ABI,
                 INVERSE_LENDING_COMPTROLLER_ABI, INVERSE_LENDING_POOL_ABI,
             },
             addresses,
@@ -663,32 +624,36 @@ mod tests_with_jsonrpc {
         pool: Address,
         pool_abi: &ethers::abi::Contract,
         pair: (Address, Address),
+        (idx0, idx1): (u128, u128),
         is_crypto_pool: bool,
+        is_underlying: bool,
     ) {
         let provider = JsonRpcBcProvider::default();
         let mut state = BcStateBuilder::fork_at(&provider, 14972421).unwrap();
-        let caller = HighLevelCaller::new(ToPrimitive::cvt(1))
+        let caller = HighLevelCaller::new(ToPrimitive::cvt(1234567890))
             .bypass_check()
             .at_block(&provider, 14972421);
-        let usdc_idx: u128 = 1;
-        let usdt_idx: u128 = 2;
         let test_amount_in = U256::from(1_000_000u128);
         let (amount_out_before,) = unwrap_token_values!(
             caller
                 .view(
                     &mut state,
                     pool,
-                    pool_abi.function("get_dy").unwrap(),
+                    if is_underlying {
+                        pool_abi.function("get_dy_underlying").unwrap()
+                    } else {
+                        pool_abi.function("get_dy").unwrap()
+                    },
                     &[
                         if is_crypto_pool {
-                            ToEthers::cvt(usdc_idx)
+                            ToEthers::cvt(idx0)
                         } else {
-                            Token::Int(ToEthers::cvt(usdc_idx))
+                            Token::Int(ToEthers::cvt(idx0))
                         },
                         if is_crypto_pool {
-                            ToEthers::cvt(usdt_idx)
+                            ToEthers::cvt(idx1)
                         } else {
-                            Token::Int(ToEthers::cvt(usdt_idx))
+                            Token::Int(ToEthers::cvt(idx1))
                         },
                         ToEthers::cvt(test_amount_in),
                     ],
@@ -716,17 +681,21 @@ mod tests_with_jsonrpc {
                 .view(
                     &mut state,
                     pool,
-                    pool_abi.function("get_dy").unwrap(),
+                    if is_underlying {
+                        pool_abi.function("get_dy_underlying").unwrap()
+                    } else {
+                        pool_abi.function("get_dy").unwrap()
+                    },
                     &[
                         if is_crypto_pool {
-                            ToEthers::cvt(usdc_idx)
+                            ToEthers::cvt(idx0)
                         } else {
-                            Token::Int(ToEthers::cvt(usdc_idx))
+                            Token::Int(ToEthers::cvt(idx0))
                         },
                         if is_crypto_pool {
-                            ToEthers::cvt(usdt_idx)
+                            ToEthers::cvt(idx1)
                         } else {
-                            Token::Int(ToEthers::cvt(usdt_idx))
+                            Token::Int(ToEthers::cvt(idx1))
                         },
                         ToEthers::cvt(test_amount_in),
                     ],
@@ -740,10 +709,17 @@ mod tests_with_jsonrpc {
     }
 
     macro_rules! gen_manipulate_curve_test {
-        ($name:ident, $pool:expr, $abi:expr, $pair: expr, $is_crypto:expr) => {
+        ($name:ident, $pool:expr, $abi:expr, $pair:expr, $indices:expr, $is_crypto:expr, $is_underlying:expr) => {
             #[test]
             fn $name() {
-                manipulate_curve($pool, $abi, $pair, $is_crypto);
+                manipulate_curve(
+                    $pool,
+                    $abi,
+                    $pair,
+                    $indices,
+                    $is_crypto,
+                    $is_underlying,
+                );
             }
         };
     }
@@ -754,6 +730,8 @@ mod tests_with_jsonrpc {
             .unwrap(),
         &CURVE_POOL_ABI,
         (*addresses::USDC, *addresses::USDT),
+        (1, 2),
+        false,
         false
     );
     gen_manipulate_curve_test!(
@@ -762,7 +740,9 @@ mod tests_with_jsonrpc {
             .unwrap(),
         &CURVE_POOL_ABI,
         (*addresses::USDC, *addresses::USDT),
-        false
+        (1, 2),
+        false,
+        true
     );
     gen_manipulate_curve_test!(
         test_manipulate_curve_usdt_wbtc,
@@ -770,7 +750,9 @@ mod tests_with_jsonrpc {
             .unwrap(),
         &CURVE_CRYPTO_POOL_ABI,
         (*addresses::USDT, *addresses::WBTC),
-        true
+        (0, 1),
+        true,
+        false
     );
 
     #[test]
@@ -783,7 +765,7 @@ mod tests_with_jsonrpc {
             .at_block(&provider, 14972419);
         let mut observer = DifferentialAssetFlowObserver::default();
         let mut state = BcStateBuilder::fork_at(&provider, 14972419).unwrap();
-        let caller = HighLevelCaller::new(ToPrimitive::cvt(1))
+        let caller = HighLevelCaller::new(ToPrimitive::cvt(1234567890))
             .bypass_check()
             .at_block(&provider, 14972419);
 
@@ -863,11 +845,12 @@ mod tests_with_jsonrpc {
                 true,
                 (*addresses::WBTC, *addresses::USDT),
                 Flation::Inflation(UFixed256 {
-                    raw_value: U256::from(1),
+                    raw_value: U256::from(90),
                     decimals: 1,
                 }),
             )
             .unwrap();
+        println!("manipulation done");
 
         // borrow call after manipulation
         caller
@@ -879,7 +862,7 @@ mod tests_with_jsonrpc {
                 None,
                 no_inspector(),
             )
-            .expect("borrow call should fail");
+            .expect("borrow call should not fail");
 
         // BcState::transit(&mut bc_state, spec, inspector);
     }
@@ -894,13 +877,13 @@ impl<BS: Database> Inspector<BS> for TestInsp {
         _data: &mut revm::EVMData<'_, BS>,
         _is_static: bool,
     ) -> revm::interpreter::InstructionResult {
-        println!(
-            "{}, {:?}",
-            _interp.program_counter(),
-            OpCode::try_from_u8(_interp.current_opcode())
-                .unwrap()
-                .as_str()
-        );
+        // println!(
+        //     "{}, {:?}",
+        //     _interp.program_counter(),
+        //     OpCode::try_from_u8(_interp.current_opcode())
+        //         .unwrap()
+        //         .as_str()
+        // );
         revm::interpreter::InstructionResult::Continue
     }
 
