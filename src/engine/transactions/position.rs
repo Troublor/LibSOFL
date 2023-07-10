@@ -6,7 +6,7 @@ use std::{
 
 use reth_primitives::BlockHashOrNumber;
 
-use reth_provider::{BlockNumProvider, TransactionsProvider};
+use reth_provider::{BlockNumReader, TransactionsProvider};
 use revm_primitives::B256;
 
 pub type StateChange = revm_primitives::State;
@@ -22,7 +22,7 @@ pub enum TxPositionOutOfRangeError {
 }
 
 impl TxPositionOutOfRangeError {
-    pub fn unknown_block(pos: TxPosition, p: &impl BlockNumProvider) -> Self {
+    pub fn unknown_block(pos: TxPosition, p: &impl BlockNumReader) -> Self {
         match pos.block {
             BlockHashOrNumber::Hash(hash) => Self::UnknownHash(hash),
             BlockHashOrNumber::Number(block) => {

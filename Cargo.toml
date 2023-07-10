@@ -61,7 +61,6 @@ reth-db = { path = "./reth/crates/storage/db", features = ["mdbx", "test-utils"]
 reth-provider = { path = "./reth/crates/storage/provider", features = ["test-utils"] }
 reth-revm = { path = "./reth/crates/revm" }
 reth-revm-inspectors = { path = "./reth/crates/revm/revm-inspectors" }
-reth-staged-sync = { path = "./reth/crates/staged-sync" }
 reth-stages = { path = "./reth/crates/stages" }
 reth-interfaces = { path = "./reth/crates/interfaces", features = ["test-utils"] }
 reth-transaction-pool = { path = "./reth/crates/transaction-pool" }

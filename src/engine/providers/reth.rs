@@ -50,6 +50,7 @@ impl BcProviderBuilder {
             let db_inner = Env::<WriteMap>::open(
                 &datadir.join("db"),
                 reth_db::mdbx::EnvKind::RO,
+                None,
             )?;
             db = Arc::new(db_inner);
             *maybe_db = Some(db.clone());

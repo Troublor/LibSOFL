@@ -23,7 +23,7 @@ use reth_primitives::{
     TransactionSignedNoHash, TxHash, TxNumber,
 };
 use reth_provider::{
-    AccountReader, BlockHashProvider, BlockIdProvider, BlockNumProvider,
+    AccountReader, BlockHashReader, BlockIdReader, BlockNumReader,
     EvmEnvProvider, HeaderProvider, PostState, ProviderError, ReceiptProvider,
     StateProvider, StateProviderFactory, StateRootProvider,
     TransactionsProvider,
@@ -103,7 +103,7 @@ impl Default for JsonRpcBcProvider<Http> {
     }
 }
 
-impl<P: JsonRpcClient> BlockHashProvider for JsonRpcBcProvider<P> {
+impl<P: JsonRpcClient> BlockHashReader for JsonRpcBcProvider<P> {
     #[doc = " Get the hash of the block with the given number. Returns `None` if no block with this number"]
     #[doc = " exists."]
     fn block_hash(&self, number: BlockNumber) -> rethResult<Option<H256>> {
@@ -152,7 +152,7 @@ impl<P: JsonRpcClient> BlockHashProvider for JsonRpcBcProvider<P> {
     }
 }
 
-impl<P: JsonRpcClient> BlockNumProvider for JsonRpcBcProvider<P> {
+impl<P: JsonRpcClient> BlockNumReader for JsonRpcBcProvider<P> {
     #[doc = " Returns the current info for the chain."]
     fn chain_info(&self) -> rethResult<ChainInfo> {
         let bn = self.last_block_number()?;
@@ -622,7 +622,7 @@ impl<P: JsonRpcClient> EvmEnvProvider for JsonRpcBcProvider<P> {
     }
 }
 
-impl<P: JsonRpcClient> BlockIdProvider for JsonRpcBcProvider<P> {
+impl<P: JsonRpcClient> BlockIdReader for JsonRpcBcProvider<P> {
     #[doc = " Get the current pending block number and hash."]
     fn pending_block_num_hash(
         &self,
@@ -735,7 +735,7 @@ impl<P: JsonRpcClient> JsonRpcStateProvider<P> {
     }
 }
 
-impl<P: JsonRpcClient> BlockHashProvider for JsonRpcStateProvider<P> {
+impl<P: JsonRpcClient> BlockHashReader for JsonRpcStateProvider<P> {
     #[doc = " Get the hash of the block with the given number. Returns `None` if no block with this number"]
     #[doc = " exists."]
     fn block_hash(&self, number: BlockNumber) -> rethResult<Option<H256>> {
@@ -880,7 +880,7 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
 mod tests_with_jsonrpc {
 
     use ethers_providers::Http;
-    use reth_provider::BlockNumProvider;
+    use reth_provider::BlockNumReader;
 
     use crate::{
         config::flags::SoflConfig, engine::providers::BcProviderBuilder,

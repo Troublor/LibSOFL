@@ -47,4 +47,7 @@ define_address!(
 );
 
 // Inverse Finance
-define_address!(INVERSE_LENDING_COMPTROLLER, "0x4dCf7407AE5C07f8681e1659f626E114A7667339");
+define_address!(
+    INVERSE_LENDING_COMPTROLLER,
+    "0x4dCf7407AE5C07f8681e1659f626E114A7667339"
+);

@@ -1,5 +1,5 @@
 use reth_provider::{
-    BlockProvider, EvmEnvProvider, StateProviderFactory, TransactionsProvider,
+    BlockReader, EvmEnvProvider, StateProviderFactory, TransactionsProvider,
 };
 
 pub mod reth;
@@ -8,7 +8,7 @@ pub mod rpc;
 pub trait BcProvider:
     EvmEnvProvider
     + TransactionsProvider
-    + BlockProvider
+    + BlockReader
     + StateProviderFactory
     + Send
     + Sync
