@@ -124,7 +124,9 @@ impl Shr<u64> for TxPosition {
     /// Shift the block number by `rhs` and set the index to 0.
     /// If the block is a hash, this will panic.
     fn shr(self, rhs: u64) -> Self::Output {
-        let BlockHashOrNumber::Number(n) = self.block else { panic!("TxPosition::shr: block is a hash (not a number)")};
+        let BlockHashOrNumber::Number(n) = self.block else {
+            panic!("TxPosition::shr: block is a hash (not a number)")
+        };
         Self {
             block: BlockHashOrNumber::from(n.add(rhs)),
             index: 0,
@@ -136,7 +138,9 @@ impl ShrAssign<u64> for TxPosition {
     /// Shift the block number in place by `rhs` and set the index to 0.
     /// If the block is a hash, this will panic.
     fn shr_assign(&mut self, rhs: u64) {
-        let BlockHashOrNumber::Number(n) = self.block else { panic!("TxPosition::shr_assign: block is a hash (not a number)")};
+        let BlockHashOrNumber::Number(n) = self.block else {
+            panic!("TxPosition::shr_assign: block is a hash (not a number)")
+        };
         self.block = BlockHashOrNumber::from(n.add(rhs));
         self.index = 0;
     }
@@ -164,7 +168,9 @@ impl Shl<u64> for TxPosition {
     /// Shift the block number by `rhs` and set the index to 0.
     /// If the block is a hash, this will panic.
     fn shl(self, rhs: u64) -> Self::Output {
-        let BlockHashOrNumber::Number(n) = self.block else { panic!("TxPosition::shl: block is a hash (not a number)")};
+        let BlockHashOrNumber::Number(n) = self.block else {
+            panic!("TxPosition::shl: block is a hash (not a number)")
+        };
         if n < rhs {
             panic!("TxPosition::shl: block number underflow");
         }
@@ -179,7 +185,9 @@ impl ShlAssign<u64> for TxPosition {
     /// Shift the block number in place by `rhs` and set the index to 0.
     /// If the block is a hash, this will panic.
     fn shl_assign(&mut self, rhs: u64) {
-        let BlockHashOrNumber::Number(n) = self.block else { panic!("TxPosition::shl_assign: block is a hash (not a number)")};
+        let BlockHashOrNumber::Number(n) = self.block else {
+            panic!("TxPosition::shl_assign: block is a hash (not a number)")
+        };
         if n < rhs {
             panic!("TxPosition::shl_assign: block number underflow");
         }

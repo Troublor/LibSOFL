@@ -116,7 +116,9 @@ impl AssetTransfer {
             .event("Transfer")
             .expect("Transfer event not found in ERC721 ABI")
             .parse_log(ToEthers::cvt(log))
-             else {return None};
+        else {
+            return None;
+        };
         let from = parsed_log.params.remove(0).value.into_address()?;
         let to = parsed_log.params.remove(0).value.into_address()?;
         let asset = parsed_log.params.remove(0).value.into_uint()?;

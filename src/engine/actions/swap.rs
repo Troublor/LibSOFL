@@ -105,9 +105,15 @@ impl UniswapV2Swap {
             )
             .expect("failed to invoke swap");
         let Token::Array(ret) =
-            rets.first().expect("should have one return value") else {panic!("the return value should be an array")};
-        let Token::Uint(output) = ret.last()
-            .expect("should have at least one return value") else {panic!("the return value should be an uint")};
+            rets.first().expect("should have one return value")
+        else {
+            panic!("the return value should be an array")
+        };
+        let Token::Uint(output) =
+            ret.last().expect("should have at least one return value")
+        else {
+            panic!("the return value should be an uint")
+        };
         ToPrimitive::cvt(output)
     }
 }
