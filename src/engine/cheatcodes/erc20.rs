@@ -288,13 +288,18 @@ mod tests_with_db {
 mod tests_with_jsonrpc {
     use std::str::FromStr;
 
+    use ethers::abi::Token;
     use reth_primitives::Address;
     use revm_primitives::U256;
 
     use crate::engine::cheatcodes::CheatCodes;
+    use crate::engine::inspectors::no_inspector;
     use crate::engine::providers::rpc::JsonRpcBcProvider;
     use crate::engine::state::BcStateBuilder;
     use crate::engine::transactions::position::TxPosition;
+    use crate::engine::utils::HighLevelCaller;
+    use crate::utils::abi::ERC20_ABI;
+    use crate::utils::addresses::USDT;
 
     fn eval(account: Address, token: Address, decimals: U256) {
         let bp = JsonRpcBcProvider::default();
@@ -378,5 +383,68 @@ mod tests_with_jsonrpc {
                 .unwrap();
 
         eval(account, weth, U256::from(18));
+    }
+
+    #[test]
+    fn test_usdt() {
+        let account1 =
+            Address::from_str("0xF977814e90dA44bFA03b6295A0616a897441acee")
+                .unwrap();
+
+        let bp = JsonRpcBcProvider::default();
+
+        let fork_at = TxPosition::new(14972421, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let mut cheatcodes = CheatCodes::new();
+
+        let balance1 = cheatcodes
+            .get_erc20_balance(&mut state, *USDT, account1)
+            .unwrap();
+        assert_eq!(balance1, U256::from(0));
+
+        cheatcodes
+            .set_erc20_balance(
+                &mut state,
+                *USDT,
+                account1,
+                U256::from(10u64.pow(12)),
+            )
+            .unwrap();
+        let balance2 = cheatcodes
+            .get_erc20_balance(&mut state, *USDT, account1)
+            .unwrap();
+        assert_eq!(balance2, U256::from(10u64.pow(12)));
+
+        let account2 =
+            Address::from_str("0xD51a44d3FaE010294C616388b506AcdA1bfAAE45")
+                .unwrap();
+        let func = ERC20_ABI.function("transfer").unwrap();
+        let caller = HighLevelCaller::new(account1)
+            .bypass_check()
+            .at_block(&bp, fork_at.block);
+        caller
+            .invoke_ignore_return(
+                &mut state,
+                *USDT,
+                func,
+                &[
+                    Token::Address(account2.into()),
+                    Token::Uint((10u64.pow(11)).into()),
+                ],
+                None,
+                no_inspector(),
+            )
+            .unwrap();
+
+        let balance3 = cheatcodes
+            .get_erc20_balance(&mut state, *USDT, account1)
+            .unwrap();
+        assert_eq!(balance3, U256::from(10u64.pow(12) - 10u64.pow(11)));
+
+        let balance4 = cheatcodes
+            .get_erc20_balance(&mut state, *USDT, account2)
+            .unwrap();
+        assert_eq!(balance4, U256::from(10u64.pow(11)));
     }
 }
