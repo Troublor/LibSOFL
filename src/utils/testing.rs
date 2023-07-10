@@ -1,5 +1,7 @@
 use std::path::PathBuf;
 
+use tracing::info;
+
 use crate::error::SoflError;
 
 /// Compile a solidity snippet.
@@ -26,4 +28,29 @@ pub fn compile_solidity_snippet(
     project
         .compile_with_version(&solc, sources)
         .map_err(SoflError::Solc)
+}
+
+#[cfg(not(feature = "test-use-jsonrpc"))]
+pub fn get_testing_bc_provider(
+) -> crate::engine::providers::reth::RethBcProvider {
+    let db_provider = crate::engine::providers::BcProviderBuilder::default_db();
+    if let Ok(provider) = db_provider {
+        info!("Using reth database provider.");
+        provider
+    } else {
+        panic!("No reth database provider is set in SoflConfig or the database does not exist.")
+    }
+}
+
+#[cfg(feature = "test-use-jsonrpc")]
+pub fn get_testing_bc_provider(
+) -> crate::engine::providers::rpc::JsonRpcBcProvider<ethers_providers::Http> {
+    let db_provider =
+        crate::engine::providers::BcProviderBuilder::default_jsonrpc();
+    if let Ok(provider) = db_provider {
+        info!("Using jsonrpc provider.");
+        provider
+    } else {
+        panic!("No jsonrpc endpoint is set in SoflConfig or the endpoint is not valid.")
+    }
 }

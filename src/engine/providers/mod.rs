@@ -19,3 +19,15 @@ pub trait BcProvider:
 pub struct BcProviderBuilder {
     // constructors are implemented in specific provider moduels
 }
+
+impl<
+        P: EvmEnvProvider
+            + TransactionsProvider
+            + BlockReader
+            + StateProviderFactory
+            + Send
+            + Sync
+            + Clone,
+    > BcProvider for P
+{
+}

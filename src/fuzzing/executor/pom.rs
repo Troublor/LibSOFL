@@ -538,7 +538,7 @@ pub fn get_uniswap_v2_reserves<
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests {
 
     use std::str::FromStr;
 
@@ -551,7 +551,7 @@ mod tests_with_jsonrpc {
         engine::{
             cheatcodes::CheatCodes,
             inspectors::no_inspector,
-            providers::{rpc::JsonRpcBcProvider, BcProviderBuilder},
+            providers::rpc::JsonRpcBcProvider,
             state::{env::TransitionSpecBuilder, BcStateBuilder},
             utils::HighLevelCaller,
         },
@@ -565,6 +565,7 @@ mod tests_with_jsonrpc {
             addresses,
             conversion::{Convert, ToEthers, ToPrimitive},
             math::UFixed256,
+            testing::get_testing_bc_provider,
         },
     };
 
@@ -574,7 +575,7 @@ mod tests_with_jsonrpc {
 
     #[test]
     fn test_manipulate_uniswap_v2_eth_usdc_price() {
-        let provider = JsonRpcBcProvider::default();
+        let provider = get_testing_bc_provider();
         let mut state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
         let pair = get_uniswap_v2_pair_address(
             &mut state,
@@ -741,7 +742,7 @@ mod tests_with_jsonrpc {
     fn test_inverse_finance_manipulation_execution() {
         let mut cheatcodes = CheatCodes::new();
         // attack tx: 0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c
-        let provider = BcProviderBuilder::default_jsonrpc().unwrap();
+        let provider = get_testing_bc_provider();
         let _spec_builder = TransitionSpecBuilder::new()
             .bypass_check()
             .at_block(&provider, 14972419);

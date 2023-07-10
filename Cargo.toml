@@ -16,6 +16,10 @@ path = "bin/play/main.rs"
 name = "pom"
 path = "bin/pom/main.rs"
 
+[features]
+
+test-use-jsonrpc = []
+
 [patch.crates-io]
 # revm = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
 # revm-primitives = { git = "https://github.com/bluealloy/revm/", branch = "release/v25" }
