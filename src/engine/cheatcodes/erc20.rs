@@ -6,7 +6,7 @@ use revm::{Database, DatabaseCommit};
 use revm_primitives::U256;
 
 use crate::{
-    engine::state::DatabaseEditable,
+    engine::{inspectors::no_inspector, state::DatabaseEditable},
     error::SoflError,
     unwrap_first_token_value,
     utils::{abi::ERC20_ABI, addresses::WETH},
@@ -128,6 +128,47 @@ impl CheatCodes {
             &[Token::Address(owner.into()), Token::Address(spender.into())],
             allowance,
         )
+    }
+
+    pub fn steal_erc20<E, S>(
+        &mut self,
+        state: &mut S,
+        token: Address,
+        from: Address,
+        to: Address,
+        amount: U256,
+    ) -> Result<(), SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        // signature: transferFrom(address,address,uint256) -> 0x23b872dd
+        let func = ERC20_ABI
+            .function("transfer")
+            .expect("bug: cannot find transferFrom function in ERC20 ABI");
+
+        // get the balance of the sender
+        let balance_before = self.get_erc20_balance(state, token, from)?;
+
+        let mut caller = self.caller.clone();
+        caller.address = from;
+        caller.invoke_ignore_return(
+            state,
+            token,
+            func,
+            &[Token::Address(to.into()), Token::Uint(amount.into())],
+            None,
+            no_inspector(),
+        )?;
+
+        // get the balance of the sender
+        let balance_after = self.get_erc20_balance(state, token, from)?;
+
+        if balance_after != balance_before - amount {
+            Err(SoflError::Custom("ERC20: steal failed".to_string()))
+        } else {
+            Ok(())
+        }
     }
 
     // return the old balance if updated
@@ -300,6 +341,7 @@ mod tests_with_jsonrpc {
     use crate::engine::utils::HighLevelCaller;
     use crate::utils::abi::ERC20_ABI;
     use crate::utils::addresses::USDT;
+    use crate::utils::conversion::{Convert, ToPrimitive};
 
     fn eval(account: Address, token: Address, decimals: U256) {
         let bp = JsonRpcBcProvider::default();
@@ -457,5 +499,30 @@ mod tests_with_jsonrpc {
             .get_erc20_balance(&mut state, *USDT, account2)
             .unwrap();
         assert_eq!(balance4, U256::from(10u64.pow(11)));
+    }
+
+    #[test]
+    fn test_steal() {
+        let bp = JsonRpcBcProvider::default();
+
+        let fork_at = TxPosition::new(14972421, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let mut cheatcodes = CheatCodes::new();
+
+        let deposit_amount = ToPrimitive::cvt(300479464706193878654u128);
+        let yv_curve_3crypto_token =
+            ToPrimitive::cvt("0xE537B5cc158EB71037D4125BDD7538421981E6AA");
+        let yv_curve_3crypto_richer =
+            ToPrimitive::cvt("0xA67EC8737021A7e91e883A3277384E6018BB5776");
+        cheatcodes
+            .steal_erc20(
+                &mut state,
+                yv_curve_3crypto_token,
+                yv_curve_3crypto_richer,
+                cheatcodes.caller.address,
+                deposit_amount,
+            )
+            .unwrap();
     }
 }

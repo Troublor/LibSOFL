@@ -63,11 +63,11 @@ define_contract!(
 #[cfg(test)]
 pub mod test_utils {
     define_contract!(
-        yvcrv3cryptofeed,
+        YV_CRV3_CRYPTO_FEED,
         "../../assets/test/yvcrv3cryptofeed.abi.json"
     );
     define_contract!(
-        yvcrv3crypto,
+        YV_CRV3_CRYPTO,
         "../../assets/test/yvcrv3crypto_token.abi.json"
     );
 }

@@ -9,13 +9,13 @@ use reth_primitives::Address;
 use reth_provider::{
     EvmEnvProvider, StateProviderFactory, TransactionsProvider,
 };
-use revm::{interpreter::OpCode, Database, DatabaseCommit, Inspector};
+use revm::{Database, DatabaseCommit};
 use revm_primitives::{db::DatabaseRef, U256};
 
 use crate::{
     engine::{
         cheatcodes::CheatCodes,
-        inspectors::{self, no_inspector, MultiTxInspector},
+        inspectors::{self, no_inspector},
         state::{
             env::TransitionSpecBuilder, BcState, BcStateBuilder,
             DatabaseEditable, ForkedState, ForkedStateDbError,
@@ -35,8 +35,7 @@ use crate::{
     utils::{
         abi::{
             CURVE_CRYPTO_POOL_ABI, CURVE_CRYPTO_REGISTRY_ABI, CURVE_POOL_ABI,
-            CURVE_REGISTRY_ABI, ERC20_ABI, UNISWAP_V2_FACTORY_ABI,
-            UNISWAP_V2_PAIR_ABI,
+            CURVE_REGISTRY_ABI, UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI,
         },
         addresses::{self},
         conversion::{Convert, ToEthers, ToPrimitive},
@@ -317,10 +316,9 @@ impl NaivePriceOracleManipulator {
         pair: (Address, Address),
         flation: Flation,
     ) -> Result<(), SoflError<E>> {
-        let mut caller = self.caller.clone();
+        let caller = self.caller.clone();
         let mut cheatcodes = CheatCodes::new();
         // manipulate curve plain pool price by performing an exchange
-        println!("before manipulate");
         // mainipulate pool
         let registry: Address;
         let registry_abi: &ethers::abi::Contract;
@@ -350,10 +348,6 @@ impl NaivePriceOracleManipulator {
                 Uint
             );
             is_underlying = false;
-            println!(
-                "idx0: {}, idx1: {}, underlying: {}",
-                idx0, idx1, is_underlying,
-            );
         } else {
             registry = *addresses::CURVE_REGISTRY;
             registry_abi = &CURVE_REGISTRY_ABI;
@@ -387,7 +381,6 @@ impl NaivePriceOracleManipulator {
                     .expect("impossible: i1 is not a U256"),
             );
         }
-        println!("before flation");
         let (token_in, _token_out, idx_in, idx_out, amount_in) = match flation {
             Flation::Inflation(percent) => {
                 let (in_reserve,) = unwrap_token_values!(
@@ -463,10 +456,8 @@ impl NaivePriceOracleManipulator {
             pool_args.push(ToEthers::cvt(amount_in));
             pool_args.push(ToEthers::cvt(0));
         }
-        println!("where");
         // exchange
         if is_underlying {
-            println!("exchange underlying");
             caller.invoke_ignore_return(
                 state,
                 pool,
@@ -478,7 +469,6 @@ impl NaivePriceOracleManipulator {
                 no_inspector(),
             )?;
         } else {
-            println!("exchange: {:?} {:?}", pool, pool_args);
             caller.invoke_ignore_return(
                 state,
                 pool,
@@ -487,7 +477,7 @@ impl NaivePriceOracleManipulator {
                     .expect("impossible: exchange function does not exist"),
                 &pool_args,
                 value,
-                &mut TestInsp {},
+                no_inspector(),
             )?;
         }
         Ok(())
@@ -562,20 +552,14 @@ mod tests_with_jsonrpc {
             cheatcodes::CheatCodes,
             inspectors::no_inspector,
             providers::{rpc::JsonRpcBcProvider, BcProviderBuilder},
-            state::{env::TransitionSpecBuilder, BcState, BcStateBuilder},
+            state::{env::TransitionSpecBuilder, BcStateBuilder},
             utils::HighLevelCaller,
         },
-        fuzzing::{
-            executor::pom::TestInsp,
-            observer::{
-                asset_flow::DifferentialAssetFlowObserver,
-                DifferentialEvmObserver,
-            },
-        },
+        fuzzing::observer::asset_flow::DifferentialAssetFlowObserver,
         unwrap_token_values,
         utils::{
             abi::{
-                CURVE_CRYPTO_POOL_ABI, CURVE_POOL_ABI, ERC20_ABI,
+                CURVE_CRYPTO_POOL_ABI, CURVE_POOL_ABI,
                 INVERSE_LENDING_COMPTROLLER_ABI, INVERSE_LENDING_POOL_ABI,
             },
             addresses,
@@ -703,7 +687,6 @@ mod tests_with_jsonrpc {
                 .unwrap(),
             Uint
         );
-        println!("{:?} => {:?}", amount_out_before, amount_out_after);
         assert!(amount_out_before > amount_out_after);
     }
 
@@ -759,114 +742,37 @@ mod tests_with_jsonrpc {
         let mut cheatcodes = CheatCodes::new();
         // attack tx: 0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c
         let provider = BcProviderBuilder::default_db().unwrap();
-        let spec_builder = TransitionSpecBuilder::new()
+        let _spec_builder = TransitionSpecBuilder::new()
             .bypass_check()
             .at_block(&provider, 14972419);
-        let mut observer = DifferentialAssetFlowObserver::default();
+        let mut _observer = DifferentialAssetFlowObserver::default();
         let mut state = BcStateBuilder::fork_at(&provider, 14972419).unwrap();
         let caller = HighLevelCaller::new(ToPrimitive::cvt(1234567890))
             .bypass_check()
             .at_block(&provider, 14972419);
-
-        let oracle =
-            ToPrimitive::cvt("0xe8b3bc58774857732c6c1147bfc9b9e5fb6f427c");
-        let (answer,) = unwrap_token_values!(
-            caller
-                .invoke(
-                    &mut state,
-                    oracle,
-                    crate::utils::abi::test_utils::yvcrv3cryptofeed
-                        .function("latestAnswer")
-                        .unwrap(),
-                    &[],
-                    None,
-                    no_inspector(),
-                )
-                .expect("oracle call should not fail"),
-            Uint
-        );
-        println!("oracle answer before: {:?}", answer);
 
         // preparation
         // 1. deposit to lending pool
         let lending_pool =
             Address::from_str("0x1429a930ec3bcf5Aa32EF298ccc5aB09836EF587")
                 .unwrap();
-        let crv3crypto_token =
-            ToPrimitive::cvt("0xc4AD29ba4B3c580e6D59105FFf484999997675Ff");
-        let deposit_amount = ToPrimitive::cvt(5375596969399930881565u128);
+        // let crv3crypto_token =
+        //     ToPrimitive::cvt("0xc4AD29ba4B3c580e6D59105FFf484999997675Ff");
+        let deposit_amount = ToPrimitive::cvt(300479464706193878654u128);
+        let yv_curve_3crypto_token =
+            ToPrimitive::cvt("0xE537B5cc158EB71037D4125BDD7538421981E6AA");
+        let yv_curve_3crypto_richer =
+            ToPrimitive::cvt("0xA67EC8737021A7e91e883A3277384E6018BB5776");
         cheatcodes
-            .set_erc20_balance(
+            .steal_erc20(
                 &mut state,
-                crv3crypto_token,
+                yv_curve_3crypto_token,
+                yv_curve_3crypto_richer,
                 caller.address,
                 deposit_amount,
             )
             .unwrap();
-        let yv_curve_3crypto_token =
-            ToPrimitive::cvt("0xE537B5cc158EB71037D4125BDD7538421981E6AA");
-        cheatcodes
-            .set_erc20_allowance(
-                &mut state,
-                crv3crypto_token,
-                caller.address,
-                yv_curve_3crypto_token,
-                U256::MAX,
-            )
-            .unwrap();
-        caller
-            .invoke_ignore_return(
-                &mut state,
-                yv_curve_3crypto_token,
-                crate::utils::abi::test_utils::yvcrv3crypto
-                    .functions_by_name("deposit")
-                    .unwrap()
-                    .get(2)
-                    .unwrap(),
-                &[ToEthers::cvt(deposit_amount), ToEthers::cvt(caller.address)],
-                None,
-                no_inspector(),
-            )
-            .unwrap();
-        let (price_per_share,) = unwrap_token_values!(
-            caller
-                .invoke(
-                    &mut state,
-                    yv_curve_3crypto_token,
-                    crate::utils::abi::test_utils::yvcrv3crypto
-                        .function("pricePerShare")
-                        .unwrap(),
-                    &[],
-                    None,
-                    no_inspector(),
-                )
-                .expect("oracle call should not fail"),
-            Uint
-        );
-        cheatcodes
-            .set_erc20_balance(
-                &mut state,
-                ToPrimitive::cvt("0xc4AD29ba4B3c580e6D59105FFf484999997675Ff"),
-                caller.address,
-                price_per_share * deposit_amount,
-            )
-            .unwrap();
-        let (answer,) = unwrap_token_values!(
-            caller
-                .invoke(
-                    &mut state,
-                    oracle,
-                    crate::utils::abi::test_utils::yvcrv3cryptofeed
-                        .function("latestAnswer")
-                        .unwrap(),
-                    &[],
-                    None,
-                    no_inspector(),
-                )
-                .expect("oracle call should not fail"),
-            Uint
-        );
-        println!("oracle answer before: {:?}", answer);
+
         cheatcodes
             .set_erc20_allowance(
                 &mut state,
@@ -881,7 +787,7 @@ mod tests_with_jsonrpc {
                 &mut state,
                 lending_pool,
                 INVERSE_LENDING_POOL_ABI.function("mint").unwrap(),
-                &[ToEthers::cvt(4906754677503974414310u128)],
+                &[ToEthers::cvt(200000000000000000000u128)],
                 None,
                 no_inspector(),
             )
@@ -900,7 +806,7 @@ mod tests_with_jsonrpc {
             )
             .unwrap();
 
-        let borrow_amount = 10133949192393802606886848u128;
+        let borrow_amount = 200000000000000000000000u128;
         let borrow_pool =
             Address::from_str("0x7Fcb7DAC61eE35b3D4a51117A7c58D53f0a8a670")
                 .unwrap();
@@ -919,7 +825,6 @@ mod tests_with_jsonrpc {
                 .expect("borrow call should not fail"),
             Uint
         );
-        println!("success: {:?}", success);
         assert!(success > U256::ZERO);
 
         // price manipulation
@@ -938,23 +843,6 @@ mod tests_with_jsonrpc {
                 }),
             )
             .unwrap();
-        let (answer,) = unwrap_token_values!(
-            caller
-                .invoke(
-                    &mut bc_state,
-                    oracle,
-                    crate::utils::abi::test_utils::yvcrv3cryptofeed
-                        .function("latestAnswer")
-                        .unwrap(),
-                    &[],
-                    None,
-                    no_inspector(),
-                )
-                .expect("oracle call should not fail"),
-            Uint
-        );
-        println!("oracle answer after: {:?}", answer);
-        println!("manipulation done");
 
         // borrow call after manipulation
         let (success,) = unwrap_token_values!(
@@ -970,68 +858,6 @@ mod tests_with_jsonrpc {
                 .expect("borrow call should not fail"),
             Uint
         );
-        println!("success: {:?}", success);
         assert!(success == U256::ZERO);
     }
 }
-
-pub struct TestInsp {}
-
-impl<BS: Database> Inspector<BS> for TestInsp {
-    fn step(
-        &mut self,
-        _interp: &mut revm::interpreter::Interpreter,
-        _data: &mut revm::EVMData<'_, BS>,
-        _is_static: bool,
-    ) -> revm::interpreter::InstructionResult {
-        // println!(
-        //     "{}, {:?}",
-        //     _interp.program_counter(),
-        //     OpCode::try_from_u8(_interp.current_opcode())
-        //         .unwrap()
-        //         .as_str()
-        // );
-        revm::interpreter::InstructionResult::Continue
-    }
-
-    fn call(
-        &mut self,
-        _data: &mut revm::EVMData<'_, BS>,
-        _inputs: &mut revm::interpreter::CallInputs,
-        _is_static: bool,
-    ) -> (
-        revm::interpreter::InstructionResult,
-        revm::interpreter::Gas,
-        revm_primitives::Bytes,
-    ) {
-        println!("call: {:?}", _inputs.context);
-        (
-            revm::interpreter::InstructionResult::Continue,
-            revm::interpreter::Gas::new(0),
-            revm_primitives::Bytes::new(),
-        )
-    }
-
-    fn call_end(
-        &mut self,
-        _data: &mut revm::EVMData<'_, BS>,
-        _inputs: &revm::interpreter::CallInputs,
-        remaining_gas: revm::interpreter::Gas,
-        ret: revm::interpreter::InstructionResult,
-        out: revm_primitives::Bytes,
-        _is_static: bool,
-    ) -> (
-        revm::interpreter::InstructionResult,
-        revm::interpreter::Gas,
-        revm_primitives::Bytes,
-    ) {
-        println!(
-            "call_end: {:?}, {:?}, {:?}",
-            ret,
-            _inputs.context,
-            String::from_utf8_lossy(&out)
-        );
-        (ret, remaining_gas, out)
-    }
-}
-impl<BS: Database> MultiTxInspector<BS> for TestInsp {}
