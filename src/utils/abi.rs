@@ -60,6 +60,18 @@ define_contract!(
     "../../assets/inverse_lending_comptroller.abi.json"
 );
 
+#[cfg(test)]
+pub mod test_utils {
+    define_contract!(
+        yvcrv3cryptofeed,
+        "../../assets/test/yvcrv3cryptofeed.abi.json"
+    );
+    define_contract!(
+        yvcrv3crypto,
+        "../../assets/test/yvcrv3crypto_token.abi.json"
+    );
+}
+
 pub(crate) mod macros {
 
     #[macro_export]
