@@ -33,8 +33,8 @@ Should they are needed, conversions functions are provided in `./src/utils/conve
 
 There are three groups of tests, grouped by rust modules:
 - `tests_nodep`: tests that do not rely on any external dependencies.
-- `tests_with_db`: tests that rely on Reth database, i.e., the database must present for the tests to be executed.
-- `tests_with_jsonrpc`: tests that rely on Ethereum JSON-RPC.
+- `tests_with_dep`: tests that rely on blockchian provider, if `test-use-jsonrpc` feature is specified, jsonrpc provider will be used, otherwise reth database provider will be used.
+- `tests_for_jsonrpc`: tests that rely on Ethereum JSON-RPC.
 
 Use the command to run each group separately:
 

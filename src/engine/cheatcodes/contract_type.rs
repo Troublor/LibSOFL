@@ -235,19 +235,19 @@ impl CheatCodes {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
     use std::str::FromStr;
 
     use reth_primitives::Address;
 
     use crate::engine::cheatcodes::{CheatCodes, ContractType};
-    use crate::engine::providers::rpc::JsonRpcBcProvider;
     use crate::engine::state::BcStateBuilder;
     use crate::engine::transactions::position::TxPosition;
+    use crate::utils::testing::get_testing_bc_provider;
 
     #[test]
     fn test_match_contract_type() {
-        let bp = JsonRpcBcProvider::default();
+        let bp = get_testing_bc_provider();
 
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();

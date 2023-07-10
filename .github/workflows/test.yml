@@ -46,9 +46,12 @@ jobs:
     - name: Run tests without external dependency
       run: cargo test tests_nodep
       
+    - name: Run tests for jsonrpc
+      run: cargo test tests_for_jsonrpc
+      
     - name: Run tests with jsonrpc dependency
       run: |
         export SOFL__JSONRPC__ENDPOINT=https://libsofl.eth.troublor.xyz/v1/mainnet
         export SOFL__JSONRPC__CLOUDFLARE_CLIENT_ID=${{ secrets.CLOUDFLARE_CLIENT_ID }}
         export SOFL__JSONRPC__CLOUDFLARE_CLIENT_SECRET=${{ secrets.CLOUDFLARE_CLIENT_SECRET }}
-        cargo test tests_with_jsonrpc
+        cargo test tests_with_jsonrpc --features test-use-jsonrpc

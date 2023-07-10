@@ -62,17 +62,17 @@ impl<S, P: TransactionsProvider> Generator<TxInput, S>
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
     use libafl::prelude::Generator;
 
-    use crate::{
-        engine::providers::rpc::JsonRpcBcProvider,
-        utils::conversion::{Convert, ToPrimitive},
+    use crate::utils::{
+        conversion::{Convert, ToPrimitive},
+        testing::get_testing_bc_provider,
     };
 
     #[test]
     fn test_generate_tx_across_blocks() {
-        let provider = JsonRpcBcProvider::default();
+        let provider = get_testing_bc_provider();
         let wtf_token =
             ToPrimitive::cvt("0xA68Dd8cB83097765263AdAD881Af6eeD479c4a33");
         let mut generator =

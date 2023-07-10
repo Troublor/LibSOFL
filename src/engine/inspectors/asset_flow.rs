@@ -410,23 +410,25 @@ impl<BS: Database> super::MultiTxInspector<BS> for AssetFlowInspector {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
     use reth_primitives::TxHash;
 
     use crate::{
         engine::{
             inspectors::asset_flow::AssetKind,
-            providers::rpc::JsonRpcBcProvider,
             state::{env::TransitionSpec, BcState, BcStateBuilder},
         },
-        utils::conversion::{Convert, ToPrimitive},
+        utils::{
+            conversion::{Convert, ToPrimitive},
+            testing::get_testing_bc_provider,
+        },
     };
 
     use super::AssetFlowInspector;
 
     #[test]
     fn test_transfers_in_plain_transaction() {
-        let provider = JsonRpcBcProvider::default();
+        let provider = get_testing_bc_provider();
         let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
         let tx: TxHash = ToPrimitive::cvt("0x6b3fa0f8c6a87b9c8951e96dd44c5d4635f1bbf056040d9a626f344496b6ce54");
         let transition_spec =
@@ -454,7 +456,7 @@ mod tests_with_jsonrpc {
 
     #[test]
     fn test_no_transfer() {
-        let provider = JsonRpcBcProvider::default();
+        let provider = get_testing_bc_provider();
         let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
         let tx: TxHash = ToPrimitive::cvt("0xd801d27211b0dfcfdff7e370069268e6fb3ef08ea25148c1065718482c4eab32");
         let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
@@ -467,7 +469,7 @@ mod tests_with_jsonrpc {
 
     #[test]
     fn test_token_transfer() {
-        let provider = JsonRpcBcProvider::default();
+        let provider = get_testing_bc_provider();
         let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
         let tx: TxHash = ToPrimitive::cvt("0x90c93f15f470569d0339a28a6d0d0af7eeaeb6b40e6e53eb56016158119906dc");
         let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
@@ -481,7 +483,7 @@ mod tests_with_jsonrpc {
     #[test]
     fn test_snood_spend_allowance_attack() {
         // attack tx: 0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e
-        let provider = JsonRpcBcProvider::default();
+        let provider = get_testing_bc_provider();
         let state = BcStateBuilder::fork_at(&provider, 14983664).unwrap();
         let tx: TxHash = ToPrimitive::cvt("0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e");
         let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();

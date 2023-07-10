@@ -326,7 +326,7 @@ mod tests_with_db {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
     use std::str::FromStr;
 
     use ethers::abi::Token;
@@ -335,16 +335,16 @@ mod tests_with_jsonrpc {
 
     use crate::engine::cheatcodes::CheatCodes;
     use crate::engine::inspectors::no_inspector;
-    use crate::engine::providers::rpc::JsonRpcBcProvider;
     use crate::engine::state::BcStateBuilder;
     use crate::engine::transactions::position::TxPosition;
     use crate::engine::utils::HighLevelCaller;
     use crate::utils::abi::ERC20_ABI;
     use crate::utils::addresses::USDT;
     use crate::utils::conversion::{Convert, ToPrimitive};
+    use crate::utils::testing::get_testing_bc_provider;
 
     fn eval(account: Address, token: Address, decimals: U256) {
-        let bp = JsonRpcBcProvider::default();
+        let bp = get_testing_bc_provider();
 
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
@@ -436,7 +436,7 @@ mod tests_with_jsonrpc {
             Address::from_str("0xD51a44d3FaE010294C616388b506AcdA1bfAAE45")
                 .unwrap();
 
-        let bp = JsonRpcBcProvider::default();
+        let bp = get_testing_bc_provider();
 
         let fork_at = TxPosition::new(14972421, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
@@ -503,7 +503,7 @@ mod tests_with_jsonrpc {
 
     #[test]
     fn test_steal() {
-        let bp = JsonRpcBcProvider::default();
+        let bp = get_testing_bc_provider();
 
         let fork_at = TxPosition::new(14972421, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();

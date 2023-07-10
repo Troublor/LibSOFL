@@ -106,21 +106,21 @@ impl<BS: Database> Inspector<BS> for CallExtractInspector {
 impl<BS: Database> MultiTxInspector<BS> for CallExtractInspector {}
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
     use reth_primitives::{Address, TxHash};
 
     use crate::{
-        engine::{
-            providers::rpc::JsonRpcBcProvider,
-            state::{env::TransitionSpec, BcState, BcStateBuilder},
+        engine::state::{env::TransitionSpec, BcState, BcStateBuilder},
+        utils::{
+            conversion::{Convert, ToPrimitive},
+            testing::get_testing_bc_provider,
         },
-        utils::conversion::{Convert, ToPrimitive},
     };
 
     #[test]
     fn test_inverse_finance_attack() {
         // attack tx: 0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c
-        let provider = JsonRpcBcProvider::default();
+        let provider = get_testing_bc_provider();
         let state = BcStateBuilder::fork_at(&provider, 14972419).unwrap();
         let tx : TxHash= ToPrimitive::cvt("0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c");
         let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();

@@ -538,7 +538,7 @@ pub fn get_uniswap_v2_reserves<
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_with_dep {
 
     use std::str::FromStr;
 

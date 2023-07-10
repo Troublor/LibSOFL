@@ -113,22 +113,25 @@ impl UniswapV2Swap {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
 
     use ethers::utils::parse_ether;
     use reth_primitives::Address;
 
     use crate::{
         engine::{
-            providers::rpc::JsonRpcBcProvider, state::BcStateBuilder,
-            transactions::position::TxPosition, utils::HighLevelCaller,
+            state::BcStateBuilder, transactions::position::TxPosition,
+            utils::HighLevelCaller,
         },
-        utils::conversion::{Convert, ToPrimitive},
+        utils::{
+            conversion::{Convert, ToPrimitive},
+            testing::get_testing_bc_provider,
+        },
     };
 
     #[test]
     fn test_swap() {
-        let p = JsonRpcBcProvider::default();
+        let p = get_testing_bc_provider();
         let mut state =
             BcStateBuilder::fork_at(&p, TxPosition::new(16000000, 0)).unwrap();
         let swap = super::UniswapV2Swap {
