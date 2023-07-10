@@ -741,7 +741,7 @@ mod tests_with_jsonrpc {
     fn test_inverse_finance_manipulation_execution() {
         let mut cheatcodes = CheatCodes::new();
         // attack tx: 0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c
-        let provider = BcProviderBuilder::default_db().unwrap();
+        let provider = BcProviderBuilder::default_jsonrpc().unwrap();
         let _spec_builder = TransitionSpecBuilder::new()
             .bypass_check()
             .at_block(&provider, 14972419);
