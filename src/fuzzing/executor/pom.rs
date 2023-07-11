@@ -200,7 +200,7 @@ pub enum Flation {
     Deflation(UFixed256),
 }
 
-#[derive(Debug, Default)]
+#[derive(Default)]
 pub struct NaivePriceOracleManipulator {
     caller: HighLevelCaller,
     cheatcodes: CheatCodes,

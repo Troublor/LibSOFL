@@ -1,6 +1,6 @@
 use ethers::abi::Token;
 use revm::{Database, DatabaseCommit};
-use revm_primitives::Address;
+use revm_primitives::{Address, U256};
 use std::fmt::Debug;
 
 use crate::{
@@ -22,12 +22,36 @@ use crate::{
 
 use super::CheatCodes;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub enum ContractType {
-    UniswapV2Pair,
-    UniswapV3Pool,
-    CurveStableSwap,
-    CurveCryptoSwap,
+    Unknown,
+    UniswapV2Pair(
+        Address, // token0
+        Address, // token1
+    ),
+    UniswapV3Pool(
+        Address, // token0
+        Address, // token1
+        U256,    // fee
+    ),
+    CurveStableSwap(Vec<Address>),
+    CurveCryptoSwap(Vec<Address>),
+}
+
+impl ContractType {
+    pub fn is_unknown(&self) -> bool {
+        matches!(self, ContractType::Unknown)
+    }
+
+    pub fn is_dex(&self) -> bool {
+        matches!(
+            self,
+            ContractType::UniswapV2Pair(_, _)
+                | ContractType::UniswapV3Pool(_, _, _)
+                | ContractType::CurveStableSwap(_)
+                | ContractType::CurveCryptoSwap(_)
+        )
+    }
 }
 
 impl CheatCodes {
@@ -35,28 +59,28 @@ impl CheatCodes {
         &mut self,
         state: &mut S,
         address: Address,
-    ) -> Result<Option<ContractType>, SoflError<E>>
+    ) -> Result<ContractType, SoflError<E>>
     where
         E: Debug,
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
         if let Some(ty) = self.__check_uniswap_v2(state, address) {
-            return Ok(Some(ty));
+            return Ok(ty);
         }
 
         if let Some(ty) = self.__check_uniswap_v3(state, address) {
-            return Ok(Some(ty));
+            return Ok(ty);
         }
 
         if let Some(ty) = self.__check_curve_stableswap(state, address) {
-            return Ok(Some(ty));
+            return Ok(ty);
         }
 
         if let Some(ty) = self.__check_curve_cryptoswap(state, address) {
-            return Ok(Some(ty));
+            return Ok(ty);
         }
 
-        Ok(None)
+        Ok(ContractType::Unknown)
     }
 
     fn __check_uniswap_v2<E, S>(
@@ -104,7 +128,7 @@ impl CheatCodes {
             .ok()?
         ) == address
         {
-            Some(ContractType::UniswapV2Pair)
+            Some(ContractType::UniswapV2Pair(token0, token1))
         } else {
             None
         }
@@ -169,7 +193,7 @@ impl CheatCodes {
             .ok()?
         ) == address
         {
-            Some(ContractType::UniswapV3Pool)
+            Some(ContractType::UniswapV3Pool(token0, token1, fee))
         } else {
             None
         }
@@ -198,7 +222,12 @@ impl CheatCodes {
             .ok()?;
         let coins = unwrap_first_token_value!(Vec<Address>, tokens);
         if !coins.is_empty() && coins[0] != Address::zero() {
-            return Some(ContractType::CurveStableSwap);
+            return Some(ContractType::CurveStableSwap(
+                coins
+                    .into_iter()
+                    .filter(|x| *x != Address::zero())
+                    .collect(),
+            ));
         }
 
         None
@@ -227,7 +256,12 @@ impl CheatCodes {
             .ok()?;
         let coins = unwrap_first_token_value!(Vec<Address>, tokens);
         if !coins.is_empty() && coins[0] != Address::zero() {
-            return Some(ContractType::CurveCryptoSwap);
+            return Some(ContractType::CurveCryptoSwap(
+                coins
+                    .into_iter()
+                    .filter(|x| *x != Address::zero())
+                    .collect(),
+            ));
         }
 
         None
@@ -270,37 +304,37 @@ mod tests_with_jsonrpc {
             Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
                 .unwrap();
 
-        assert_eq!(
+        assert!(matches!(
             cheatcodes
                 .get_contract_type(&mut state, uniswap_v2)
                 .unwrap(),
-            Some(ContractType::UniswapV2Pair)
-        );
+            ContractType::UniswapV2Pair(_, _)
+        ));
 
-        assert_eq!(
+        assert!(matches!(
             cheatcodes
                 .get_contract_type(&mut state, uniswap_v3)
                 .unwrap(),
-            Some(ContractType::UniswapV3Pool)
-        );
+            ContractType::UniswapV3Pool(_, _, _)
+        ));
 
-        assert_eq!(
+        assert!(matches!(
             cheatcodes
                 .get_contract_type(&mut state, curve_stable_swap)
                 .unwrap(),
-            Some(ContractType::CurveStableSwap)
-        );
+            ContractType::CurveStableSwap(_)
+        ));
 
-        assert_eq!(
+        assert!(matches!(
             cheatcodes
                 .get_contract_type(&mut state, curve_crypto_swap)
                 .unwrap(),
-            Some(ContractType::CurveCryptoSwap)
-        );
+            ContractType::CurveCryptoSwap(_)
+        ));
 
-        assert!(cheatcodes
-            .get_contract_type(&mut state, random)
-            .unwrap()
-            .is_none());
+        assert_eq!(
+            cheatcodes.get_contract_type(&mut state, random).unwrap(),
+            ContractType::Unknown
+        );
     }
 }

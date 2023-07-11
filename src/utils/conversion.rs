@@ -324,6 +324,15 @@ impl Convert<u128, Token> for ToEthers {
     }
 }
 
+impl<T> Convert<Vec<T>, Token> for ToEthers
+where
+    ToEthers: Convert<T, Token>,
+{
+    fn cvt(v: Vec<T>) -> Token {
+        Token::FixedArray(v.into_iter().map(|t| ToEthers::cvt(t)).collect())
+    }
+}
+
 pub struct ToIterator {}
 
 impl ToIterator {

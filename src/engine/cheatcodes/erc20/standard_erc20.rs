@@ -12,7 +12,7 @@ use crate::{
     utils::{abi::ERC20_ABI, addresses::WETH},
 };
 
-use super::CheatCodes;
+use crate::engine::cheatcodes::CheatCodes;
 
 impl CheatCodes {
     pub fn get_erc20_balance<E, S>(
@@ -183,6 +183,13 @@ impl CheatCodes {
         E: Debug,
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
+        // first check whether the token is a LP token for a DEX pool
+        if let Some((pool, pool_ty)) = self.get_lp_token_type(state, token)? {
+            return self.set_lp_token_balance(
+                state, pool_ty, pool, token, account, balance,
+            );
+        }
+
         // signature: balanceOf(address) -> 0x70a08231
         let func = ERC20_ABI
             .function("balanceOf")

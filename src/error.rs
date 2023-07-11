@@ -16,6 +16,14 @@ pub enum SoflError<DBERR = Infallible> {
         ethers::abi::Error,
     ),
 
+    /// Wrapper of abi parsing error
+    #[error("abi error: {0}")]
+    AbiParsing(
+        #[from]
+        #[source]
+        ethers::abi::ParseError,
+    ),
+
     /// Wrapper of reth error
     #[error("reth error: {0}")]
     Reth(

@@ -3,7 +3,7 @@
 use std::{collections::BTreeMap, fmt::Debug};
 
 use crate::error::SoflError;
-use ethers::abi::{self, Function, ParamType, Token};
+use ethers::abi::{self, AbiParser, Function, ParamType, Token};
 use reth_primitives::{Address, Bytes, U256};
 use revm::{Database, DatabaseCommit};
 use revm_primitives::{Bytecode, B256};
@@ -37,7 +37,6 @@ enum SlotQueryResult {
     Found(U256),
 }
 
-#[derive(Debug)]
 pub struct CheatCodes {
     // runtime env
     inspector: CheatcodeInspector,
@@ -47,6 +46,9 @@ pub struct CheatCodes {
 
     // high-level caller
     caller: HighLevelCaller,
+
+    // abi parser
+    abi_parser: AbiParser,
 }
 
 fn pack_calldata(fsig: [u8; 4], args: &[Token]) -> Bytes {
@@ -67,7 +69,20 @@ impl CheatCodes {
             caller: HighLevelCaller::default().bypass_check(),
             inspector: CheatcodeInspector::default(),
             slots: BTreeMap::new(),
+            abi_parser: AbiParser::default(),
         }
+    }
+
+    pub fn set_caller(
+        mut self,
+        f: &dyn Fn(HighLevelCaller) -> HighLevelCaller,
+    ) -> Self {
+        self.caller = f(self.caller);
+        self
+    }
+
+    pub fn reset_caller(&mut self) {
+        self.caller = HighLevelCaller::default().bypass_check();
     }
 
     fn find_slot<E, S>(
