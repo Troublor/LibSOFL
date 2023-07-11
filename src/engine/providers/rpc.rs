@@ -877,27 +877,15 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_for_jsonrpc {
 
-    use ethers_providers::Http;
     use reth_provider::BlockNumReader;
 
-    use crate::{
-        config::flags::SoflConfig, engine::providers::BcProviderBuilder,
-    };
-
-    use super::JsonRpcBcProvider;
-
-    fn get_bc_provider() -> JsonRpcBcProvider<Http> {
-        let cfg = SoflConfig::load().unwrap();
-        let url = cfg.jsonrpc.endpoint.clone();
-        BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, cfg.jsonrpc)
-            .unwrap()
-    }
+    use crate::engine::providers::rpc::JsonRpcBcProvider;
 
     #[test]
     fn test_connection() {
-        let provider = get_bc_provider();
+        let provider = JsonRpcBcProvider::default();
         let bn = provider.last_block_number().unwrap();
         assert!(bn > 0);
     }
@@ -907,11 +895,11 @@ mod tests_with_jsonrpc {
 
         use reth_provider::TransactionsProvider;
 
-        use crate::engine::providers::rpc::tests_with_jsonrpc::get_bc_provider;
+        use crate::engine::providers::rpc::JsonRpcBcProvider;
 
         #[test]
         fn test_get_block_txs() {
-            let provider = get_bc_provider();
+            let provider = JsonRpcBcProvider::default();
             let range = Range {
                 start: 14000000,
                 end: 14000003,
@@ -930,11 +918,11 @@ mod tests_with_jsonrpc {
         use reth_provider::HeaderProvider;
         use revm_primitives::hex;
 
-        use crate::engine::providers::rpc::tests_with_jsonrpc::get_bc_provider;
+        use crate::engine::providers::rpc::JsonRpcBcProvider;
 
         #[test]
         fn test_get_header() {
-            let provider = get_bc_provider();
+            let provider = JsonRpcBcProvider::default();
             let sealed_header = provider.sealed_header(14000000).unwrap();
             assert!(sealed_header.is_some());
             let sealed_header = sealed_header.unwrap();
@@ -951,11 +939,11 @@ mod tests_with_jsonrpc {
         use reth_provider::EvmEnvProvider;
         use revm_primitives::{BlockEnv, CfgEnv, U256};
 
-        use super::get_bc_provider;
+        use crate::engine::providers::rpc::JsonRpcBcProvider;
 
         #[test]
         fn test_fill_env_at() {
-            let provider = get_bc_provider();
+            let provider = JsonRpcBcProvider::default();
             let mut cfg = CfgEnv::default();
             let mut block_env = BlockEnv::default();
             let r =
@@ -977,13 +965,14 @@ mod tests_with_jsonrpc {
     mod test_state_provider {
         use reth_provider::StateProviderFactory;
 
-        use crate::utils::conversion::{Convert, ToPrimitive};
-
-        use super::get_bc_provider;
+        use crate::{
+            engine::providers::rpc::JsonRpcBcProvider,
+            utils::conversion::{Convert, ToPrimitive},
+        };
 
         #[test]
         fn test_get_latest_state_provider() {
-            let bc_provider = get_bc_provider();
+            let bc_provider = JsonRpcBcProvider::default();
             let state_provider = bc_provider.latest();
             assert!(state_provider.is_ok());
             let state_provider = state_provider.unwrap();
@@ -994,7 +983,7 @@ mod tests_with_jsonrpc {
 
         #[test]
         fn test_historical_state_provider_has_cutoff() {
-            let bc_provider = get_bc_provider();
+            let bc_provider = JsonRpcBcProvider::default();
             let state_provider =
                 bc_provider.history_by_block_number(16000000).unwrap();
             let hash = state_provider.block_hash(17450000);
@@ -1004,7 +993,7 @@ mod tests_with_jsonrpc {
 
         #[test]
         fn test_state_provider_account_info() {
-            let bc_provider = get_bc_provider();
+            let bc_provider = JsonRpcBcProvider::default();
             let state_provider =
                 bc_provider.history_by_block_number(17000000).unwrap();
             let account = state_provider.basic_account(ToPrimitive::cvt(
@@ -1035,7 +1024,7 @@ mod tests_with_jsonrpc {
 
         #[test]
         fn test_state_provider_storage() {
-            let bc_provider = get_bc_provider();
+            let bc_provider = JsonRpcBcProvider::default();
             let state_provider =
                 bc_provider.history_by_block_number(17000000).unwrap();
             // Test oracle based on transaction

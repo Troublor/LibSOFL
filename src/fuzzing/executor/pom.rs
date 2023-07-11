@@ -538,7 +538,7 @@ pub fn get_uniswap_v2_reserves<
 }
 
 #[cfg(test)]
-mod tests {
+mod tests_with_dep {
 
     use std::str::FromStr;
 
@@ -550,12 +550,11 @@ mod tests {
     use crate::{
         engine::{
             cheatcodes::CheatCodes,
-            inspectors::no_inspector,
+            inspectors::{asset_flow::AssetFlowInspector, no_inspector},
             providers::rpc::JsonRpcBcProvider,
             state::{env::TransitionSpecBuilder, BcStateBuilder},
             utils::HighLevelCaller,
         },
-        fuzzing::observer::asset_flow::DifferentialAssetFlowObserver,
         unwrap_token_values,
         utils::{
             abi::{
@@ -746,7 +745,8 @@ mod tests {
         let _spec_builder = TransitionSpecBuilder::new()
             .bypass_check()
             .at_block(&provider, 14972419);
-        let mut _observer = DifferentialAssetFlowObserver::default();
+        let mut insp1 = AssetFlowInspector::default();
+        let mut insp2 = AssetFlowInspector::default();
         let mut state = BcStateBuilder::fork_at(&provider, 14972419).unwrap();
         let caller = HighLevelCaller::new(ToPrimitive::cvt(1234567890))
             .bypass_check()
@@ -821,7 +821,7 @@ mod tests {
                     INVERSE_LENDING_POOL_ABI.function("borrow").unwrap(),
                     &[ToEthers::cvt(borrow_amount)],
                     None,
-                    no_inspector(),
+                    &mut insp1,
                 )
                 .expect("borrow call should not fail"),
             Uint
@@ -854,11 +854,13 @@ mod tests {
                     INVERSE_LENDING_POOL_ABI.function("borrow").unwrap(),
                     &[ToEthers::cvt(borrow_amount)],
                     None,
-                    no_inspector(),
+                    &mut insp2,
                 )
                 .expect("borrow call should not fail"),
             Uint
         );
         assert!(success == U256::ZERO);
+
+        // the asset flow should be different
     }
 }

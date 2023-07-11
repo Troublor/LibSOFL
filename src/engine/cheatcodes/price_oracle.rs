@@ -527,20 +527,20 @@ mod tests_with_db {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
     use std::str::FromStr;
 
     use reth_primitives::Address;
     use revm_primitives::U256;
 
     use crate::engine::cheatcodes::CheatCodes;
-    use crate::engine::providers::rpc::JsonRpcBcProvider;
     use crate::engine::state::BcStateBuilder;
     use crate::engine::transactions::position::TxPosition;
+    use crate::utils::testing::get_testing_bc_provider;
 
     #[test]
     fn test_price_oracle_weth() {
-        let bp = JsonRpcBcProvider::default();
+        let bp = get_testing_bc_provider();
 
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
@@ -557,7 +557,7 @@ mod tests_with_jsonrpc {
 
     #[test]
     fn test_price_oracle_wbtc() {
-        let bp = JsonRpcBcProvider::default();
+        let bp = get_testing_bc_provider();
 
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
@@ -575,7 +575,7 @@ mod tests_with_jsonrpc {
 
     #[test]
     fn test_price_oracle_stablecoins() {
-        let bp = JsonRpcBcProvider::default();
+        let bp = get_testing_bc_provider();
 
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();

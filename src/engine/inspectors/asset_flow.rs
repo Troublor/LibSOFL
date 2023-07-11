@@ -3,7 +3,7 @@ use revm::{
     interpreter::{instruction_result::SuccessOrHalt, InstructionResult},
     Database, Inspector,
 };
-use revm_primitives::{ExecutionResult, Output, TransactTo, U256};
+use revm_primitives::{ExecutionResult, Output, TransactTo, B256, U256};
 use serde::{Deserialize, Serialize};
 
 use crate::utils::{
@@ -11,47 +11,328 @@ use crate::utils::{
     conversion::{Convert, ToEthers, ToPrimitive},
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub enum AssetKind {
-    Ether,
-    ERC20,
-    ERC721,
-    ERC777,
-    ERC1155,
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum Asset {
+    /// Ether(amount)
+    Ether(U256),
+    /// ERC20(contract, amount)
+    ERC20(Address, U256),
+    /// ERC721(contract, NFT_id)
+    ERC721(Address, B256),
+    /// ERC777(contract, amount)
+    ERC777(Address, U256),
+    /// ERC1155(contract, token_id, amount)
+    ERC1155(Address, B256, U256),
+}
+
+impl PartialOrd for Asset {
+    /// return none if assets are not comparable
+    /// return Some(Ordering) if assets are comparable
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (Asset::Ether(a0), Asset::Ether(a1)) => Some(a0.cmp(a1)),
+            (Asset::ERC20(c0, a0), Asset::ERC20(c1, a1)) => {
+                if c0 == c1 {
+                    Some(a0.cmp(a1))
+                } else {
+                    None
+                }
+            }
+            (Asset::ERC721(c0, a0), Asset::ERC721(c1, a1)) => {
+                if c0 == c1 || a0 == a1 {
+                    Some(std::cmp::Ordering::Equal)
+                } else {
+                    None
+                }
+            }
+            (Asset::ERC777(c0, a0), Asset::ERC777(c1, a1)) => {
+                if c0 == c1 {
+                    Some(a0.cmp(a1))
+                } else {
+                    None
+                }
+            }
+            (Asset::ERC1155(c0, i0, a0), Asset::ERC1155(c1, i1, a1)) => {
+                if c0 == c1 && i0 == i1 {
+                    Some(a0.cmp(a1))
+                } else {
+                    None
+                }
+            }
+            _ => None,
+        }
+    }
+}
+
+impl std::ops::Add for Asset {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Asset::Ether(a0), Asset::Ether(a1)) => {
+                Asset::Ether(a0.checked_add(a1).expect("overflow"))
+            }
+            (Asset::ERC20(c0, a0), Asset::ERC20(c1, a1)) => {
+                if c0 == c1 {
+                    Asset::ERC20(c0, a0.checked_add(a1).expect("overflow"))
+                } else {
+                    panic!("cannot add different ERC20 assets")
+                }
+            }
+            (Asset::ERC721(_, _), Asset::ERC721(_, _)) => {
+                panic!("cannot add different ERC721 assets")
+            }
+            (Asset::ERC777(c0, a0), Asset::ERC777(c1, a1)) => {
+                if c0 == c1 {
+                    Asset::ERC777(c0, a0.checked_add(a1).expect("overflow"))
+                } else {
+                    panic!("cannot add different ERC777 assets")
+                }
+            }
+            (Asset::ERC1155(c0, i0, a0), Asset::ERC1155(c1, i1, a1)) => {
+                if c0 == c1 && i0 == i1 {
+                    Asset::ERC1155(
+                        c0,
+                        i0,
+                        a0.checked_add(a1).expect("overflow"),
+                    )
+                } else {
+                    panic!("cannot add different ERC1155 assets")
+                }
+            }
+            _ => panic!("cannot add different assets"),
+        }
+    }
+}
+
+impl std::ops::Sub for Asset {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (Asset::Ether(a0), Asset::Ether(a1)) => {
+                Asset::Ether(a0.checked_sub(a1).expect("underflow"))
+            }
+            (Asset::ERC20(c0, a0), Asset::ERC20(c1, a1)) => {
+                if c0 == c1 {
+                    Asset::ERC20(c0, a0.checked_sub(a1).expect("underflow"))
+                } else {
+                    panic!("cannot sub different ERC20 assets")
+                }
+            }
+            (Asset::ERC721(_, _), Asset::ERC721(_, _)) => {
+                panic!("cannot sub different ERC721 assets")
+            }
+            (Asset::ERC777(c0, a0), Asset::ERC777(c1, a1)) => {
+                if c0 == c1 {
+                    Asset::ERC777(c0, a0.checked_sub(a1).expect("underflow"))
+                } else {
+                    panic!("cannot sub different ERC777 assets")
+                }
+            }
+            (Asset::ERC1155(c0, i0, a0), Asset::ERC1155(c1, i1, a1)) => {
+                if c0 == c1 && i0 == i1 {
+                    Asset::ERC1155(
+                        c0,
+                        i0,
+                        a0.checked_sub(a1).expect("underflow"),
+                    )
+                } else {
+                    panic!("cannot sub different ERC1155 assets")
+                }
+            }
+            _ => panic!("cannot sub different assets"),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum AssetChange {
+    Gain(Asset),
+    Loss(Asset),
+    Zero,
+}
+
+impl PartialOrd for AssetChange {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        match (self, other) {
+            (AssetChange::Gain(a0), AssetChange::Gain(a1)) => {
+                a0.partial_cmp(a1)
+            }
+            (AssetChange::Gain(a0), AssetChange::Loss(a1)) => {
+                a0.partial_cmp(a1).map(|_| std::cmp::Ordering::Greater)
+            }
+            (AssetChange::Gain(_), AssetChange::Zero) => {
+                Some(std::cmp::Ordering::Greater)
+            }
+            (AssetChange::Loss(a0), AssetChange::Loss(a1)) => {
+                a0.partial_cmp(a1).map(|o| o.reverse())
+            }
+            (AssetChange::Loss(_), AssetChange::Zero) => {
+                Some(std::cmp::Ordering::Less)
+            }
+            (AssetChange::Zero, AssetChange::Zero) => {
+                Some(std::cmp::Ordering::Equal)
+            }
+            _ => other.partial_cmp(self).map(|o| o.reverse()),
+        }
+    }
+}
+
+impl std::ops::Add for AssetChange {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        match (self, rhs) {
+            (AssetChange::Gain(a0), AssetChange::Gain(a1)) => {
+                AssetChange::Gain(a0 + a1)
+            }
+            (AssetChange::Gain(a0), AssetChange::Loss(a1)) => {
+                match a0.partial_cmp(&a1) {
+                    Some(std::cmp::Ordering::Greater) => {
+                        AssetChange::Gain(a0 - a1)
+                    }
+                    Some(std::cmp::Ordering::Equal) => AssetChange::Zero,
+                    Some(std::cmp::Ordering::Less) => {
+                        AssetChange::Loss(a1 - a0)
+                    }
+                    None => panic!("cannot add different assets"),
+                }
+            }
+            (AssetChange::Gain(a0), AssetChange::Zero) => AssetChange::Gain(a0),
+            (AssetChange::Loss(a0), AssetChange::Loss(a1)) => {
+                AssetChange::Loss(a0 + a1)
+            }
+            (AssetChange::Loss(a0), AssetChange::Zero) => AssetChange::Loss(a0),
+            (AssetChange::Zero, AssetChange::Zero) => AssetChange::Zero,
+            _ => rhs + self,
+        }
+    }
+}
+
+impl std::ops::Sub for AssetChange {
+    type Output = Self;
+    fn sub(self, rhs: Self) -> Self::Output {
+        self + (-rhs)
+    }
+}
+
+impl std::ops::Neg for AssetChange {
+    type Output = Self;
+    fn neg(self) -> Self::Output {
+        match self {
+            AssetChange::Gain(a) => AssetChange::Loss(a),
+            AssetChange::Loss(a) => AssetChange::Gain(a),
+            AssetChange::Zero => AssetChange::Zero,
+        }
+    }
+}
+
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    Serialize,
+    Deserialize,
+    Default,
+    derive_more::AsRef,
+    derive_more::AsMut,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    derive_more::From,
+)]
+pub struct AssetsChange {
+    #[as_ref]
+    #[as_mut]
+    #[deref]
+    #[deref_mut]
+    changes: Vec<AssetChange>,
+}
+
+impl From<AssetChange> for AssetsChange {
+    fn from(change: AssetChange) -> Self {
+        Self {
+            changes: vec![change],
+        }
+    }
+}
+
+impl std::ops::Add<AssetChange> for AssetsChange {
+    type Output = Self;
+    fn add(self, rhs: AssetChange) -> Self::Output {
+        let changes = self
+            .changes
+            .into_iter()
+            .map(|c| {
+                if c.partial_cmp(&rhs).is_some() {
+                    c + rhs
+                } else {
+                    c
+                }
+            })
+            .filter(|c| *c != AssetChange::Zero)
+            .collect();
+        Self { changes }
+    }
+}
+
+impl std::ops::AddAssign<AssetChange> for AssetsChange {
+    fn add_assign(&mut self, rhs: AssetChange) {
+        let mut zero_indices = Vec::new();
+        let mut merged = false;
+        for i in 0..self.changes.len() {
+            let change =
+                self.changes.get(i).expect("impossible: index out of range");
+            if change.partial_cmp(&rhs).is_some() {
+                let new_change = *change + rhs;
+                merged = true;
+                if new_change == AssetChange::Zero {
+                    zero_indices.push(i);
+                } else {
+                    self.changes[i] = new_change;
+                }
+            }
+        }
+        if !merged {
+            self.changes.push(rhs);
+        }
+        for i in zero_indices.into_iter().rev() {
+            self.changes.swap_remove(i);
+        }
+    }
+}
+
+impl std::ops::Add for AssetsChange {
+    type Output = Self;
+    fn add(self, rhs: Self) -> Self::Output {
+        let mut changes = Self::default();
+        for change in rhs.changes {
+            changes += change;
+        }
+        changes
+    }
+}
+
+impl std::ops::AddAssign for AssetsChange {
+    fn add_assign(&mut self, rhs: Self) {
+        for change in rhs.changes {
+            *self += change;
+        }
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AssetTransfer {
-    kind: AssetKind,
-
-    from: Address,
-    to: Address,
-
-    /// The contract of the asset being transferred.
-    /// For Ether, this is None.
-    contract: Option<Address>,
-
-    /// The amount being transferred.
-    /// For Ether/ERC20/ERC777, this is the amount in wei.
-    /// For ERC721, this is always 1.
-    /// For ERC1155, this is the amount of the token being transferred.
-    amount: U256,
-
-    /// The asset being transferred.
-    /// For Ether/ERC20/ERC777, this is None.
-    /// For ERC72/ERC11551, this is the token ID.
-    asset: Option<U256>,
+    sender: Address,
+    receiver: Address,
+    asset: Asset,
 }
 
 impl AssetTransfer {
     pub fn new_ether(from: Address, to: Address, amount: U256) -> Self {
+        let asset = Asset::Ether(amount);
         Self {
-            kind: AssetKind::Ether,
-            from,
-            to,
-            contract: None,
-            amount,
-            asset: None,
+            sender: from,
+            receiver: to,
+            asset,
         }
     }
 
@@ -102,12 +383,9 @@ impl AssetTransfer {
         }
 
         Some(Self {
-            kind: AssetKind::ERC20,
-            from: ToPrimitive::cvt(from),
-            to: ToPrimitive::cvt(to),
-            contract: Some(log.address),
-            amount: ToPrimitive::cvt(amount),
-            asset: None,
+            sender: ToPrimitive::cvt(from),
+            receiver: ToPrimitive::cvt(to),
+            asset: Asset::ERC20(log.address, ToPrimitive::cvt(amount)),
         })
     }
 
@@ -116,18 +394,17 @@ impl AssetTransfer {
             .event("Transfer")
             .expect("Transfer event not found in ERC721 ABI")
             .parse_log(ToEthers::cvt(log))
-             else {return None};
+        else {
+            return None;
+        };
         let from = parsed_log.params.remove(0).value.into_address()?;
         let to = parsed_log.params.remove(0).value.into_address()?;
         let asset = parsed_log.params.remove(0).value.into_uint()?;
 
         Some(Self {
-            kind: AssetKind::ERC721,
-            from: ToPrimitive::cvt(from),
-            to: ToPrimitive::cvt(to),
-            contract: Some(log.address),
-            amount: ToPrimitive::cvt(1),
-            asset: Some(ToPrimitive::cvt(asset)),
+            sender: ToPrimitive::cvt(from),
+            receiver: ToPrimitive::cvt(to),
+            asset: Asset::ERC721(log.address, ToPrimitive::cvt(asset)),
         })
     }
 
@@ -163,12 +440,9 @@ impl AssetTransfer {
             return None;
         }
         Some(Self {
-            kind: AssetKind::ERC777,
-            from: ToPrimitive::cvt(from),
-            to: ToPrimitive::cvt(to),
-            contract: Some(log.address),
-            amount: ToPrimitive::cvt(amount),
-            asset: None,
+            sender: ToPrimitive::cvt(from),
+            receiver: ToPrimitive::cvt(to),
+            asset: Asset::ERC777(log.address, ToPrimitive::cvt(amount)),
         })
     }
 
@@ -184,12 +458,13 @@ impl AssetTransfer {
             let asset = parsed_log.params.remove(1).value.into_uint()?;
             let amount = parsed_log.params.remove(1).value.into_uint()?;
             let transfer = Self {
-                kind: AssetKind::ERC1155,
-                from: ToPrimitive::cvt(from),
-                to: ToPrimitive::cvt(to),
-                contract: Some(log.address),
-                amount: ToPrimitive::cvt(amount),
-                asset: Some(ToPrimitive::cvt(asset)),
+                sender: ToPrimitive::cvt(from),
+                receiver: ToPrimitive::cvt(to),
+                asset: Asset::ERC1155(
+                    log.address,
+                    ToPrimitive::cvt(amount),
+                    ToPrimitive::cvt(asset),
+                ),
             };
             transfers.push(transfer);
         } else if let Ok(mut parsed_log) = ERC1155_ABI
@@ -205,17 +480,28 @@ impl AssetTransfer {
                 let asset = asset.into_uint()?;
                 let amount = amount.into_uint()?;
                 let transfer = Self {
-                    kind: AssetKind::ERC1155,
-                    from: ToPrimitive::cvt(from),
-                    to: ToPrimitive::cvt(to),
-                    contract: Some(log.address),
-                    amount: ToPrimitive::cvt(amount),
-                    asset: Some(ToPrimitive::cvt(asset)),
+                    sender: ToPrimitive::cvt(from),
+                    receiver: ToPrimitive::cvt(to),
+                    asset: Asset::ERC1155(
+                        log.address,
+                        ToPrimitive::cvt(asset),
+                        ToPrimitive::cvt(amount),
+                    ),
                 };
                 transfers.push(transfer);
             }
         }
         Some(transfers)
+    }
+}
+
+impl AssetTransfer {
+    pub fn get_sender_change(&self) -> AssetChange {
+        AssetChange::Loss(self.asset)
+    }
+
+    pub fn get_receiver_change(&self) -> AssetChange {
+        AssetChange::Gain(self.asset)
     }
 }
 
@@ -410,85 +696,156 @@ impl<BS: Database> super::MultiTxInspector<BS> for AssetFlowInspector {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
-    use reth_primitives::TxHash;
+mod tests_with_dep {
 
-    use crate::{
-        engine::{
-            inspectors::asset_flow::AssetKind,
-            providers::rpc::JsonRpcBcProvider,
-            state::{env::TransitionSpec, BcState, BcStateBuilder},
-        },
-        utils::conversion::{Convert, ToPrimitive},
-    };
+    mod asset {
+        use crate::{
+            engine::inspectors::asset_flow::{
+                Asset, AssetChange, AssetsChange,
+            },
+            utils::{
+                addresses,
+                conversion::{Convert, ToPrimitive},
+            },
+        };
 
-    use super::AssetFlowInspector;
+        #[test]
+        fn test_asset_partial_compare() {
+            // Comparable ERC20 assets
+            let asset0 = Asset::ERC20(*addresses::DAI, ToPrimitive::cvt(12));
+            let asset1 = Asset::ERC20(*addresses::DAI, ToPrimitive::cvt(123));
+            assert!(asset0 < asset1);
 
-    #[test]
-    fn test_transfers_in_plain_transaction() {
-        let provider = JsonRpcBcProvider::default();
-        let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
-        let tx: TxHash = ToPrimitive::cvt("0x6b3fa0f8c6a87b9c8951e96dd44c5d4635f1bbf056040d9a626f344496b6ce54");
-        let transition_spec =
-            TransitionSpec::from_tx_hash(&provider, tx).unwrap();
-        let mut insp = AssetFlowInspector::new();
-        let _ = BcState::transit(state, transition_spec, &mut insp).unwrap();
-        assert_eq!(insp.transfers.len(), 1);
-        let transfers = &insp.transfers[0];
-        assert_eq!(transfers.len(), 1);
-        let transfer = &transfers[0];
-        assert_eq!(transfer.kind, AssetKind::Ether);
-        assert_eq!(
-            transfer.from,
-            ToPrimitive::cvt("0x78eC5C6265B45B9c98CF682665A00A3E8f085fFE")
-        );
-        assert_eq!(
-            transfer.to,
-            ToPrimitive::cvt("0x4E41e19f939a0040330F7Cd3CFfde8cA96700d9b")
-        );
-        assert_eq!(
-            transfer.amount,
-            ToPrimitive::cvt(ethers::utils::parse_ether("0.002312").unwrap())
-        );
+            // Two different ERC20 tokens are not comparable
+            let asset0 = Asset::ERC20(*addresses::DAI, ToPrimitive::cvt(12));
+            let asset1 = Asset::ERC20(*addresses::USDC, ToPrimitive::cvt(123));
+            assert_eq!(asset0.partial_cmp(&asset1), None);
+
+            // Two different kind of assets are not comparable
+            let asset0 = Asset::ERC20(*addresses::DAI, ToPrimitive::cvt(123));
+            let asset1 = Asset::Ether(ToPrimitive::cvt(123));
+            assert_eq!(asset0.partial_cmp(&asset1), None);
+        }
+
+        #[test]
+        fn test_asset_change_merge() {
+            let asset0 = Asset::ERC20(*addresses::DAI, ToPrimitive::cvt(12));
+            let asset1 = Asset::ERC20(*addresses::DAI, ToPrimitive::cvt(123));
+            let mut assets = AssetsChange::from(AssetChange::Gain(asset0));
+            assets += AssetChange::Gain(asset1);
+            assert_eq!(assets.len(), 1);
+            assert_eq!(
+                assets[0],
+                AssetChange::Gain(Asset::ERC20(
+                    *addresses::DAI,
+                    ToPrimitive::cvt(135)
+                ))
+            );
+
+            let asset0 =
+                Asset::ERC777(*addresses::WBTC, ToPrimitive::cvt(1234));
+            let asset1 = Asset::Ether(ToPrimitive::cvt(12345));
+            let asset2 = Asset::ERC777(*addresses::WBTC, ToPrimitive::cvt(123));
+            let mut assets = AssetsChange::from(AssetChange::Gain(asset0));
+            assets += AssetChange::Gain(asset1);
+            assert_eq!(assets.len(), 2);
+
+            assets += AssetChange::Loss(asset2);
+            assert_eq!(assets.len(), 2);
+            assert_eq!(
+                assets[0],
+                AssetChange::Gain(Asset::ERC777(
+                    *addresses::WBTC,
+                    ToPrimitive::cvt(1111)
+                ))
+            );
+        }
     }
 
-    #[test]
-    fn test_no_transfer() {
-        let provider = JsonRpcBcProvider::default();
-        let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
-        let tx: TxHash = ToPrimitive::cvt("0xd801d27211b0dfcfdff7e370069268e6fb3ef08ea25148c1065718482c4eab32");
-        let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
-        let mut insp = AssetFlowInspector::new();
-        let _ = BcState::transit(state, spec, &mut insp).unwrap();
-        assert_eq!(insp.transfers.len(), 1);
-        let transfers = &insp.transfers[0];
-        assert_eq!(transfers.len(), 0);
-    }
+    mod asset_flow_inspector {
+        use reth_primitives::TxHash;
+        use revm_primitives::U256;
 
-    #[test]
-    fn test_token_transfer() {
-        let provider = JsonRpcBcProvider::default();
-        let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
-        let tx: TxHash = ToPrimitive::cvt("0x90c93f15f470569d0339a28a6d0d0af7eeaeb6b40e6e53eb56016158119906dc");
-        let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
-        let mut insp = AssetFlowInspector::new();
-        let _ = BcState::transit(state, spec, &mut insp).unwrap();
-        assert_eq!(insp.transfers.len(), 1);
-        let transfers = &insp.transfers[0];
-        assert_eq!(transfers.len(), 6);
-    }
+        use crate::{
+            engine::{
+                inspectors::asset_flow::Asset,
+                state::{env::TransitionSpec, BcState, BcStateBuilder},
+            },
+            utils::{
+                conversion::{Convert, ToPrimitive},
+                testing::get_testing_bc_provider,
+            },
+        };
 
-    #[test]
-    fn test_snood_spend_allowance_attack() {
-        // attack tx: 0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e
-        let provider = JsonRpcBcProvider::default();
-        let state = BcStateBuilder::fork_at(&provider, 14983664).unwrap();
-        let tx: TxHash = ToPrimitive::cvt("0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e");
-        let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
-        let mut insp = AssetFlowInspector::new();
-        let _ = BcState::transit(state, spec, &mut insp).unwrap();
-        assert_eq!(insp.transfers.len(), 1);
-        let transfers = &insp.transfers[0];
-        assert_eq!(transfers.len(), 11);
+        use super::super::AssetFlowInspector;
+
+        #[test]
+        fn test_transfers_in_plain_transaction() {
+            let provider = get_testing_bc_provider();
+            let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
+            let tx: TxHash = ToPrimitive::cvt("0x6b3fa0f8c6a87b9c8951e96dd44c5d4635f1bbf056040d9a626f344496b6ce54");
+            let transition_spec =
+                TransitionSpec::from_tx_hash(&provider, tx).unwrap();
+            let mut insp = AssetFlowInspector::new();
+            let _ =
+                BcState::transit(state, transition_spec, &mut insp).unwrap();
+            assert_eq!(insp.transfers.len(), 1);
+            let transfers = &insp.transfers[0];
+            assert_eq!(transfers.len(), 1);
+            let transfer = &transfers[0];
+            assert!(matches!(transfer.asset, Asset::Ether(_)));
+            assert_eq!(
+                transfer.sender,
+                ToPrimitive::cvt("0x78eC5C6265B45B9c98CF682665A00A3E8f085fFE")
+            );
+            assert_eq!(
+                transfer.receiver,
+                ToPrimitive::cvt("0x4E41e19f939a0040330F7Cd3CFfde8cA96700d9b")
+            );
+            let value: U256 = ToPrimitive::cvt(
+                ethers::utils::parse_ether("0.002312").unwrap(),
+            );
+            assert_eq!(transfer.asset, Asset::Ether(value));
+        }
+
+        #[test]
+        fn test_no_transfer() {
+            let provider = get_testing_bc_provider();
+            let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
+            let tx: TxHash = ToPrimitive::cvt("0xd801d27211b0dfcfdff7e370069268e6fb3ef08ea25148c1065718482c4eab32");
+            let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
+            let mut insp = AssetFlowInspector::new();
+            let _ = BcState::transit(state, spec, &mut insp).unwrap();
+            assert_eq!(insp.transfers.len(), 1);
+            let transfers = &insp.transfers[0];
+            assert_eq!(transfers.len(), 0);
+        }
+
+        #[test]
+        fn test_token_transfer() {
+            let provider = get_testing_bc_provider();
+            let state = BcStateBuilder::fork_at(&provider, 16000000).unwrap();
+            let tx: TxHash = ToPrimitive::cvt("0x90c93f15f470569d0339a28a6d0d0af7eeaeb6b40e6e53eb56016158119906dc");
+            let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
+            let mut insp = AssetFlowInspector::new();
+            let _ = BcState::transit(state, spec, &mut insp).unwrap();
+            assert_eq!(insp.transfers.len(), 1);
+            let transfers = &insp.transfers[0];
+            assert_eq!(transfers.len(), 6);
+        }
+
+        #[test]
+        fn test_snood_spend_allowance_attack() {
+            // attack tx: 0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e
+            let provider = get_testing_bc_provider();
+            let state = BcStateBuilder::fork_at(&provider, 14983664).unwrap();
+            let tx: TxHash = ToPrimitive::cvt("0x9a6227ef97d7ce75732645bd604ef128bb5dfbc1bfbe0966ad1cd2870d45a20e");
+            let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
+            let mut insp = AssetFlowInspector::new();
+            let _ = BcState::transit(state, spec, &mut insp).unwrap();
+            assert_eq!(insp.transfers.len(), 1);
+            let transfers = &insp.transfers[0];
+            assert_eq!(transfers.len(), 11);
+        }
     }
 }

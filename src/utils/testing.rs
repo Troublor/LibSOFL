@@ -1,7 +1,5 @@
 use std::path::PathBuf;
 
-use tracing::info;
-
 use crate::error::SoflError;
 
 /// Compile a solidity snippet.
@@ -35,7 +33,7 @@ pub fn get_testing_bc_provider(
 ) -> crate::engine::providers::reth::RethBcProvider {
     let db_provider = crate::engine::providers::BcProviderBuilder::default_db();
     if let Ok(provider) = db_provider {
-        info!("Using reth database provider.");
+        println!("Using reth database provider.");
         provider
     } else {
         panic!("No reth database provider is set in SoflConfig or the database does not exist.")
@@ -48,7 +46,7 @@ pub fn get_testing_bc_provider(
     let db_provider =
         crate::engine::providers::BcProviderBuilder::default_jsonrpc();
     if let Ok(provider) = db_provider {
-        info!("Using jsonrpc provider.");
+        println!("Using jsonrpc provider.");
         provider
     } else {
         panic!("No jsonrpc endpoint is set in SoflConfig or the endpoint is not valid.")

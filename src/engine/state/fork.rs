@@ -59,29 +59,24 @@ mod tests_with_db {
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
     use reth_provider::ReceiptProvider;
 
     use crate::{
-        config::flags::SoflConfig,
         engine::{
             inspectors::no_inspector,
-            providers::BcProviderBuilder,
             state::{env::TransitionSpec, BcState, BcStateBuilder},
             transactions::position::TxPosition,
         },
-        utils::conversion::{Convert, ToPrimitive},
+        utils::{
+            conversion::{Convert, ToPrimitive},
+            testing::get_testing_bc_provider,
+        },
     };
 
     #[test]
     fn test_reproduce_tx() {
-        let cfg = SoflConfig::load().unwrap();
-        let url = cfg.jsonrpc.endpoint.clone();
-        let bp = BcProviderBuilder::with_jsonrpc_via_http_with_auth(
-            url,
-            cfg.jsonrpc,
-        )
-        .unwrap();
+        let bp = get_testing_bc_provider();
         let fork_at = TxPosition::new(17000000, 0);
 
         // prepare state

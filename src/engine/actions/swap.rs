@@ -105,30 +105,39 @@ impl UniswapV2Swap {
             )
             .expect("failed to invoke swap");
         let Token::Array(ret) =
-            rets.first().expect("should have one return value") else {panic!("the return value should be an array")};
-        let Token::Uint(output) = ret.last()
-            .expect("should have at least one return value") else {panic!("the return value should be an uint")};
+            rets.first().expect("should have one return value")
+        else {
+            panic!("the return value should be an array")
+        };
+        let Token::Uint(output) =
+            ret.last().expect("should have at least one return value")
+        else {
+            panic!("the return value should be an uint")
+        };
         ToPrimitive::cvt(output)
     }
 }
 
 #[cfg(test)]
-mod tests_with_jsonrpc {
+mod tests_with_dep {
 
     use ethers::utils::parse_ether;
     use reth_primitives::Address;
 
     use crate::{
         engine::{
-            providers::rpc::JsonRpcBcProvider, state::BcStateBuilder,
-            transactions::position::TxPosition, utils::HighLevelCaller,
+            state::BcStateBuilder, transactions::position::TxPosition,
+            utils::HighLevelCaller,
         },
-        utils::conversion::{Convert, ToPrimitive},
+        utils::{
+            conversion::{Convert, ToPrimitive},
+            testing::get_testing_bc_provider,
+        },
     };
 
     #[test]
     fn test_swap() {
-        let p = JsonRpcBcProvider::default();
+        let p = get_testing_bc_provider();
         let mut state =
             BcStateBuilder::fork_at(&p, TxPosition::new(16000000, 0)).unwrap();
         let swap = super::UniswapV2Swap {
