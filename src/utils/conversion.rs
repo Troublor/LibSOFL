@@ -74,6 +74,14 @@ impl Convert<ethersU256, U256> for ToPrimitive {
     }
 }
 
+impl Convert<ethersU256, B256> for ToPrimitive {
+    fn cvt(v: ethersU256) -> B256 {
+        let mut b: [u8; 32] = [0; 32];
+        v.to_big_endian(&mut b);
+        B256::from_slice(&b)
+    }
+}
+
 impl Convert<ethersAddress, Address> for ToPrimitive {
     fn cvt(v: ethersAddress) -> Address {
         v.into()
