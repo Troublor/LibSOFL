@@ -12,82 +12,18 @@ use crate::{
     error::SoflError,
     unwrap_first_token_value,
     utils::{
-        abi::{
-            CURVE_CRYPTO_REGISTRY_ABI, CURVE_REGISTRY_ABI, UNISWAP_V2_PAIR_ABI,
-        },
-        addresses::{CURVE_CRYPTO_REGISTRY, CURVE_REGISTRY, DUMMY_ADDRESS},
+        abi::UNISWAP_V2_PAIR_ABI,
+        addresses::DUMMY_ADDRESS,
         conversion::{Convert, ToEthers},
         math::HPMultipler,
     },
 };
 
 impl CheatCodes {
-    pub fn get_lp_token_type<E, S>(
-        &mut self,
-        state: &mut S,
-        token: Address,
-    ) -> Result<Option<(Address, ContractType)>, SoflError<E>>
-    where
-        E: Debug,
-        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
-    {
-        let contract_type = self.get_contract_type(state, token)?;
-
-        // check Uniswap V2
-        if matches!(contract_type, ContractType::UniswapV2Pair(_, _)) {
-            return Ok(Some((token, contract_type)));
-        }
-
-        // check CurveStableSwap
-        {
-            let func = CURVE_REGISTRY_ABI
-                .function("get_pool_from_lp_token")
-                .unwrap();
-            let pool = unwrap_first_token_value!(
-                Address,
-                self.cheat_read(
-                    state,
-                    *CURVE_REGISTRY,
-                    func,
-                    &[ToEthers::cvt(token)]
-                )?
-            );
-            if pool != Address::zero() {
-                let contract_type = self.get_contract_type(state, pool)?;
-                return Ok(Some((pool, contract_type)));
-            }
-        }
-
-        // check CurveCryptoSwap
-        {
-            let func = CURVE_CRYPTO_REGISTRY_ABI
-                .function("get_pool_from_lp_token")
-                .unwrap();
-            let pool = unwrap_first_token_value!(
-                Address,
-                self.cheat_read(
-                    state,
-                    *CURVE_CRYPTO_REGISTRY,
-                    func,
-                    &[ToEthers::cvt(token)]
-                )?
-            );
-            if pool != Address::zero() {
-                let contract_type = self.get_contract_type(state, pool)?;
-                return Ok(Some((pool, contract_type)));
-            }
-        }
-
-        Ok(None)
-    }
-}
-
-impl CheatCodes {
     pub fn set_lp_token_balance<E, S>(
         &mut self,
         state: &mut S,
-        pool_ty: ContractType,
-        pool: Address,
+        token_ty: ContractType,
         token: Address,
         account: Address,
         balance: U256,
@@ -96,6 +32,12 @@ impl CheatCodes {
         E: Debug,
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
+        let (pool, pool_ty) = token_ty.get_pool(token).ok_or_else(|| {
+            SoflError::Custom(
+                "try to set lp token balance to a non-lp token".to_string(),
+            )
+        })?;
+
         if token == account || pool == account {
             return Err(SoflError::Custom(
                 "try to set lp token balance to the lp token address or the pool address itself"
@@ -388,61 +330,11 @@ impl CheatCodes {
 mod tests_with_dep {
     use revm_primitives::U256;
 
-    use crate::engine::cheatcodes::{CheatCodes, ContractType};
+    use crate::engine::cheatcodes::CheatCodes;
     use crate::engine::state::BcStateBuilder;
     use crate::engine::transactions::position::TxPosition;
     use crate::utils::conversion::{Convert, ToPrimitive};
     use crate::utils::testing::get_testing_bc_provider;
-
-    #[test]
-    fn test_get_dex_lp_token_type() {
-        let bp = get_testing_bc_provider();
-
-        let fork_at = TxPosition::new(17000001, 0);
-        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
-
-        let mut cheatcodes = CheatCodes::default()
-            .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
-
-        let (pool, pool_ty) = cheatcodes
-            .get_lp_token_type(
-                &mut state,
-                ToPrimitive::cvt("0x3Ba78eC6Fdd9E1AD64c1a28F5Db6D63156565fF9"),
-            )
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            pool,
-            ToPrimitive::cvt("0x3Ba78eC6Fdd9E1AD64c1a28F5Db6D63156565fF9")
-        );
-        assert!(matches!(pool_ty, ContractType::UniswapV2Pair(_, _)));
-
-        let (pool, pool_ty) = cheatcodes
-            .get_lp_token_type(
-                &mut state,
-                ToPrimitive::cvt("0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490"),
-            )
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            pool,
-            ToPrimitive::cvt("0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7")
-        );
-        assert!(matches!(pool_ty, ContractType::CurveStableSwap(_)));
-
-        let (pool, pool_ty) = cheatcodes
-            .get_lp_token_type(
-                &mut state,
-                ToPrimitive::cvt("0xc4AD29ba4B3c580e6D59105FFf484999997675Ff"),
-            )
-            .unwrap()
-            .unwrap();
-        assert_eq!(
-            pool,
-            ToPrimitive::cvt("0xD51a44d3FaE010294C616388b506AcdA1bfAAE46")
-        );
-        assert!(matches!(pool_ty, ContractType::CurveCryptoSwap(_)));
-    }
 
     #[test]
     fn test_increase_lp_token() {
@@ -472,6 +364,32 @@ mod tests_with_dep {
                     .get_erc20_balance(&mut state, token, account)
                     .unwrap(),
                 U256::from(5000000000000u64)
+            );
+        }
+
+        if false {
+            let token =
+                ToPrimitive::cvt("0xFd2a8fA60Abd58Efe3EeE34dd494cD491dC14900");
+            let account =
+                ToPrimitive::cvt("0xFCa7C5CF95821f3D45b9949De6E2846D66aF819F");
+            let balance = cheatcodes
+                .get_erc20_balance(&mut state, token, account)
+                .unwrap();
+            assert!(balance < U256::from(5000000000000000u64));
+
+            cheatcodes
+                .set_erc20_balance(
+                    &mut state,
+                    token,
+                    account,
+                    U256::from(5000000000000000u64),
+                )
+                .unwrap();
+            assert_eq!(
+                cheatcodes
+                    .get_erc20_balance(&mut state, token, account)
+                    .unwrap(),
+                U256::from(5000000000000000u64)
             );
         }
 
@@ -537,7 +455,6 @@ mod tests_with_dep {
                 .get_erc20_balance(&mut state, token, account)
                 .unwrap();
             assert!(balance > U256::from(5000000000000000u64));
-            println!("FUCK {}", balance);
 
             cheatcodes
                 .set_erc20_balance(

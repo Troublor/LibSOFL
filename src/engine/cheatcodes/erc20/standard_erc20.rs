@@ -184,9 +184,10 @@ impl CheatCodes {
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
         // first check whether the token is a LP token for a DEX pool
-        if let Some((pool, pool_ty)) = self.get_lp_token_type(state, token)? {
+        let token_ty = self.get_contract_type(state, token)?;
+        if token_ty.is_lp_token() {
             return self.set_lp_token_balance(
-                state, pool_ty, pool, token, account, balance,
+                state, token_ty, token, account, balance,
             );
         }
 
