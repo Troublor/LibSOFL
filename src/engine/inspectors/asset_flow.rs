@@ -225,6 +225,9 @@ impl std::ops::Neg for AssetChange {
     }
 }
 
+/// The set of changes of assets.
+/// This struct guarantees that the changes are compact,
+/// meaning that no two changes can be merged in the set.
 #[derive(
     Debug,
     Clone,
@@ -255,14 +258,66 @@ impl From<AssetChange> for AssetsChange {
     }
 }
 
+impl std::cmp::PartialOrd for AssetsChange {
+    fn partial_cmp(&self, other: &Self) -> Option<std::cmp::Ordering> {
+        let mut r = std::cmp::Ordering::Equal;
+        // resize the two changes to the same length
+        let length = self.len() + other.len();
+        let mut changes0: Vec<&AssetChange> = self.changes.iter().collect();
+        changes0.resize(length, &AssetChange::Zero);
+        let mut changes1: Vec<&AssetChange> = other.changes.iter().collect();
+        changes1.resize(length, &AssetChange::Zero);
+
+        // compare
+        for i in 0..length {
+            let c0 = changes0
+                .get(i)
+                .expect("impossible: vec must be long enough");
+            let mut cmp = c0
+                .partial_cmp(&&AssetChange::Zero)
+                .expect("impossible: any change is comparable to Zero");
+            for j in i..length {
+                let c1 = changes1
+                    .get(j)
+                    .expect("impossible: vec must be long enough");
+                if let Some(cmp_) = c0.partial_cmp(c1) {
+                    cmp = cmp_;
+                    changes1.swap(i, j);
+                    break;
+                }
+            }
+            match cmp {
+                // current c0 is equal to some change in other, compare next c0
+                std::cmp::Ordering::Equal => continue,
+                // current c0 is larger or smaller than some change in other, update result and check if it is consistent with previous results
+                _ => {
+                    if r == std::cmp::Ordering::Equal {
+                        r = cmp;
+                    } else if r != cmp {
+                        // inconsistent, return uncomparable
+                        return None;
+                    } else {
+                        // consistent, compare next c0
+                        continue;
+                    }
+                }
+            }
+        }
+
+        Some(r)
+    }
+}
+
 impl std::ops::Add<AssetChange> for AssetsChange {
     type Output = Self;
     fn add(self, rhs: AssetChange) -> Self::Output {
-        let changes = self
+        let mut merged = false;
+        let mut changes: Vec<AssetChange> = self
             .changes
             .into_iter()
             .map(|c| {
                 if c.partial_cmp(&rhs).is_some() {
+                    merged = true;
                     c + rhs
                 } else {
                     c
@@ -270,6 +325,9 @@ impl std::ops::Add<AssetChange> for AssetsChange {
             })
             .filter(|c| *c != AssetChange::Zero)
             .collect();
+        if !merged {
+            changes.push(rhs);
+        }
         Self { changes }
     }
 }
@@ -502,6 +560,16 @@ impl AssetTransfer {
 
     pub fn get_receiver_change(&self) -> AssetChange {
         AssetChange::Gain(self.asset)
+    }
+
+    pub fn get_account_change(&self, addr: Address) -> AssetChange {
+        if self.sender == addr {
+            self.get_sender_change()
+        } else if self.receiver == addr {
+            self.get_receiver_change()
+        } else {
+            AssetChange::Zero
+        }
     }
 }
 
@@ -759,6 +827,49 @@ mod tests_with_dep {
                     ToPrimitive::cvt(1111)
                 ))
             );
+        }
+
+        #[test]
+        fn test_asset_change_compare() {
+            let changes0 = AssetsChange::default()
+                + AssetChange::Gain(Asset::ERC20(
+                    *addresses::DAI,
+                    ToPrimitive::cvt(12),
+                ))
+                + AssetChange::Gain(Asset::ERC20(
+                    *addresses::USDC,
+                    ToPrimitive::cvt(123),
+                ))
+                + AssetChange::Gain(Asset::ERC20(
+                    *addresses::DAI,
+                    ToPrimitive::cvt(1234),
+                ));
+            let changes1 = AssetsChange::default()
+                + AssetChange::Gain(Asset::ERC20(
+                    *addresses::DAI,
+                    ToPrimitive::cvt(20),
+                ));
+            assert!(changes0 > changes1);
+
+            let changes0: AssetsChange = Default::default();
+            let changes1 = AssetsChange::default()
+                + AssetChange::Gain(Asset::ERC20(
+                    *addresses::DAI,
+                    ToPrimitive::cvt(20),
+                ));
+            assert!(changes0 < changes1);
+
+            let changes0 = AssetsChange::default()
+                + AssetChange::Gain(Asset::ERC20(
+                    *addresses::DAI,
+                    ToPrimitive::cvt(20),
+                ));
+            let changes1 = AssetsChange::default()
+                + AssetChange::Gain(Asset::ERC20(
+                    *addresses::WBTC,
+                    ToPrimitive::cvt(20),
+                ));
+            assert_eq!(changes0.partial_cmp(&changes1), None);
         }
     }
 

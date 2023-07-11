@@ -550,7 +550,10 @@ mod tests_with_dep {
     use crate::{
         engine::{
             cheatcodes::CheatCodes,
-            inspectors::{asset_flow::AssetFlowInspector, no_inspector},
+            inspectors::{
+                asset_flow::{AssetFlowInspector, AssetsChange},
+                no_inspector,
+            },
             providers::rpc::JsonRpcBcProvider,
             state::{env::TransitionSpecBuilder, BcStateBuilder},
             utils::HighLevelCaller,
@@ -862,5 +865,21 @@ mod tests_with_dep {
         assert!(success == U256::ZERO);
 
         // the asset flow should be different
+        let attacker = caller.address;
+        let changes0 = insp1
+            .transfers
+            .into_iter()
+            .flatten()
+            .fold(AssetsChange::default(), |changes, transfer| {
+                changes + transfer.get_account_change(attacker)
+            });
+        let changes1 = insp2
+            .transfers
+            .into_iter()
+            .flatten()
+            .fold(AssetsChange::default(), |changes, transfer| {
+                changes + transfer.get_account_change(attacker)
+            });
+        assert!(changes0 < changes1);
     }
 }
