@@ -43,6 +43,9 @@ pub enum ContractType {
     // LP Token
     CurveStableSwapToken(Address, Box<Self>),
     CurveCryptoSwapToken(Address, Box<Self>),
+
+    // Pegged Token
+    CurveYVault(Address, Box<Self>),
 }
 
 impl ContractType {
@@ -124,7 +127,42 @@ impl CheatCodes {
         // lp token
         check_and_return!(self.__check_curve_lp_token(state, address));
 
+        // pegged token
+        check_and_return!(self.__check_curve_y_vault(state, address));
+
         None
+    }
+}
+
+impl CheatCodes {
+    pub fn __check_curve_y_vault<E, S>(
+        &mut self,
+        state: &mut S,
+        token: Address,
+    ) -> Option<ContractType>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        let func = self
+            .parse_abi::<E>("function token() returns (address)".to_string())
+            .ok()?
+            .clone();
+        let token = unwrap_first_token_value!(
+            Address,
+            self.cheat_read(state, token, &func, &[]).ok()?
+        );
+
+        let token_ty = self.get_contract_type(state, token).ok()?;
+        if matches!(
+            token_ty,
+            ContractType::CurveCryptoSwapToken(_, _)
+                | ContractType::CurveStableSwapToken(_, _)
+        ) {
+            Some(ContractType::CurveYVault(token, Box::new(token_ty)))
+        } else {
+            None
+        }
     }
 }
 
@@ -387,6 +425,24 @@ mod tests_with_dep {
     use crate::engine::transactions::position::TxPosition;
     use crate::utils::conversion::{Convert, ToPrimitive};
     use crate::utils::testing::get_testing_bc_provider;
+
+    #[test]
+    fn test_get_pegged_token_type() {
+        let bp = get_testing_bc_provider();
+
+        let fork_at = TxPosition::new(17000001, 0);
+        let mut state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
+
+        let mut cheatcodes = CheatCodes::new()
+            .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
+
+        let curve_yvault =
+            ToPrimitive::cvt("0xE537B5cc158EB71037D4125BDD7538421981E6AA");
+        let token_ty = cheatcodes
+            .get_contract_type(&mut state, curve_yvault)
+            .unwrap();
+        assert!(matches!(token_ty, ContractType::CurveYVault(_, _)));
+    }
 
     #[test]
     fn test_get_dex_type() {

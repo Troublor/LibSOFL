@@ -186,18 +186,18 @@ impl CheatCodes {
                     )?;
                 }
 
-                let func = self.abi_parser.parse_function(
-                    format!("add_liquidity(uint256[{}],uint256)", coins.len())
-                        .as_str(),
-                )?;
-
                 let token_balance_before =
                     self.get_erc20_balance(state, token, account)?;
+
+                let func = self.parse_abi(format!(
+                    "add_liquidity(uint256[{}],uint256)",
+                    coins.len()
+                ))?;
 
                 caller.invoke_ignore_return(
                     state,
                     pool,
-                    &func,
+                    func,
                     &[ToEthers::cvt(coin_amounts), ToEthers::cvt(amount)],
                     None,
                     no_inspector(),
@@ -295,18 +295,15 @@ impl CheatCodes {
             ContractType::CurveStableSwap(coins)
             | ContractType::CurveCryptoSwap(coins) => {
                 // CurveStableSwap and CurveCryptoSwap are similar
-                let func = self.abi_parser.parse_function(
-                    format!(
-                        "remove_liquidity(uint256,uint256[{}])",
-                        coins.len()
-                    )
-                    .as_str(),
-                )?;
+                let func = self.parse_abi(format!(
+                    "remove_liquidity(uint256,uint256[{}])",
+                    coins.len()
+                ))?;
 
                 caller.invoke_ignore_return(
                     state,
                     pool,
-                    &func,
+                    func,
                     &[
                         ToEthers::cvt(amount),
                         ToEthers::cvt(vec![U256::ZERO, U256::ZERO, U256::ZERO]),

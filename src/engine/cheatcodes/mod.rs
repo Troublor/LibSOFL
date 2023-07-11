@@ -1,6 +1,9 @@
 // A set of cheatcodes that can directly modify the environments
 
-use std::{collections::BTreeMap, fmt::Debug};
+use std::{
+    collections::{BTreeMap, HashMap},
+    fmt::Debug,
+};
 
 use crate::error::SoflError;
 use ethers::abi::{self, AbiParser, Function, ParamType, Token};
@@ -49,6 +52,7 @@ pub struct CheatCodes {
 
     // abi parser
     abi_parser: AbiParser,
+    abi_cache: HashMap<String, Function>,
 }
 
 fn pack_calldata(fsig: [u8; 4], args: &[Token]) -> Bytes {
@@ -70,6 +74,7 @@ impl CheatCodes {
             inspector: CheatcodeInspector::default(),
             slots: BTreeMap::new(),
             abi_parser: AbiParser::default(),
+            abi_cache: HashMap::new(),
         }
     }
 
@@ -83,6 +88,18 @@ impl CheatCodes {
 
     pub fn reset_caller(&mut self) {
         self.caller = HighLevelCaller::default().bypass_check();
+    }
+
+    pub fn parse_abi<E>(&mut self, s: String) -> Result<&Function, SoflError<E>>
+    where
+        E: Debug,
+    {
+        if !self.abi_cache.contains_key(&s) {
+            let abi = self.abi_parser.parse_function(s.as_str())?;
+            self.abi_cache.insert(s.clone(), abi);
+        }
+
+        Ok(self.abi_cache.get(&s).unwrap())
     }
 
     fn find_slot<E, S>(
