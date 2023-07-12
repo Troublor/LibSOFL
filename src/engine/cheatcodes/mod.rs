@@ -1,6 +1,7 @@
 // A set of cheatcodes that can directly modify the environments
 
 use std::{
+    any::type_name,
     collections::{BTreeMap, HashMap},
     fmt::Debug,
 };
@@ -14,10 +15,9 @@ use revm_primitives::{Bytecode, B256};
 mod inspector;
 use inspector::CheatcodeInspector;
 
+mod contract_type;
 mod erc20;
 mod price_oracle;
-
-mod contract_type;
 pub use contract_type::ContractType;
 
 use super::{state::DatabaseEditable, utils::HighLevelCaller};
@@ -278,7 +278,10 @@ impl CheatCodes {
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
         let account_info = state.basic(to).map_err(SoflError::Db)?.ok_or(
-            SoflError::Custom("account does not have code".to_string()),
+            SoflError::Custom(format!(
+                "{}: account does not have code",
+                type_name::<Self>()
+            )),
         )?;
 
         let calldata = pack_calldata(func.short_signature(), args);
@@ -287,9 +290,10 @@ impl CheatCodes {
             Some(SlotQueryResult::Found(slot)) => {
                 self.write_or_err(state, to, *slot, data)
             }
-            Some(SlotQueryResult::NotFound) => Err(SoflError::Custom(
-                "cannot find the target slot".to_string(),
-            )),
+            Some(SlotQueryResult::NotFound) => Err(SoflError::Custom(format!(
+                "{}: cannot find the target slot",
+                type_name::<Self>(),
+            ))),
             None => {
                 // we need to find the slot
                 if let Some(slot) = self.find_slot(state, to, func, args) {
@@ -307,9 +311,10 @@ impl CheatCodes {
                         (code_hash, calldata),
                         SlotQueryResult::NotFound,
                     );
-                    Err(SoflError::Custom(
-                        "cannot find the target slot".to_string(),
-                    ))
+                    Err(SoflError::Custom(format!(
+                        "{}: cannot find the target slot",
+                        type_name::<Self>()
+                    )))
                 }
             }
         }

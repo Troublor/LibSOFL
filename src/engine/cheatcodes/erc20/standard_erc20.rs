@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{any::type_name, fmt::Debug};
 
 use ethers::abi::Token;
 use reth_primitives::Address;
@@ -165,10 +165,29 @@ impl CheatCodes {
         let balance_after = self.get_erc20_balance(state, token, from)?;
 
         if balance_after != balance_before - amount {
-            Err(SoflError::Custom("ERC20: steal failed".to_string()))
+            Err(SoflError::Custom(format!(
+                "{}: cannot steal ERC20",
+                type_name::<Self>()
+            )))
         } else {
             Ok(())
         }
+    }
+
+    pub fn increase_erc20_balance_by<E, S>(
+        &mut self,
+        state: &mut S,
+        token: Address,
+        account: Address,
+        amount: U256,
+    ) -> Result<Option<U256>, SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        let balance_before = self.get_erc20_balance(state, token, account)?;
+        let balance_after = balance_before + amount;
+        self.set_erc20_balance(state, token, account, balance_after)
     }
 
     // return the old balance if updated
@@ -187,6 +206,10 @@ impl CheatCodes {
         let token_ty = self.get_contract_type(state, token)?;
         if token_ty.is_lp_token() {
             return self.set_lp_token_balance(
+                state, token_ty, token, account, balance,
+            );
+        } else if token_ty.is_pegged_token() {
+            return self.set_pegged_token_balance(
                 state, token_ty, token, account, balance,
             );
         }

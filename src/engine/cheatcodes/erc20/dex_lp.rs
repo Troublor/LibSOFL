@@ -1,4 +1,4 @@
-use std::fmt::Debug;
+use std::{any::type_name, fmt::Debug};
 
 use revm::{Database, DatabaseCommit};
 use revm_primitives::{Address, U256};
@@ -12,8 +12,8 @@ use crate::{
     error::SoflError,
     unwrap_first_token_value,
     utils::{
-        abi::UNISWAP_V2_PAIR_ABI,
-        addresses::DUMMY_ADDRESS,
+        abi::{ERC20_ABI, UNISWAP_V2_PAIR_ABI},
+        addresses::BURNER_ADDRESS,
         conversion::{Convert, ToEthers},
         math::HPMultipler,
     },
@@ -33,15 +33,15 @@ impl CheatCodes {
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
         let (pool, pool_ty) = token_ty.get_pool(token).ok_or_else(|| {
-            SoflError::Custom(
-                "try to set lp token balance to a non-lp token".to_string(),
-            )
+            SoflError::Custom(format!(
+                "{}: try to set lp token balance to a non-lp token",
+                type_name::<Self>()
+            ))
         })?;
 
         if token == account || pool == account {
-            return Err(SoflError::Custom(
-                "try to set lp token balance to the lp token address or the pool address itself"
-                    .to_string(),
+            return Err(SoflError::Custom(format!(
+                "{}: try to set lp token balance to the lp token address or the pool address itself", type_name::<Self>()),
             ));
         }
 
@@ -209,16 +209,18 @@ impl CheatCodes {
                 token_balance_after - token_balance_before
             }
             _ => {
-                return Err(SoflError::Custom(
-                    "increase lp token balance by not supported".to_string(),
-                ))
+                return Err(SoflError::Custom(format!(
+                    "{}: increase lp token balance by not supported",
+                    type_name::<Self>()
+                )))
             }
         };
 
         if amount_out < amount {
-            Err(SoflError::Custom(
-                "increase lp token balance by not enough".to_string(),
-            ))
+            Err(SoflError::Custom(format!(
+                "{}: increase lp token balance by not enough",
+                type_name::<Self>()
+            )))
         } else {
             // send out the additional lp to somehere
             let func = UNISWAP_V2_PAIR_ABI
@@ -229,7 +231,7 @@ impl CheatCodes {
                 token,
                 func,
                 &[
-                    ToEthers::cvt(*DUMMY_ADDRESS),
+                    ToEthers::cvt(*BURNER_ADDRESS),
                     ToEthers::cvt(amount_out - amount),
                 ],
                 None,
@@ -245,8 +247,8 @@ impl CheatCodes {
     fn __decrease_lp_token_balance_by<E, S>(
         &mut self,
         state: &mut S,
-        pool_ty: ContractType,
-        pool: Address,
+        _pool_ty: ContractType,
+        _pool: Address,
         token: Address,
         account: Address,
         amount: U256,
@@ -259,65 +261,17 @@ impl CheatCodes {
         let mut caller = self.caller.clone();
         caller.address = account;
 
-        match pool_ty {
-            ContractType::UniswapV2Pair(_, _) => {
-                assert!(
-                    pool == token,
-                    "pool should be the same as token for Uniswap V2"
-                );
-
-                // first transfer to the pair
-                let func = UNISWAP_V2_PAIR_ABI
-                    .function("transfer")
-                    .expect("transfer function should exist");
-                caller.invoke_ignore_return(
-                    state,
-                    pool,
-                    func,
-                    &[ToEthers::cvt(token), ToEthers::cvt(amount)],
-                    None,
-                    no_inspector(),
-                )?;
-
-                // burn the lp token
-                let func = UNISWAP_V2_PAIR_ABI
-                    .function("burn")
-                    .expect("burn function should exist");
-                caller.invoke_ignore_return(
-                    state,
-                    pool,
-                    func,
-                    &[ToEthers::cvt(account)],
-                    None,
-                    no_inspector(),
-                )?;
-            }
-            ContractType::CurveStableSwap(coins)
-            | ContractType::CurveCryptoSwap(coins) => {
-                // CurveStableSwap and CurveCryptoSwap are similar
-                let func = self.parse_abi(format!(
-                    "remove_liquidity(uint256,uint256[{}])",
-                    coins.len()
-                ))?;
-
-                caller.invoke_ignore_return(
-                    state,
-                    pool,
-                    func,
-                    &[
-                        ToEthers::cvt(amount),
-                        ToEthers::cvt(vec![U256::ZERO, U256::ZERO, U256::ZERO]),
-                    ],
-                    None,
-                    no_inspector(),
-                )?;
-            }
-            _ => {
-                return Err(SoflError::Custom(
-                    "not a ERC20-backed dex".to_string(),
-                ));
-            }
-        }
+        let func = ERC20_ABI
+            .function("transfer")
+            .expect("transfer function must exist");
+        caller.invoke_ignore_return(
+            state,
+            token,
+            func,
+            &[ToEthers::cvt(*BURNER_ADDRESS), ToEthers::cvt(amount)],
+            None,
+            no_inspector(),
+        )?;
 
         Ok(())
     }

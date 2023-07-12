@@ -7,9 +7,8 @@ use revm_primitives::{
 };
 
 use crate::{
-    engine::transactions::builder::TxBuilder,
-    error::SoflError,
-    utils::conversion::{Convert, ToPrimitive},
+    engine::transactions::builder::TxBuilder, error::SoflError,
+    utils::addresses::DEFAULT_CALLER_ADDRESS,
 };
 
 use super::{
@@ -28,7 +27,7 @@ pub struct HighLevelCaller {
 impl Default for HighLevelCaller {
     fn default() -> Self {
         Self {
-            address: ToPrimitive::cvt(1234567890),
+            address: *DEFAULT_CALLER_ADDRESS,
             nonce: 0,
             gas_limit: 0,
             spec_builder: TransitionSpecBuilder::default(),

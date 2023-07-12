@@ -49,6 +49,7 @@ define_contract!(
     "../../assets/curve_crypto_pool.abi.json"
 );
 define_contract!(CURVE_EXCHANGE_ABI, "../../assets/curve_exchange.abi.json");
+define_contract!(CURVE_Y_VAULT_ABI, "../../assets/curve_y_vault.abi.json");
 
 // Inverse Finance
 define_contract!(

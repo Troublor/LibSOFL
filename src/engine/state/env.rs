@@ -1,3 +1,5 @@
+use std::any::type_name;
+
 use reth_primitives::{
     Address, BlockHashOrNumber, Transaction, TransactionSigned, TxHash,
 };
@@ -47,7 +49,8 @@ impl TransitionSpec {
             .transaction_by_hash_with_meta(hash)
             .map_err(SoflError::Reth)?
             .ok_or(SoflError::Custom(format!(
-                "transaction with hash {} not found",
+                "{}, transaction with hash {} not found",
+                type_name::<Self>(),
                 hash
             )))?;
         p.fill_env_at(&mut this.cfg, &mut this.block, meta.block_number.into())

@@ -53,4 +53,10 @@ define_address!(
 );
 
 // Dummy Address
-define_address!(DUMMY_ADDRESS, "0x0123456789abcDEF0123456789abCDef01234567");
+define_address!(BURNER_ADDRESS, "0x0123456789abcDEF0123456789abCDef01234567");
+
+// Default Caller Address
+define_address!(
+    DEFAULT_CALLER_ADDRESS,
+    "0x4354bB7C9dad5b0299199c0084E6ae386afD636C"
+);

@@ -742,9 +742,10 @@ mod tests_with_dep {
 
     #[test]
     fn test_inverse_finance_manipulation_execution() {
-        let mut cheatcodes = CheatCodes::new();
-        // attack tx: 0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c
         let provider = get_testing_bc_provider();
+        let mut cheatcodes = CheatCodes::new()
+            .set_caller(&|caller| caller.at_block(&provider, 14972419));
+        // attack tx: 0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c
         let _spec_builder = TransitionSpecBuilder::new()
             .bypass_check()
             .at_block(&provider, 14972419);
@@ -765,13 +766,21 @@ mod tests_with_dep {
         let deposit_amount = ToPrimitive::cvt(300479464706193878654u128);
         let yv_curve_3crypto_token =
             ToPrimitive::cvt("0xE537B5cc158EB71037D4125BDD7538421981E6AA");
-        let yv_curve_3crypto_richer =
-            ToPrimitive::cvt("0xA67EC8737021A7e91e883A3277384E6018BB5776");
+        // let yv_curve_3crypto_richer =
+        //     ToPrimitive::cvt("0xA67EC8737021A7e91e883A3277384E6018BB5776");
+        // cheatcodes
+        //     .steal_erc20(
+        //         &mut state,
+        //         yv_curve_3crypto_token,
+        //         yv_curve_3crypto_richer,
+        //         caller.address,
+        //         deposit_amount,
+        //     )
+        //     .unwrap();
         cheatcodes
-            .steal_erc20(
+            .set_erc20_balance(
                 &mut state,
                 yv_curve_3crypto_token,
-                yv_curve_3crypto_richer,
                 caller.address,
                 deposit_amount,
             )

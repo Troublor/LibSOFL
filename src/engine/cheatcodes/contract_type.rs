@@ -46,6 +46,7 @@ pub enum ContractType {
 
     // Pegged Token
     CurveYVault(Address, Box<Self>),
+    AaveAToken(Address, Box<Self>),
 }
 
 impl ContractType {
@@ -78,6 +79,19 @@ impl ContractType {
             ContractType::CurveStableSwapToken(pool, pool_ty)
             | ContractType::CurveCryptoSwapToken(pool, pool_ty) => {
                 Some((pool, *pool_ty))
+            }
+            _ => None,
+        }
+    }
+
+    pub fn is_pegged_token(&self) -> bool {
+        matches!(self, ContractType::CurveYVault(_, _))
+    }
+
+    pub fn get_pegged_token(self, _: Address) -> Option<(Address, Self)> {
+        match self {
+            ContractType::CurveYVault(token, token_ty) => {
+                Some((token, *token_ty))
             }
             _ => None,
         }

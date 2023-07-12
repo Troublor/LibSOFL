@@ -1,3 +1,4 @@
+use std::any::type_name;
 use std::{cmp::Ordering, fmt::Debug};
 
 use ethers::abi::Token;
@@ -53,7 +54,10 @@ impl CheatCodes {
         }
 
         if liquidity == U256::ZERO {
-            Err(SoflError::Custom("No liquidity found".to_string()))
+            Err(SoflError::Custom(format!(
+                "{}: no liquidity found",
+                type_name::<Self>()
+            )))
         } else {
             Ok(price)
         }
@@ -163,9 +167,10 @@ impl CheatCodes {
 
         // if no pool found, return error
         if pool == Address::default() {
-            Err(SoflError::Custom(
-                "No pool found for uniswap v3".to_string(),
-            ))
+            Err(SoflError::Custom(format!(
+                "{}: no pool found for uniswap v3",
+                type_name::<Self>()
+            )))
         } else {
             Ok((pool, bs_token, liquidity))
         }
@@ -391,9 +396,10 @@ impl CheatCodes {
 
         // if no pool found, return error
         if pool == Address::default() {
-            Err(SoflError::Custom(
-                "No pool found for uniswap v3".to_string(),
-            ))
+            Err(SoflError::Custom(format!(
+                "{}: no pool found for uniswap v3",
+                type_name::<Self>(),
+            )))
         } else {
             Ok((pool, bs_token, liquidity))
         }
