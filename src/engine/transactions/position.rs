@@ -76,6 +76,12 @@ impl TxPosition {
     }
 }
 
+impl From<BlockHashOrNumber> for TxPosition {
+    fn from(block: BlockHashOrNumber) -> Self {
+        Self { block, index: 0 }
+    }
+}
+
 impl From<u64> for TxPosition {
     fn from(block: u64) -> Self {
         Self {
