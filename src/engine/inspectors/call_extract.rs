@@ -1,38 +1,14 @@
 use reth_primitives::Address;
-use revm::{
-    interpreter::{instruction_result::SuccessOrHalt, CallContext},
-    Database, Inspector,
-};
-use revm_primitives::{Bytes, U256};
+use revm::{Database, Inspector};
+use revm_primitives::Bytes;
+
+use crate::knowledge::contract::msg_call::MsgCall;
 
 use super::MultiTxInspector;
 
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct MsgCall {
-    pub context: CallContext,
-    pub gas_limit: u64,
-    pub value: U256,
-    pub input: Bytes,
-    pub output: Bytes,
-    pub result: SuccessOrHalt,
-}
-
-impl Default for MsgCall {
-    fn default() -> Self {
-        Self {
-            context: Default::default(),
-            gas_limit: 0,
-            value: Default::default(),
-            input: Default::default(),
-            output: Default::default(),
-            result: SuccessOrHalt::InternalContinue,
-        }
-    }
-}
-
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct CallExtractInspector {
-    pub target_contract: Address,
+    pub target_contract: Option<Address>,
     pub calls: Vec<MsgCall>,
 
     call_stack: Vec<Option<MsgCall>>,
@@ -41,7 +17,7 @@ pub struct CallExtractInspector {
 impl CallExtractInspector {
     pub fn new(target_contract: Address) -> Self {
         Self {
-            target_contract,
+            target_contract: Some(target_contract),
             calls: Vec::new(),
             call_stack: Vec::new(),
         }
@@ -59,7 +35,9 @@ impl<BS: Database> Inspector<BS> for CallExtractInspector {
         revm::interpreter::Gas,
         revm_primitives::Bytes,
     ) {
-        if inputs.contract == self.target_contract {
+        if self.target_contract.is_none()
+            || Some(inputs.contract) == self.target_contract
+        {
             self.call_stack.push(Some(MsgCall {
                 context: inputs.context.clone(),
                 value: inputs.transfer.value,
@@ -122,7 +100,7 @@ mod tests_with_dep {
         // attack tx: 0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c
         let provider = get_testing_bc_provider();
         let state = BcStateBuilder::fork_at(&provider, 14972419).unwrap();
-        let tx : TxHash= ToPrimitive::cvt("0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c");
+        let tx: TxHash = ToPrimitive::cvt("0x958236266991bc3fe3b77feaacea120f172c0708ad01c7a715b255f218f9313c");
         let spec = TransitionSpec::from_tx_hash(&provider, tx).unwrap();
         let lending_pool: Address =
             ToPrimitive::cvt("0x7Fcb7DAC61eE35b3D4a51117A7c58D53f0a8a670");
