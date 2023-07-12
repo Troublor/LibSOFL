@@ -1,5 +1,7 @@
 use std::convert::Infallible;
 
+use ethers::etherscan;
+
 use crate::engine::transactions::position::TxPosition;
 
 #[derive(Debug, thiserror::Error)]
@@ -66,5 +68,12 @@ pub enum SoflError<DBERR = Infallible> {
         #[from]
         #[source]
         ethers_solc::error::SolcError,
+    ),
+
+    #[error("etherscan error: {0}")]
+    Etherscan(
+        #[from]
+        #[source]
+        etherscan::errors::EtherscanError,
     ),
 }

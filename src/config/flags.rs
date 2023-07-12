@@ -1,7 +1,7 @@
 use reqwest::header::HeaderMap;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[allow(unused)]
 pub struct RethConfig {
     pub datadir: String,
@@ -15,7 +15,7 @@ impl Default for RethConfig {
     }
 }
 
-#[derive(Debug, Deserialize, Serialize)]
+#[derive(Debug, Clone, Deserialize, Serialize)]
 #[allow(unused)]
 pub struct JsonRpcConfig {
     pub endpoint: String,
@@ -50,9 +50,28 @@ impl Default for JsonRpcConfig {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct EtherscanConfig {
+    pub api_url: String,
+    pub api_key: Option<String>,
+    /// Number of requests per second
+    pub rate_limit: Option<u32>,
+}
+
+impl Default for EtherscanConfig {
+    fn default() -> Self {
+        Self {
+            api_url: String::from("https://api.etherscan.io/api"),
+            api_key: None,
+            rate_limit: None,
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Default)]
 #[allow(unused)]
 pub struct SoflConfig {
     pub reth: RethConfig,
     pub jsonrpc: JsonRpcConfig,
+    pub etherscan: EtherscanConfig,
 }
