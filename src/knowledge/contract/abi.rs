@@ -47,7 +47,7 @@ impl AbiProvider for EtherscanAbiProvider {
         let maybe_abi = self
             .runtime
             .block_on(self.client.contract_abi(ToEthers::cvt(contract)));
-        let abi = match maybe_abi {
+        let _abi = match maybe_abi {
             Ok(abi) => Some(abi),
             Err(ethers::etherscan::errors::EtherscanError::ContractCodeNotVerified(_)) => None,
             Err(ethers::etherscan::errors::EtherscanError::RateLimitExceeded) => {

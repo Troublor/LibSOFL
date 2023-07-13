@@ -2,7 +2,6 @@ pub mod abi;
 pub mod msg_call;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},
-    convert::Infallible,
     ops::{Range, RangeBounds},
 };
 
@@ -31,13 +30,17 @@ pub trait MsgCallProvider {
 }
 
 pub type ContractKnowledge<K> = HashMap<Address, K>;
+type Seeds = HashMap<Address, BTreeMap<([u8; 4], usize), HashSet<Token>>>;
 
 #[derive(Clone, Debug)]
 pub struct FunctionParamKnowledge<P> {
     /// The seed pool: contract address => (function sighash, param index(0-indexed)) => token
-    pub seeds: HashMap<Address, BTreeMap<([u8; 4], usize), HashSet<Token>>>,
+    pub seeds: Seeds,
 
+    #[allow(unused)]
     provider: P,
+
+    #[allow(unused)]
     block_range: Range<BlockNumber>,
 }
 
@@ -52,20 +55,19 @@ impl<P> FunctionParamKnowledge<P> {
 }
 
 impl<P: MsgCallProvider> FunctionParamKnowledge<P> {
-    fn load_contract(&mut self, contract: Address) -> Result<(), SoflError> {
-        let calls = self
+    fn _load_contract(&mut self, contract: Address) -> Result<(), SoflError> {
+        let _calls = self
             .provider
             .get_msg_call_for_contract(contract, self.block_range.clone())?;
         // let mut knowledge = BTreeMap::new();
-        for call in calls {}
         todo!()
     }
 
     pub fn gen_func_arg(
         &mut self,
         contract: Address,
-        func: &Function,
-        arg_index: usize,
+        _func: &Function,
+        _arg_index: usize,
     ) -> Token {
         if !self.seeds.contains_key(&contract) {}
         todo!()

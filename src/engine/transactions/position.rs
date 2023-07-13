@@ -7,7 +7,7 @@ use std::{
 use reth_primitives::BlockHashOrNumber;
 
 use reth_provider::{BlockNumReader, TransactionsProvider};
-use revm_primitives::B256;
+use revm_primitives::{B256, U256};
 
 pub type StateChange = revm_primitives::State;
 
@@ -72,6 +72,15 @@ impl TxPosition {
         Self {
             block: BlockHashOrNumber::from(block),
             index,
+        }
+    }
+}
+
+impl From<U256> for TxPosition {
+    fn from(block: U256) -> Self {
+        Self {
+            block: BlockHashOrNumber::from(block.as_limbs()[3]),
+            index: 0,
         }
     }
 }
