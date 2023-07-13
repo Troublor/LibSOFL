@@ -15,6 +15,7 @@ pub struct EtherscanClient {
     #[deref_mut]
     client: ethers::etherscan::Client,
 
+    #[allow(unused)]
     last_request_time: std::time::SystemTime,
 }
 

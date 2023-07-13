@@ -1,8 +1,4 @@
-use reth_primitives::Address;
-use revm::{
-    interpreter::{instruction_result::SuccessOrHalt, CallContext},
-    Database, Inspector,
-};
+use revm::interpreter::{instruction_result::SuccessOrHalt, CallContext};
 use revm_primitives::{Bytes, U256};
 
 #[derive(Clone, Debug, PartialEq, Eq)]
