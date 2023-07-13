@@ -9,9 +9,8 @@ use crate::{
     unwrap_first_token_value, unwrap_token_values,
     utils::{
         abi::{
-            AAVE_ATOKEN_V2_ABI, AAVE_LENDING_POOL_V2_ABI,
-            CURVE_CRYPTO_REGISTRY_ABI, CURVE_REGISTRY_ABI,
-            UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI,
+            AAVE_LENDING_POOL_V2_ABI, CURVE_CRYPTO_REGISTRY_ABI,
+            CURVE_REGISTRY_ABI, UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI,
             UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
         },
         addresses::{
