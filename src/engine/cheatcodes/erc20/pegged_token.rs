@@ -38,7 +38,7 @@ impl CheatCodes {
         }
         if balance_before < balance {
             match token_ty {
-                ContractType::CurveYVault(base_token, _) => self
+                ContractType::CurveYVault(base_token) => self
                     .__increase_curve_yvault_balance(
                         state,
                         token,
@@ -46,7 +46,7 @@ impl CheatCodes {
                         account,
                         balance - balance_before,
                     )?,
-                ContractType::AaveAToken(_, _) => todo!(),
+                ContractType::AaveAToken(_) => todo!(),
                 _ => {}
             }
         }

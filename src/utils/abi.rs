@@ -17,48 +17,66 @@ macro_rules! define_contract {
 
 define_contract!(
     UNISWAP_V2_ROUTER02_ABI,
-    "../../assets/uniswap_v2_router02.abi.json"
+    "../../assets/abi/uniswap_v2_router02.abi.json"
 );
-define_contract!(ERC20_ABI, "../../assets/erc20.abi.json");
-define_contract!(ERC721_ABI, "../../assets/erc721.abi.json");
-define_contract!(ERC777_ABI, "../../assets/erc777.abi.json");
-define_contract!(ERC1155_ABI, "../../assets/erc1155.abi.json");
-define_contract!(WETH_ABI, "../../assets/weth.abi.json");
+define_contract!(ERC20_ABI, "../../assets/abi/erc20.abi.json");
+define_contract!(ERC721_ABI, "../../assets/abi/erc721.abi.json");
+define_contract!(ERC777_ABI, "../../assets/abi/erc777.abi.json");
+define_contract!(ERC1155_ABI, "../../assets/abi/erc1155.abi.json");
+define_contract!(WETH_ABI, "../../assets/abi/weth.abi.json");
 
 // Uniswap
-define_contract!(UNISWAP_V2_PAIR_ABI, "../../assets/uniswap_v2_pair.abi.json");
+define_contract!(
+    UNISWAP_V2_PAIR_ABI,
+    "../../assets/abi/uniswap_v2_pair.abi.json"
+);
 define_contract!(
     UNISWAP_V2_FACTORY_ABI,
-    "../../assets/uniswap_v2_factory.abi.json"
+    "../../assets/abi/uniswap_v2_factory.abi.json"
 );
 define_contract!(
     UNISWAP_V3_FACTORY_ABI,
-    "../../assets/uniswap_v3_factory.abi.json"
+    "../../assets/abi/uniswap_v3_factory.abi.json"
 );
-define_contract!(UNISWAP_V3_POOL_ABI, "../../assets/uniswap_v3_pool.abi.json");
-define_contract!(CURVE_REGISTRY_ABI, "../../assets/curve_registry.abi.json");
+define_contract!(
+    UNISWAP_V3_POOL_ABI,
+    "../../assets/abi/uniswap_v3_pool.abi.json"
+);
+define_contract!(
+    CURVE_REGISTRY_ABI,
+    "../../assets/abi/curve_registry.abi.json"
+);
 
 // Curve.FI
 define_contract!(
     CURVE_CRYPTO_REGISTRY_ABI,
-    "../../assets/curve_crypto_registry.abi.json"
+    "../../assets/abi/curve_crypto_registry.abi.json"
 );
-define_contract!(CURVE_POOL_ABI, "../../assets/curve_pool.abi.json");
+define_contract!(CURVE_POOL_ABI, "../../assets/abi/curve_pool.abi.json");
 define_contract!(
     CURVE_CRYPTO_POOL_ABI,
-    "../../assets/curve_crypto_pool.abi.json"
+    "../../assets/abi/curve_crypto_pool.abi.json"
 );
-define_contract!(CURVE_EXCHANGE_ABI, "../../assets/curve_exchange.abi.json");
-define_contract!(CURVE_Y_VAULT_ABI, "../../assets/curve_y_vault.abi.json");
+define_contract!(
+    CURVE_EXCHANGE_ABI,
+    "../../assets/abi/curve_exchange.abi.json"
+);
+define_contract!(CURVE_Y_VAULT_ABI, "../../assets/abi/curve_y_vault.abi.json");
+
+// AAve
+define_contract!(
+    AAVE_ATOKEN_V2_ABI,
+    "../../assets/abi/aave_atoken_v2.abi.json"
+);
 
 // Inverse Finance
 define_contract!(
     INVERSE_LENDING_POOL_ABI,
-    "../../assets/inverse_lending_pool.abi.json"
+    "../../assets/abi/inverse_lending_pool.abi.json"
 );
 define_contract!(
     INVERSE_LENDING_COMPTROLLER_ABI,
-    "../../assets/inverse_lending_comptroller.abi.json"
+    "../../assets/abi/inverse_lending_comptroller.abi.json"
 );
 
 #[cfg(test)]

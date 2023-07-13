@@ -9,7 +9,7 @@ use crate::{
     unwrap_first_token_value,
     utils::{
         abi::{
-            CURVE_CRYPTO_REGISTRY_ABI, CURVE_REGISTRY_ABI,
+            AAVE_ATOKEN_V2_ABI, CURVE_CRYPTO_REGISTRY_ABI, CURVE_REGISTRY_ABI,
             UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI,
             UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
         },
@@ -45,8 +45,8 @@ pub enum ContractType {
     CurveCryptoSwapToken(Address, Box<Self>),
 
     // Pegged Token
-    CurveYVault(Address, Box<Self>),
-    AaveAToken(Address, Box<Self>),
+    CurveYVault(Address),
+    AaveAToken(Address),
 }
 
 impl ContractType {
@@ -85,14 +85,16 @@ impl ContractType {
     }
 
     pub fn is_pegged_token(&self) -> bool {
-        matches!(self, ContractType::CurveYVault(_, _))
+        matches!(
+            self,
+            ContractType::CurveYVault(_) | ContractType::AaveAToken(_)
+        )
     }
 
-    pub fn get_pegged_token(self, _: Address) -> Option<(Address, Self)> {
+    pub fn get_pegged_token(self, _: Address) -> Option<Address> {
         match self {
-            ContractType::CurveYVault(token, token_ty) => {
-                Some((token, *token_ty))
-            }
+            ContractType::CurveYVault(token)
+            | ContractType::AaveAToken(token) => Some(token),
             _ => None,
         }
     }
@@ -143,6 +145,7 @@ impl CheatCodes {
 
         // pegged token
         check_and_return!(self.__check_curve_y_vault(state, address));
+        check_and_return!(self.__check_aave_atoken_v2(state, address));
 
         None
     }
@@ -173,10 +176,33 @@ impl CheatCodes {
             ContractType::CurveCryptoSwapToken(_, _)
                 | ContractType::CurveStableSwapToken(_, _)
         ) {
-            Some(ContractType::CurveYVault(token, Box::new(token_ty)))
+            Some(ContractType::CurveYVault(token))
         } else {
             None
         }
+    }
+
+    pub fn __check_aave_atoken_v2<E, S>(
+        &mut self,
+        state: &mut S,
+        token: Address,
+    ) -> Option<ContractType>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        let func = AAVE_ATOKEN_V2_ABI
+            .function("underlyingAssetAddress")
+            .expect("underlyingAssetAddress function not found");
+
+        let token = unwrap_first_token_value!(
+            Address,
+            self.cheat_read(state, token, func, &[]).ok()?
+        );
+
+        println!("underlying token: {}", token);
+
+        None
     }
 }
 
@@ -455,7 +481,13 @@ mod tests_with_dep {
         let token_ty = cheatcodes
             .get_contract_type(&mut state, curve_yvault)
             .unwrap();
-        assert!(matches!(token_ty, ContractType::CurveYVault(_, _)));
+        assert!(matches!(token_ty, ContractType::CurveYVault(_)));
+
+        let ausdc =
+            ToPrimitive::cvt("0x9bA00D6856a4eDF4665BcA2C2309936572473B7E");
+        let token_type =
+            cheatcodes.get_contract_type(&mut state, ausdc).unwrap();
+        // assert!(matches!(token_ty, ContractType::AaveAToken(_)));
     }
 
     #[test]
