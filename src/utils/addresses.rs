@@ -60,3 +60,7 @@ define_address!(
     DEFAULT_CALLER_ADDRESS,
     "0x4354bB7C9dad5b0299199c0084E6ae386afD636C"
 );
+
+macro_rules! gen_address_book {
+    () => {};
+}
