@@ -6,18 +6,19 @@ use std::fmt::Debug;
 use crate::{
     engine::state::DatabaseEditable,
     error::SoflError,
-    unwrap_first_token_value,
+    unwrap_first_token_value, unwrap_token_values,
     utils::{
         abi::{
-            AAVE_ATOKEN_V2_ABI, CURVE_CRYPTO_REGISTRY_ABI, CURVE_REGISTRY_ABI,
+            AAVE_ATOKEN_V2_ABI, AAVE_LENDING_POOL_V2_ABI,
+            CURVE_CRYPTO_REGISTRY_ABI, CURVE_REGISTRY_ABI,
             UNISWAP_V2_FACTORY_ABI, UNISWAP_V2_PAIR_ABI,
             UNISWAP_V3_FACTORY_ABI, UNISWAP_V3_POOL_ABI,
         },
         addresses::{
-            CURVE_CRYPTO_REGISTRY, CURVE_REGISTRY, UNISWAP_V2_FACTORY,
-            UNISWAP_V3_FACTORY,
+            AAVE_LENDING_POOL_V2, CURVE_CRYPTO_REGISTRY, CURVE_REGISTRY,
+            UNISWAP_V2_FACTORY, UNISWAP_V3_FACTORY,
         },
-        conversion::{Convert, ToEthers},
+        conversion::{Convert, ToEthers, ToPrimitive},
     },
 };
 
@@ -191,18 +192,53 @@ impl CheatCodes {
         E: Debug,
         S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
     {
-        let func = AAVE_ATOKEN_V2_ABI
-            .function("underlyingAssetAddress")
-            .expect("underlyingAssetAddress function not found");
+        let func = self
+            .parse_abi::<E>(
+                "underlyingAssetAddress() returns (address)".to_string(),
+            )
+            .ok()?
+            .clone();
+        let base_token = if let Ok(mut underlying_token) =
+            self.cheat_read(state, token, &func, &[])
+        {
+            unwrap_first_token_value!(Address, underlying_token)
+        } else {
+            let func = self
+                .parse_abi::<E>(
+                    "UNDERLYING_ASSET_ADDRESS() returns (address)".to_string(),
+                )
+                .ok()?
+                .clone();
+            unwrap_first_token_value!(
+                Address,
+                self.cheat_read(state, token, &func, &[]).ok()?
+            )
+        };
 
-        let token = unwrap_first_token_value!(
-            Address,
-            self.cheat_read(state, token, func, &[]).ok()?
+        let func = AAVE_LENDING_POOL_V2_ABI
+            .function("getReserveData")
+            .expect("getReserveData function not found");
+        let (rets,) = unwrap_token_values!(
+            self.cheat_read(
+                state,
+                *AAVE_LENDING_POOL_V2,
+                func,
+                &[ToEthers::cvt(base_token)],
+            )
+            .ok()?,
+            Tuple
         );
 
-        println!("underlying token: {}", token);
-
-        None
+        if rets.len() != 12 {
+            None
+        } else {
+            match rets[7] {
+                Token::Address(atoken) if ToPrimitive::cvt(atoken) == token => {
+                    Some(ContractType::AaveAToken(base_token))
+                }
+                _ => None,
+            }
+        }
     }
 }
 
@@ -484,10 +520,9 @@ mod tests_with_dep {
         assert!(matches!(token_ty, ContractType::CurveYVault(_)));
 
         let ausdc =
-            ToPrimitive::cvt("0x9bA00D6856a4eDF4665BcA2C2309936572473B7E");
-        let token_type =
-            cheatcodes.get_contract_type(&mut state, ausdc).unwrap();
-        // assert!(matches!(token_ty, ContractType::AaveAToken(_)));
+            ToPrimitive::cvt("0xbcca60bb61934080951369a648fb03df4f96263c");
+        let token_ty = cheatcodes.get_contract_type(&mut state, ausdc).unwrap();
+        assert!(matches!(token_ty, ContractType::AaveAToken(_)));
     }
 
     #[test]

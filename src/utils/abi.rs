@@ -68,6 +68,10 @@ define_contract!(
     AAVE_ATOKEN_V2_ABI,
     "../../assets/abi/aave_atoken_v2.abi.json"
 );
+define_contract!(
+    AAVE_LENDING_POOL_V2_ABI,
+    "../../assets/abi/aave_lending_pool_v2.abi.json"
+);
 
 // Inverse Finance
 define_contract!(
@@ -112,14 +116,19 @@ pub(crate) mod macros {
             )
         };
         (Vec<u8>, $v:expr) => {
-            (match $v.remove(0) {
-                ethers::abi::Token::FixedBytes(v) => Some(v),
-                ethers::abi::Token::Bytes(v) => Some(v),
+            match $v.remove(0) {
+                ethers::abi::Token::FixedBytes(v)
+                | ethers::abi::Token::Bytes(v) => v,
                 _ => panic!(
                     "impossible: return value is not bytes or fixed_bytes"
                 ),
-            })
-            .expect("impossible: return value is not fixed_byte")
+            }
+        };
+        (Tuple, $v:expr) => {
+            match $v.remove(0) {
+                ethers::abi::Token::Tuple(v) => v,
+                _ => panic!("impossible: return value is not tuple"),
+            }
         };
         (Int, $v:expr) => {
             ethers::types::I256::from_raw(
@@ -167,13 +176,12 @@ pub(crate) mod macros {
             })
         };
         (Vec<Token>, $v:expr) => {
-            (match $v.remove(0) {
+            match $v.remove(0) {
                 ethers::abi::Token::Array(v)
                 | ethers::abi::Token::FixedArray(v)
-                | ethers::abi::Token::Tuple(v) => Some(v),
+                | ethers::abi::Token::Tuple(v) => v,
                 _ => panic!("impossible: return value is not array"),
-            })
-            .expect("impossible: return value is not array or tuple")
+            }
         };
     }
 

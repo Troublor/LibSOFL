@@ -52,6 +52,12 @@ define_address!(
     "0x4dCf7407AE5C07f8681e1659f626E114A7667339"
 );
 
+// Aave
+define_address!(
+    AAVE_LENDING_POOL_V2,
+    "0x7d2768dE32b0b80b7a3454c06BdAc94A69DDc7A9"
+);
+
 // Dummy Address
 define_address!(BURNER_ADDRESS, "0x0123456789abcDEF0123456789abCDef01234567");
 
