@@ -29,19 +29,3 @@ impl MigrationTrait for Migration {
             .await
     }
 }
-
-// /// Learn more at https://docs.rs/sea-query#iden
-// #[derive(Iden)]
-// enum Contract {
-//     Table,
-//     Address,
-//     CreateTx,
-// }
-
-// #[derive(Iden)]
-// enum Invocation {
-//     Table,
-//     Contract,
-//     FromBlock,
-//     ToBlock,
-// }
