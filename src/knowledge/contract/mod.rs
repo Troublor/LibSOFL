@@ -1,4 +1,5 @@
 pub mod abi;
+pub mod entities;
 pub mod msg_call;
 use std::{
     collections::{BTreeMap, HashMap, HashSet},

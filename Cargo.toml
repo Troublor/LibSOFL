@@ -9,6 +9,10 @@ edition = "2021"
 path = "src/lib.rs"
 
 [[bin]]
+name = "migration"
+path = "bin/migration/main.rs"
+
+[[bin]]
 name = "play"
 path = "bin/play/main.rs"
 
@@ -39,8 +43,10 @@ tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
 tracing = "0.1"
 tracing-subscriber = "0.3"
 config = "0.13.1"
-serde = "1.0.164"
-sea-orm = { version = "^0", features = ["sqlx-postgres", "sqlx-sqlite", "runtime-tokio-rustls", "macros", "mock"] }
+serde = {version = "1.0.164", features = ["derive"]}
+sea-orm = { version = "^0", features = ["sqlx-postgres", "sqlx-sqlite", "runtime-tokio-rustls", "macros", "mock", "debug-print"] }
+sea-orm-migration = { version = "^0" }
+async-std = { version = "^1", features = ["attributes", "tokio1"] }
 libafl = "0.10.1"
 thiserror = "1.0.40"
 lazy_static = "1.4.0"

@@ -127,6 +127,7 @@ impl Convert<&str, Address> for ToPrimitive {
     fn cvt(v: &str) -> Address {
         let mut b: [u8; 20] = [0; 20];
         let v = v.trim_start_matches("0x");
+        let v = format!("{:0>40}", v);
         hex::decode_to_slice(v, &mut b).unwrap();
         Address::from_slice(&b)
     }
@@ -137,6 +138,7 @@ impl Convert<&str, H256> for ToPrimitive {
     fn cvt(v: &str) -> H256 {
         let mut b: [u8; 32] = [0; 32];
         let v = v.trim_start_matches("0x");
+        let v = format!("{:0>64}", v);
         hex::decode_to_slice(v, &mut b).unwrap();
         H256::from_slice(&b)
     }
