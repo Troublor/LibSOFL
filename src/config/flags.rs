@@ -52,6 +52,7 @@ impl Default for JsonRpcConfig {
 
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct EtherscanConfig {
+    pub url: String,
     pub api_url: String,
     pub api_key: Option<String>,
     /// Number of requests per second
@@ -61,6 +62,7 @@ pub struct EtherscanConfig {
 impl Default for EtherscanConfig {
     fn default() -> Self {
         Self {
+            url: String::from("https://etherscan.io"),
             api_url: String::from("https://api.etherscan.io/api"),
             api_key: None,
             rate_limit: None,
