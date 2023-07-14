@@ -318,7 +318,7 @@ mod tests_with_dep {
             );
         }
 
-        if false {
+        {
             let token =
                 ToPrimitive::cvt("0xFd2a8fA60Abd58Efe3EeE34dd494cD491dC14900");
             let account =

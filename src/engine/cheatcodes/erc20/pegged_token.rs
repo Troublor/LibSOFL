@@ -11,8 +11,8 @@ use crate::{
     error::SoflError,
     unwrap_first_token_value,
     utils::{
-        abi::{CURVE_Y_VAULT_ABI, ERC20_ABI},
-        addresses::BURNER_ADDRESS,
+        abi::{AAVE_LENDING_POOL_V2_ABI, CURVE_Y_VAULT_ABI, ERC20_ABI},
+        addresses::{AAVE_LENDING_POOL_V2, BURNER_ADDRESS},
         conversion::{Convert, ToEthers},
         math::HPMultipler,
     },
@@ -46,7 +46,14 @@ impl CheatCodes {
                         account,
                         balance - balance_before,
                     )?,
-                ContractType::AaveAToken(_) => todo!(),
+                ContractType::AaveAToken(base_token) => self
+                    .__increase_aave_atoken_v2_balance(
+                        state,
+                        token,
+                        base_token,
+                        account,
+                        balance - balance_before,
+                    )?,
                 _ => {}
             }
         }
@@ -79,6 +86,54 @@ impl CheatCodes {
 
             Ok(Some(balance_before))
         }
+    }
+
+    fn __increase_aave_atoken_v2_balance<E, S>(
+        &mut self,
+        state: &mut S,
+        _token: Address,
+        base_token: Address,
+        account: Address,
+        amount: U256,
+    ) -> Result<(), SoflError<E>>
+    where
+        E: Debug,
+        S: DatabaseEditable<Error = E> + Database<Error = E> + DatabaseCommit,
+    {
+        let mut caller = self.caller.clone();
+        caller.address = account;
+
+        let amount_in = (HPMultipler::from(amount) * U256::from(100)
+            / U256::from(95))
+        .into();
+
+        self.increase_erc20_balance_by(state, base_token, account, amount_in)?;
+        self.set_erc20_allowance(
+            state,
+            base_token,
+            account,
+            *AAVE_LENDING_POOL_V2,
+            U256::MAX,
+        )?;
+
+        let func = AAVE_LENDING_POOL_V2_ABI
+            .function("deposit")
+            .expect("deposit not found");
+        caller.invoke(
+            state,
+            *AAVE_LENDING_POOL_V2,
+            func,
+            &[
+                ToEthers::cvt(base_token),
+                ToEthers::cvt(amount_in),
+                ToEthers::cvt(account),
+                ToEthers::cvt(0),
+            ],
+            None,
+            no_inspector(),
+        )?;
+
+        Ok(())
     }
 
     fn __increase_curve_yvault_balance<E, S>(
@@ -172,6 +227,7 @@ mod tests_with_dep {
         },
         utils::{
             conversion::{Convert, ToPrimitive},
+            math::approx_eq,
             testing::get_testing_bc_provider,
         },
     };
@@ -221,5 +277,25 @@ mod tests_with_dep {
                 .unwrap(),
             U256::from(10).pow(U256::from(24))
         );
+
+        // let's try aave
+        let token =
+            ToPrimitive::cvt("0xbcca60bb61934080951369a648fb03df4f96263c");
+        cheatcodes
+            .set_erc20_balance(
+                &mut state,
+                token,
+                account,
+                U256::from(10).pow(U256::from(13)),
+            )
+            .unwrap();
+        // AAVE may have some precision loss
+        assert!(approx_eq(
+            cheatcodes
+                .get_erc20_balance(&mut state, token, account)
+                .unwrap(),
+            U256::from(10).pow(U256::from(13)),
+            None
+        ));
     }
 }

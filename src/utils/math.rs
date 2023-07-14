@@ -182,3 +182,28 @@ impl UFixed256 {
         U256::from(2).pow(U256::from(self.decimals))
     }
 }
+
+pub fn approx_eq<const BITS: usize, const LIMBS: usize>(
+    mut a: Uint<BITS, LIMBS>,
+    mut b: Uint<BITS, LIMBS>,
+    multipler: Option<u64>,
+) -> bool {
+    // we always have a < b
+    if a > b {
+        std::mem::swap(&mut a, &mut b);
+    }
+    let diff = b - a;
+
+    // get the multipler
+    let multipler: Uint<BITS, LIMBS> = match multipler {
+        Some(m) => Uint::from(m),
+        None => Uint::from(1_000_000u64),
+    };
+
+    // to avoid overflow, we will use multiple steps to calculate the result
+    let a_reduced = a / multipler;
+
+    // at this point, we know that floor(a / multipler) <= diff
+    // but it may be due to the precision loss
+    a_reduced >= diff
+}
