@@ -12,7 +12,7 @@ use reth_primitives::{Address, BlockNumber};
 
 use crate::error::SoflError;
 
-use self::msg_call::MsgCall;
+use self::msg_call::Invocation;
 
 #[auto_impl(&, &mut, Arc, Box, Rc)]
 pub trait MsgCallProvider {
@@ -20,14 +20,14 @@ pub trait MsgCallProvider {
         &self,
         contract: Address,
         block_range: impl RangeBounds<BlockNumber>,
-    ) -> Result<Vec<MsgCall>, SoflError>;
+    ) -> Result<Vec<Invocation>, SoflError>;
 
     fn get_msg_call_for_function<E>(
         &self,
         contract: Address,
         function: &Function,
         block_range: impl RangeBounds<BlockNumber>,
-    ) -> Result<Vec<MsgCall>, SoflError>;
+    ) -> Result<Vec<Invocation>, SoflError>;
 }
 
 pub type ContractKnowledge<K> = HashMap<Address, K>;

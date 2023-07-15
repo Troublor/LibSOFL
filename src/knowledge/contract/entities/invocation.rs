@@ -5,8 +5,8 @@ use sea_orm::entity::prelude::*;
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub contract: super::Address,
-    pub from_block: u64,
-    pub to_block: u64,
+    pub from_block: u32,
+    pub to_block: u32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

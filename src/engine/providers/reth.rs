@@ -28,7 +28,7 @@ impl BcProviderBuilder {
     pub fn default_db() -> Result<RethBcProvider, rethError> {
         let cfg = SoflConfig::load().unwrap();
         let datadir = Path::new(cfg.reth.datadir.as_str());
-        Ok(BcProviderBuilder::with_mainnet_reth_db(datadir).unwrap())
+        BcProviderBuilder::with_mainnet_reth_db(datadir)
     }
 
     pub fn with_mainnet_reth_db(

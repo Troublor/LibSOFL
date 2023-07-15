@@ -70,10 +70,24 @@ impl Default for EtherscanConfig {
     }
 }
 
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct DatabaseConfig {
+    pub url: String,
+}
+
+impl Default for DatabaseConfig {
+    fn default() -> Self {
+        Self {
+            url: String::from("sqlite::memory:"),
+        }
+    }
+}
+
 #[derive(Debug, Deserialize, Serialize, Default)]
 #[allow(unused)]
 pub struct SoflConfig {
     pub reth: RethConfig,
     pub jsonrpc: JsonRpcConfig,
     pub etherscan: EtherscanConfig,
+    pub database: DatabaseConfig,
 }

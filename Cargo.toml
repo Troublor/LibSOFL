@@ -13,6 +13,10 @@ name = "migration"
 path = "bin/migration/main.rs"
 
 [[bin]]
+name = "knowledge"
+path = "bin/knowledge/main.rs"
+
+[[bin]]
 name = "play"
 path = "bin/play/main.rs"
 
@@ -51,6 +55,7 @@ async-std = { version = "^1", features = ["attributes", "tokio1"] }
 libafl = "0.10.1"
 thiserror = "1.0.40"
 lazy_static = "1.4.0"
+clap = {version = "4.3.12", features = ["derive"]}
 
 # misc
 eyre = "0.6.8"

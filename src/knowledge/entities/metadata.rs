@@ -3,8 +3,7 @@ use sea_orm::{entity::prelude::*, ActiveValue};
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
 #[sea_orm(table_name = "metadata")]
 pub struct Model {
-    #[sea_orm(primary_key)]
-    id: i32,
+    #[sea_orm(primary_key, auto_increment = false)]
     key: String,
     value: String,
 }
@@ -20,7 +19,6 @@ impl<T: serde::Serialize> From<(String, T)> for ActiveModel {
         Self {
             key: ActiveValue::Set(key),
             value: ActiveValue::Set(serde_json::to_string(&value).unwrap()),
-            ..Default::default()
         }
     }
 }
@@ -65,9 +63,9 @@ mod tests_nodep {
         let vec = vec![1, 2, 3];
         let metadata: super::ActiveModel = ("foo".to_string(), vec).into();
         let r = super::Entity::insert(metadata).exec(&db).await.unwrap();
-        assert_eq!(r.last_insert_id, 1);
+        assert_eq!(r.last_insert_id, "foo".to_string());
         // query
-        let res = super::Entity::find_by_id(1)
+        let res = super::Entity::find_by_id("foo".to_string())
             .one(&db)
             .await
             .unwrap()

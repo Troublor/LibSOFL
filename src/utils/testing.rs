@@ -1,6 +1,8 @@
 use std::path::PathBuf;
 
 use crate::error::SoflError;
+use crate::knowledge;
+use sea_orm::{ConnectionTrait, Database, DbBackend, Schema};
 
 /// Compile a solidity snippet.
 /// This method uses svm-rs internally to download solc binary.
@@ -51,4 +53,31 @@ pub fn get_testing_bc_provider(
     } else {
         panic!("No jsonrpc endpoint is set in SoflConfig or the endpoint is not valid.")
     }
+}
+
+pub async fn get_testing_db() -> sea_orm::DatabaseConnection {
+    let db = Database::connect("sqlite::memory:").await.unwrap();
+    let schema = Schema::new(DbBackend::Sqlite);
+    let sql =
+        schema.create_table_from_entity(knowledge::entities::metadata::Entity);
+    db.execute(db.get_database_backend().build(&sql))
+        .await
+        .unwrap();
+    let sql = schema
+        .create_table_from_entity(
+            knowledge::contract::entities::contract::Entity,
+        )
+        .to_owned();
+    db.execute(db.get_database_backend().build(&sql))
+        .await
+        .unwrap();
+    let sql = schema
+        .create_table_from_entity(
+            knowledge::contract::entities::invocation::Entity,
+        )
+        .to_owned();
+    db.execute(db.get_database_backend().build(&sql))
+        .await
+        .unwrap();
+    db
 }
