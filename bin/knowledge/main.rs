@@ -270,7 +270,7 @@ fn analyze_block<P: BcProvider>(
 }
 
 #[cfg(test)]
-mod tests_nodep {
+mod tests_with_db {
     use libsofl::{
         engine::providers::BcProviderBuilder,
         knowledge,
