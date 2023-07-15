@@ -339,4 +339,52 @@ mod tests_nodep {
         assert_eq!(r[0].address, contract.into());
         assert_eq!(r[0].create_tx, tx.into());
     }
+
+    #[tokio::test]
+    async fn test_continuous_blocks() {
+        let provider = BcProviderBuilder::default_db().unwrap();
+        let db = get_testing_db().await;
+        let from = 1000000u32;
+        let to = 1000011u32;
+        let contract0: Address =
+            ToPrimitive::cvt("0xc083e9947cf02b8ffc7d3090ae9aea72df98fd47");
+        let contract1: Address =
+            ToPrimitive::cvt("0xb696c21C287FFA81f9dd79828557231C98D863c9");
+        let tx: TxHash = ToPrimitive::cvt("0x0");
+
+        let _ =
+            knowledge::contract::entities::contract::Entity::insert_many(vec![
+                knowledge::contract::entities::contract::ActiveModel {
+                    address: sea_orm::ActiveValue::Set(contract0.into()),
+                    create_tx: sea_orm::ActiveValue::Set(tx.into()),
+                },
+            ])
+            .exec(&db)
+            .await
+            .unwrap();
+        let _ =
+            knowledge::contract::entities::contract::Entity::insert_many(vec![
+                knowledge::contract::entities::contract::ActiveModel {
+                    address: sea_orm::ActiveValue::Set(contract1.into()),
+                    create_tx: sea_orm::ActiveValue::Set(tx.into()),
+                },
+            ])
+            .exec(&db)
+            .await
+            .unwrap();
+
+        analyze(&provider, &db, from, to).await;
+
+        let r = knowledge::contract::entities::invocation::Entity::find()
+            .all(&db)
+            .await
+            .unwrap();
+        assert_eq!(r.len(), 2);
+        assert_eq!(r[0].contract, contract0.into());
+        assert_eq!(r[0].from_block, from);
+        assert_eq!(r[0].to_block, from);
+        assert_eq!(r[1].contract, contract1.into());
+        assert_eq!(r[1].from_block, to - 1);
+        assert_eq!(r[1].to_block, to - 1);
+    }
 }

@@ -4016,6 +4016,7 @@ dependencies = [
  "libafl",
  "mockall",
  "mockall_double",
+ "rayon",
  "reqwest",
  "reth-auto-seal-consensus",
  "reth-basic-payload-builder",
