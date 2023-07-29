@@ -118,29 +118,29 @@ impl From<Address> for MultiChainAddress {
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
 pub struct AddressBook {
     // misc
-    eth: MultiChainAddress,
-    dummy: MultiChainAddress,
-    default_caller: MultiChainAddress,
+    pub eth: MultiChainAddress,
+    pub dummy: MultiChainAddress,
+    pub default_caller: MultiChainAddress,
 
     // ERC20 tokens
-    weth: MultiChainAddress,
-    wbtc: MultiChainAddress,
-    usdc: MultiChainAddress,
-    usdt: MultiChainAddress,
-    dai: MultiChainAddress,
+    pub weth: MultiChainAddress,
+    pub wbtc: MultiChainAddress,
+    pub usdc: MultiChainAddress,
+    pub usdt: MultiChainAddress,
+    pub dai: MultiChainAddress,
 
     // Uniswap
-    uniswap_v3_factory: MultiChainAddress,
-    uniswap_v2_factory: MultiChainAddress,
+    pub uniswap_v3_factory: MultiChainAddress,
+    pub uniswap_v2_factory: MultiChainAddress,
 
     // Curve.FI
-    curve_address_provider: MultiChainAddress,
-    curve_registry: MultiChainAddress,
-    curve_exchange: MultiChainAddress,
-    curve_crypto_registry: MultiChainAddress,
+    pub curve_address_provider: MultiChainAddress,
+    pub curve_registry: MultiChainAddress,
+    pub curve_exchange: MultiChainAddress,
+    pub curve_crypto_registry: MultiChainAddress,
 
     // Aave
-    aave_lending_pool_v2: MultiChainAddress,
+    pub aave_lending_pool_v2: MultiChainAddress,
 }
 
 macro_rules! decl_address {

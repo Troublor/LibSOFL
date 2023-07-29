@@ -42,7 +42,9 @@ pub enum JsonRpcError {
 
 impl BcProviderBuilder {
     pub fn default_jsonrpc() -> Result<JsonRpcBcProvider<Http>, JsonRpcError> {
-        Ok(JsonRpcBcProvider::default())
+        let cfg = SoflConfig::load().expect("failed to load config");
+        let url = cfg.jsonrpc.endpoint.clone();
+        BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, cfg.jsonrpc)
     }
 
     pub fn with_jsonrpc_via_http(

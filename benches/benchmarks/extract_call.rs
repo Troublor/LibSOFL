@@ -44,7 +44,7 @@ pub fn reproduce_blocks_with_inspector(c: &mut Criterion) {
             for i in r.clone() {
                 reproduce_block(&provider, i, &mut insp);
             }
-            assert!(!insp.calls.is_empty());
+            assert!(!insp.invocations.is_empty());
         })
     };
     group.bench_with_input(
@@ -140,7 +140,7 @@ pub fn reproduce_very_large_tx_with_inspector(c: &mut Criterion) {
         b.iter(|| {
             let mut insp = CallExtractInspector::default();
             reproduce_tx(&provider, TxHash::from_str(tx).unwrap(), &mut insp);
-            assert!(!insp.calls.is_empty());
+            assert!(!insp.invocations.is_empty());
         })
     };
     group.bench_with_input(

@@ -4,5 +4,14 @@
     "rust-analyzer.linkedProjects": [
         "./Cargo.toml",
     ],
-    "rust-analyzer.showUnlinkedFileNotification": false
+    "rust-analyzer.showUnlinkedFileNotification": false,
+    "sqltools.connections": [
+        {
+            "previewLimit": 50,
+            "driver": "SQLite",
+            "name": "TestDB",
+            "database": "tests/data/test.db"
+        }
+    ],
+    "sqltools.useNodeRuntime": true
 }
