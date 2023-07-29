@@ -124,6 +124,37 @@ impl HighLevelCaller {
         }
     }
 
+    pub fn create<
+        'a,
+        BS: Database + DatabaseCommit,
+        I: MultiTxInspector<&'a mut BS>,
+    >(
+        &self,
+        state: &'a mut BS,
+        calldata: &[u8],
+        value: Option<U256>,
+        inspector: &mut I,
+    ) -> Result<(Bytes, Option<Address>), SoflError<BS::Error>> {
+        let tx = TxBuilder::new()
+            .set_from(self.address)
+            .set_input(calldata)
+            .set_gas_limit(self.gas_limit)
+            .set_value(value.unwrap_or(U256::default()))
+            .build();
+        let spec = self.spec_builder.clone().append_tx(tx.from(), tx).build();
+        let (_, mut result) = BcState::transit(state, spec, inspector)?;
+        let result = result.pop().unwrap();
+        match result {
+            ExecutionResult::Success { output, .. } => {
+                let Output::Create(bytes, addr) = output else {
+                    panic!("should not happen since `tx.to` is set")
+                };
+                Ok((bytes, addr))
+            }
+            _ => Err(SoflError::Exec(result)),
+        }
+    }
+
     pub fn call<
         'a,
         BS: Database + DatabaseCommit,

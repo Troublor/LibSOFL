@@ -16,6 +16,10 @@ path = "bin/play/main.rs"
 name = "pom"
 path = "bin/pom/main.rs"
 
+[[bin]]
+name = "c4c"
+path = "bin/c4c/main.rs"
+
 [features]
 
 test-use-jsonrpc = []
@@ -83,6 +87,8 @@ reth-payload-builder = { path = "./reth/crates/payload/builder" }
 reth-basic-payload-builder = { path = "./reth/crates/payload/basic" }
 reth-discv4 = { path = "./reth/crates/net/discv4" }
 reth-metrics = { path = "./reth/crates/metrics" }
+clap = { version = "4.3.19", features = ["derive"] }
+toml = "0.7.6"
 
 [dev-dependencies]
 criterion = "0.4"
