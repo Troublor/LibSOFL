@@ -13,20 +13,22 @@ use ethers_providers::{Http, Ws};
 use futures::future::join_all;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Url};
+use reth_db::models::StoredBlockBodyIndices;
 use reth_interfaces::Error as rethError;
 use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
-    Account, Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytecode,
-    Bytes, ChainInfo, ChainSpec, ChainSpecBuilder, Header, Receipt,
-    SealedHeader, StorageKey, StorageValue, TransactionMeta, TransactionSigned,
-    TransactionSignedNoHash, TxHash, TxNumber,
+    Account, Address, Block, BlockHash, BlockHashOrNumber, BlockNumber,
+    BlockWithSenders, Bytecode, Bytes, ChainInfo, ChainSpec, ChainSpecBuilder,
+    Header, Receipt, SealedBlock, SealedHeader, StorageKey, StorageValue,
+    TransactionMeta, TransactionSigned, TransactionSignedNoHash, TxHash,
+    TxNumber, Withdrawal,
 };
 use reth_provider::{
-    AccountReader, BlockHashReader, BlockIdReader, BlockNumReader,
-    EvmEnvProvider, HeaderProvider, PostState, ProviderError, ReceiptProvider,
-    StateProvider, StateProviderFactory, StateRootProvider,
-    TransactionsProvider,
+    AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader,
+    BlockSource, EvmEnvProvider, HeaderProvider, PostState, ProviderError,
+    ReceiptProvider, StateProvider, StateProviderFactory, StateRootProvider,
+    TransactionsProvider, WithdrawalsProvider,
 };
 use revm_primitives::{BlockEnv, CfgEnv, HashMap, B256 as H256, U256};
 
@@ -96,12 +98,104 @@ pub struct JsonRpcBcProvider<P: JsonRpcClient> {
     runtime: tokio::runtime::Runtime,
 }
 
+impl<P: JsonRpcClient> Clone for JsonRpcBcProvider<P> {
+    fn clone(&self) -> Self {
+        JsonRpcBcProvider {
+            provider: self.provider.clone(),
+            runtime: tokio::runtime::Runtime::new().unwrap(),
+        }
+    }
+}
+
 impl Default for JsonRpcBcProvider<Http> {
     fn default() -> Self {
         let cfg = SoflConfig::load().expect("failed to load config");
         let url = cfg.jsonrpc.endpoint.clone();
         BcProviderBuilder::with_jsonrpc_via_http_with_auth(url, cfg.jsonrpc)
             .expect("failed to create json-rpc provider from config")
+    }
+}
+
+impl<P: JsonRpcClient> WithdrawalsProvider for JsonRpcBcProvider<P> {
+    #[doc = " Get withdrawals by block id."]
+    fn withdrawals_by_block(
+        &self,
+        _id: BlockHashOrNumber,
+        _timestamp: u64,
+    ) -> rethResult<Option<Vec<Withdrawal>>> {
+        todo!()
+    }
+
+    #[doc = " Get latest withdrawal from this block or earlier ."]
+    fn latest_withdrawal(&self) -> rethResult<Option<Withdrawal>> {
+        todo!()
+    }
+}
+
+impl<P: JsonRpcClient> BlockReader for JsonRpcBcProvider<P> {
+    #[doc = " Tries to find in the given block source."]
+    #[doc = ""]
+    #[doc = " Note: this only operates on the hash because the number might be ambiguous."]
+    #[doc = ""]
+    #[doc = " Returns `None` if block is not found."]
+    fn find_block_by_hash(
+        &self,
+        _hash: H256,
+        _source: BlockSource,
+    ) -> rethResult<Option<Block>> {
+        todo!()
+    }
+
+    #[doc = " Returns the block with given id from the database."]
+    #[doc = ""]
+    #[doc = " Returns `None` if block is not found."]
+    fn block(&self, _id: BlockHashOrNumber) -> rethResult<Option<Block>> {
+        todo!()
+    }
+
+    #[doc = " Returns the pending block if available"]
+    #[doc = ""]
+    #[doc = " Note: This returns a [SealedBlock] because it\'s expected that this is sealed by the provider"]
+    #[doc = " and the caller does not know the hash."]
+    fn pending_block(&self) -> rethResult<Option<SealedBlock>> {
+        todo!()
+    }
+
+    #[doc = " Returns the pending block and receipts if available."]
+    fn pending_block_and_receipts(
+        &self,
+    ) -> rethResult<Option<(SealedBlock, Vec<Receipt>)>> {
+        todo!()
+    }
+
+    #[doc = " Returns the ommers/uncle headers of the given block from the database."]
+    #[doc = ""]
+    #[doc = " Returns `None` if block is not found."]
+    fn ommers(
+        &self,
+        _id: BlockHashOrNumber,
+    ) -> rethResult<Option<Vec<Header>>> {
+        todo!()
+    }
+
+    #[doc = " Returns the block body indices with matching number from database."]
+    #[doc = ""]
+    #[doc = " Returns `None` if block is not found."]
+    fn block_body_indices(
+        &self,
+        _num: u64,
+    ) -> rethResult<Option<StoredBlockBodyIndices>> {
+        todo!()
+    }
+
+    #[doc = " Returns the block with senders with matching number from database."]
+    #[doc = ""]
+    #[doc = " Returns `None` if block is not found."]
+    fn block_with_senders(
+        &self,
+        _number: BlockNumber,
+    ) -> rethResult<Option<BlockWithSenders>> {
+        todo!()
     }
 }
 
@@ -875,6 +969,22 @@ impl<P: JsonRpcClient> StateProvider for JsonRpcStateProvider<P> {
         Err(rethError::Provider(
             ProviderError::StateRootNotAvailableForHistoricalBlock,
         ))
+    }
+}
+
+#[cfg(test)]
+mod tests_nodep {
+    use crate::engine::providers::BcProvider;
+
+    #[test]
+    fn test_jsonrpc_provider_implements_bc_provider_trait() {
+        let provider =
+            crate::engine::providers::rpc::JsonRpcBcProvider::default();
+        take_bc_provider(provider);
+    }
+
+    fn take_bc_provider<P: BcProvider>(provider: P) {
+        let _ = provider;
     }
 }
 
