@@ -1,5 +1,4 @@
 use clap::{Parser, Subcommand};
-use ethers::prelude::account::{InternalTxQueryOption, TxListParams};
 use hashbrown::HashMap;
 use libsofl::{
     engine::{
@@ -9,14 +8,16 @@ use libsofl::{
         transactions::position::TxPosition,
         utils::HighLevelCaller,
     },
-    etherscan::EtherscanClient,
-    utils::conversion::{Convert, ToElementary, ToEthers, ToPrimitive},
+    utils::conversion::{Convert, ToElementary, ToPrimitive},
 };
 use reth_primitives::TxHash;
 use revm::{Database, DatabaseCommit};
 use revm_primitives::{hex, Address, Bytecode, ExecutionResult, B256, U256};
 use serde::Deserialize;
-use std::{fmt, fs, path::PathBuf, str::FromStr};
+use std::{collections::HashSet, fmt, fs, path::PathBuf, str::FromStr};
+
+mod inspector;
+use inspector::InternalTransactionInspector;
 
 #[derive(Parser)]
 #[command(name = "C4C-Simulator")]
@@ -45,7 +46,7 @@ enum Commands {
     },
     GasEstimation {
         #[arg(long)]
-        start_tx_hash: String,
+        start_tx_hash: Option<String>,
     },
 }
 
@@ -55,7 +56,9 @@ struct Config {
     block: u64,
     replacee_address: Option<String>,
     attack_transaction: Option<String>,
-    victim_contract: Option<String>,
+    earliest_transaction: Option<String>,
+    blocks: Option<Vec<u64>>,
+    excluded_transactions: Option<Vec<String>>,
 }
 
 fn main() {
@@ -103,7 +106,12 @@ fn main() {
             }
         }
         Some(Commands::GasEstimation { start_tx_hash }) => {
-            let start_tx_hash = TxHash::from_str(start_tx_hash).unwrap();
+            let start_tx_hash = if let Some(ref tx_hash_str) = start_tx_hash {
+                TxHash::from_str(tx_hash_str).unwrap()
+            } else {
+                TxHash::from_str(config.earliest_transaction.as_ref().unwrap())
+                    .unwrap()
+            };
             let res =
                 estimate_gas_usage(&bp, &config, &creation_code, start_tx_hash);
 
@@ -161,90 +169,101 @@ fn estimate_gas_usage<P: BcProvider>(
 
     let replacee_contract =
         Address::from_str(config.replacee_address.as_ref().unwrap()).unwrap();
-    let replacee_contract_ethers = ToEthers::cvt(replacee_contract);
-
-    // prepare etherscan client
-    let runtime = tokio::runtime::Runtime::new().unwrap();
-    let etherscan = EtherscanClient::default();
-    let mut params = TxListParams {
-        offset: 10000,
+    let txs = get_txs_by_block_range(
+        bp,
         start_block,
-        end_block: attack_block - 1, // we do not want to include any attach txs
-        ..Default::default()
-    };
-
-    // collect all transactions
-    let mut txs = HashMap::new();
-    // go with the external transactions
-    params.page = 1;
-    loop {
-        let victim_address_ethers = ToEthers::cvt(
-            Address::from_str(config.victim_contract.as_ref().unwrap())
-                .unwrap(),
-        );
-        let result = runtime
-            .block_on(
-                etherscan
-                    .get_transactions(&victim_address_ethers, Some(params)),
-            )
-            .unwrap();
-
-        for tx in &result {
-            let tx_hash: TxHash = ToPrimitive::cvt(tx.hash.value().unwrap());
-            let gas_price: U256 = ToPrimitive::cvt(tx.gas_price.unwrap());
-            txs.insert(tx_hash, gas_price);
-        }
-
-        if result.len() < params.offset as usize {
-            break;
-        }
-        params.page += 1;
-    }
-
-    // go with the internal transactions
-    params.page = 1;
-    loop {
-        let result = runtime
-            .block_on(etherscan.get_internal_transactions(
-                InternalTxQueryOption::ByAddress(replacee_contract_ethers),
-                Some(params),
-            ))
-            .unwrap();
-
-        for tx in &result {
-            let tx_hash: TxHash = ToPrimitive::cvt(tx.hash);
-            if txs.contains_key(&tx_hash) {
-                continue;
-            }
-
-            let (tx, tx_meta) =
-                bp.transaction_by_hash_with_meta(tx_hash).unwrap().unwrap();
-
-            let gas_price = ToPrimitive::cvt(
-                tx.transaction.effective_gas_price(tx_meta.base_fee),
-            );
-
-            txs.insert(tx_hash, gas_price);
-        }
-
-        if result.len() < params.offset as usize {
-            break;
-        }
-
-        params.page += 1;
-    }
+        attack_block,
+        &config.blocks,
+        replacee_contract,
+    );
 
     let mut gas_records = HashMap::new();
+
+    let excluded_txs: HashSet<TxHash> =
+        if let Some(ref exclude_txs_vec) = config.excluded_transactions {
+            exclude_txs_vec
+                .iter()
+                .map(|tx_hash_str| TxHash::from_str(tx_hash_str).unwrap())
+                .collect()
+        } else {
+            HashSet::new()
+        };
+
     for (tx_hash, gas_price) in txs {
+        if excluded_txs.contains(&tx_hash) {
+            continue;
+        }
+
         assert!(tx_hash != attack_tx_hash);
 
-        let (gas_usage, eth_price) =
-            replay(bp, config, creation_code, tx_hash).unwrap();
-
-        gas_records.insert(tx_hash, (gas_usage, gas_price, eth_price));
+        if let Some((gas_usage, eth_price)) =
+            replay(bp, config, creation_code, tx_hash)
+        {
+            gas_records.insert(tx_hash, (gas_usage, gas_price, eth_price));
+        } else {
+            println!("Replay Failed: {:?}", tx_hash);
+        }
     }
 
     gas_records
+}
+
+fn get_txs_by_block_range<P: BcProvider>(
+    bp: &P,
+    start_block: u64,
+    end_block: u64,
+    blocks: &Option<Vec<u64>>,
+    replacee_contract: Address,
+) -> HashMap<TxHash, U256> {
+    let mut rv = HashMap::new();
+
+    let blocks: Option<HashSet<u64>> = blocks
+        .as_ref()
+        .map(|blocks| blocks.iter().cloned().collect());
+
+    let mut finded_blocks = Vec::new();
+    for block in start_block..end_block {
+        let state = BcStateBuilder::fork_at(bp, block).unwrap();
+
+        if let Some(ref select) = blocks {
+            if !select.contains(&block) {
+                continue;
+            }
+        }
+
+        println!("Processing block {}", block);
+        let txs = bp.transactions_by_block(block.into()).unwrap();
+        let txs = match txs {
+            Some(txs) => txs,
+            None => continue,
+        };
+        let spec = TransitionSpecBuilder::new()
+            .at_block(bp, block)
+            .append_signed_txs(txs.clone())
+            .build();
+
+        let mut inspector =
+            InternalTransactionInspector::new(replacee_contract);
+        _ = BcState::transit(state, spec, &mut inspector).unwrap();
+
+        if !inspector.txs.is_empty() {
+            finded_blocks.push(block);
+        }
+
+        for i in inspector.txs {
+            let tx_hash = txs.get(i).unwrap().hash;
+            println!("found tx: {:?}", tx_hash);
+            let (tx, tx_meta) =
+                bp.transaction_by_hash_with_meta(tx_hash).unwrap().unwrap();
+            let gas_price = ToPrimitive::cvt(
+                tx.transaction.effective_gas_price(tx_meta.base_fee),
+            );
+            rv.insert(tx_hash, gas_price);
+        }
+    }
+    println!("{:?}", finded_blocks);
+
+    rv
 }
 
 fn get_eth_price<BS: Database<Error = E> + DatabaseCommit, E: fmt::Debug>(
