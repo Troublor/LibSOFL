@@ -19,10 +19,10 @@ use reth_interfaces::Result as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockNumber,
-    BlockWithSenders, Bytecode, Bytes, ChainInfo, ChainSpec, ChainSpecBuilder,
-    Header, Receipt, SealedBlock, SealedHeader, StorageKey, StorageValue,
-    TransactionMeta, TransactionSigned, TransactionSignedNoHash, TxHash,
-    TxNumber, Withdrawal,
+    BlockWithSenders, Bytecode, Bytes, ChainInfo, ChainSpec, Header, Receipt,
+    SealedBlock, SealedHeader, StorageKey, StorageValue, TransactionMeta,
+    TransactionSigned, TransactionSignedNoHash, TxHash, TxNumber, Withdrawal,
+    MAINNET,
 };
 use reth_provider::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader,
@@ -595,7 +595,7 @@ impl<P: JsonRpcClient> HeaderProvider for JsonRpcBcProvider<P> {
 
 fn chain_id_to_chain_spec(id: u64) -> ChainSpec {
     match id {
-        1 => ChainSpecBuilder::mainnet().build(),
+        1 => (**MAINNET).clone(),
         _ => panic!("Unsupported chain id: {}", id),
     }
 }
@@ -1078,9 +1078,18 @@ mod tests_for_jsonrpc {
         use reth_provider::StateProviderFactory;
 
         use crate::{
-            engine::providers::rpc::JsonRpcBcProvider,
+            engine::{
+                providers::rpc::JsonRpcBcProvider, state::BcStateBuilder,
+            },
             utils::conversion::{Convert, ToPrimitive},
         };
+
+        #[test]
+        fn test_fork_after_the_merge() {
+            let bc_provider = JsonRpcBcProvider::default();
+            let _ =
+                BcStateBuilder::fork_at(&bc_provider, (17809239, 1)).unwrap();
+        }
 
         #[test]
         fn test_get_latest_state_provider() {
