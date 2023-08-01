@@ -3,7 +3,7 @@ use hashbrown::HashMap;
 use libsofl::{
     engine::{
         inspectors::no_inspector,
-        providers::{BcProvider, BcProviderBuilder},
+        providers::BcProviderBuilder,
         state::{env::TransitionSpecBuilder, BcState, BcStateBuilder},
         transactions::position::TxPosition,
         utils::HighLevelCaller,
@@ -11,6 +11,10 @@ use libsofl::{
     utils::conversion::{Convert, ToElementary, ToPrimitive},
 };
 use reth_primitives::TxHash;
+use reth_provider::{
+    BlockHashReader, BlockNumReader, EvmEnvProvider, ReceiptProvider,
+    StateProviderFactory, TransactionsProvider,
+};
 use revm::{Database, DatabaseCommit};
 use revm_primitives::{hex, Address, Bytecode, ExecutionResult, B256, U256};
 use serde::Deserialize;
@@ -59,6 +63,7 @@ struct Config {
     earliest_transaction: Option<String>,
     blocks: Option<Vec<u64>>,
     excluded_transactions: Option<Vec<String>>,
+    storages: Option<Vec<(u64, String)>>,
 }
 
 fn main() {
@@ -142,7 +147,14 @@ fn main() {
     }
 }
 
-fn estimate_gas_usage<P: BcProvider>(
+fn estimate_gas_usage<
+    P: ReceiptProvider
+        + TransactionsProvider
+        + BlockNumReader
+        + BlockHashReader
+        + StateProviderFactory
+        + EvmEnvProvider,
+>(
     bp: &P,
     config: &Config,
     creation_code: &str,
@@ -155,16 +167,18 @@ fn estimate_gas_usage<P: BcProvider>(
             .expect("No attack transaction specified"),
     )
     .unwrap();
-    let (_, attack_tx_meta) = bp
-        .transaction_by_hash_with_meta(attack_tx_hash)
-        .unwrap()
-        .expect("No attack transaction receipt found");
-    let attack_block = attack_tx_meta.block_number;
+    let attack_block = if let Some((_, attack_tx_meta)) =
+        bp.transaction_by_hash_with_meta(attack_tx_hash).unwrap()
+    {
+        attack_tx_meta.block_number
+    } else {
+        17471230
+    };
 
     let (_, start_tx_meta) = bp
         .transaction_by_hash_with_meta(start_tx_hash)
         .unwrap()
-        .expect("No start transaction receipt found");
+        .unwrap();
     let start_block = start_tx_meta.block_number;
 
     let replacee_contract =
@@ -200,15 +214,20 @@ fn estimate_gas_usage<P: BcProvider>(
             replay(bp, config, creation_code, tx_hash)
         {
             gas_records.insert(tx_hash, (gas_usage, gas_price, eth_price));
-        } else {
-            println!("Replay Failed: {:?}", tx_hash);
         }
     }
 
     gas_records
 }
 
-fn get_txs_by_block_range<P: BcProvider>(
+fn get_txs_by_block_range<
+    P: ReceiptProvider
+        + TransactionsProvider
+        + BlockNumReader
+        + BlockHashReader
+        + StateProviderFactory
+        + EvmEnvProvider,
+>(
     bp: &P,
     start_block: u64,
     end_block: u64,
@@ -287,7 +306,14 @@ fn get_eth_price<BS: Database<Error = E> + DatabaseCommit, E: fmt::Debug>(
     U256::try_from_be_slice(answer_byte.as_slice()).unwrap()
 }
 
-fn replay<P: BcProvider>(
+fn replay<
+    P: ReceiptProvider
+        + TransactionsProvider
+        + BlockNumReader
+        + BlockHashReader
+        + StateProviderFactory
+        + EvmEnvProvider,
+>(
     bp: &P,
     config: &Config,
     creation_code: &str,
@@ -312,10 +338,24 @@ fn replay<P: BcProvider>(
             state.insert_account_info(addr, account_info);
         }
 
+        if let Some(storages) = &config.storages {
+            for (slot, value) in storages {
+                let slot = U256::from(*slot);
+                let value = ToPrimitive::cvt(value.as_str());
+                let _ = state.insert_account_storage(addr, slot, value);
+            }
+        }
+
         let mut spec_builder =
             TransitionSpecBuilder::new().at_block(bp, block.block);
         spec_builder = spec_builder.append_signed_tx(tx);
-        let spec = spec_builder.build();
+        let mut spec = spec_builder.build();
+
+        // make the sender rich enough to support the additional gas fee
+        spec.txs[0].gas_limit += 500_000;
+        let mut info = state.basic(spec.txs[0].caller).unwrap().unwrap();
+        info.balance += U256::from(10).pow(U256::from(22));
+        state.insert_account_info(spec.txs[0].caller, info);
 
         let (_, results) =
             BcState::transit(state, spec, no_inspector()).unwrap();
@@ -324,7 +364,10 @@ fn replay<P: BcProvider>(
             ExecutionResult::Success { gas_used, .. } => {
                 Some((gas_used, eth_price))
             }
-            _ => None,
+            _ => {
+                println!("Replay Failed ({:?}): {:?}", tx_hash, result);
+                None
+            }
         }
     } else {
         let receipts = bp.receipts_by_block(block.block).unwrap().unwrap();
@@ -340,7 +383,14 @@ fn replay<P: BcProvider>(
     }
 }
 
-fn deploy<P: BcProvider>(
+fn deploy<
+    P: ReceiptProvider
+        + TransactionsProvider
+        + BlockNumReader
+        + BlockHashReader
+        + StateProviderFactory
+        + EvmEnvProvider,
+>(
     bp: &P,
     config: &Config,
     creation_code: &str,
