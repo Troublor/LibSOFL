@@ -9,7 +9,9 @@ use reth_provider::{
     TransactionsProvider,
 };
 use reth_revm::database::StateProviderDatabase as WrappedDB;
-use revm::{db::CacheDB, db::EmptyDB, Database, DatabaseCommit, EVM, Inspector};
+use revm::{
+    db::CacheDB, db::EmptyDB, Database, DatabaseCommit, Inspector, EVM,
+};
 use revm_primitives::{
     db::DatabaseRef, AccountInfo, ExecutionResult, Halt, U256,
 };
@@ -51,8 +53,10 @@ impl BcStateBuilder {
     >(
         p: &P,
         pos: impl Into<TxPosition>,
-    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::RethError>>
-    {
+    ) -> Result<
+        CacheDB<StateProviderDB<'_>>,
+        SoflError<reth_interfaces::RethError>,
+    > {
         let pos = pos.into();
         let bn = pos.get_block_number(p).map_err(|_| SoflError::Fork(pos))?;
         let sp = p
@@ -85,8 +89,10 @@ impl BcStateBuilder {
     >(
         p: &P,
         pos: impl Into<TxPosition>,
-    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::RethError>>
-    {
+    ) -> Result<
+        CacheDB<StateProviderDB<'_>>,
+        SoflError<reth_interfaces::RethError>,
+    > {
         let mut pos = pos.into();
         pos.shift(p, 1).map_err(|_| SoflError::Fork(pos))?;
         Self::fork_at(p, pos)
@@ -95,8 +101,10 @@ impl BcStateBuilder {
     /// fork from the current latest blockchain state
     pub fn latest<P: StateProviderFactory + EvmEnvProvider>(
         p: &P,
-    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::RethError>>
-    {
+    ) -> Result<
+        CacheDB<StateProviderDB<'_>>,
+        SoflError<reth_interfaces::RethError>,
+    > {
         let sp = p.latest().map_err(SoflError::Reth)?;
         let wrapped = WrappedDB::new(sp);
         let state = CacheDB::new(wrapped);

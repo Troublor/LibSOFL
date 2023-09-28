@@ -137,13 +137,7 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
         self.inspectors
             .iter_mut()
             .map(|insp| {
-                insp.call_end(
-                    _data,
-                    _inputs,
-                    remaining_gas,
-                    ret,
-                    out.clone(),
-                )
+                insp.call_end(_data, _inputs, remaining_gas, ret, out.clone())
             })
             .filter(|(res, g, o)| {
                 *res != ret || !is_gas_equal(*g, remaining_gas) || *o != out

@@ -26,9 +26,9 @@ use reth_primitives::{
 };
 use reth_provider::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader,
-    BlockSource, EvmEnvProvider, HeaderProvider, BundleStateWithReceipts, ProviderError,
-    ReceiptProvider, StateProvider, StateProviderFactory, StateRootProvider,
-    TransactionsProvider, WithdrawalsProvider,
+    BlockSource, BundleStateWithReceipts, EvmEnvProvider, HeaderProvider,
+    ProviderError, ReceiptProvider, StateProvider, StateProviderFactory,
+    StateRootProvider, TransactionsProvider, WithdrawalsProvider,
 };
 use revm_primitives::{BlockEnv, CfgEnv, HashMap, B256 as H256, U256};
 
@@ -304,7 +304,10 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         todo!()
     }
 
-    fn transaction_by_id_no_hash(&self, _id: TxNumber) -> rethResult<Option<TransactionSignedNoHash>> {
+    fn transaction_by_id_no_hash(
+        &self,
+        _id: TxNumber,
+    ) -> rethResult<Option<TransactionSignedNoHash>> {
         todo!()
     }
 
@@ -921,7 +924,10 @@ impl<P: JsonRpcClient> AccountReader for JsonRpcStateProvider<P> {
 
 impl<P: JsonRpcClient> StateRootProvider for JsonRpcStateProvider<P> {
     #[doc = " Returns the state root of the PostState on top of the current state."]
-    fn state_root(&self, _post_state: &BundleStateWithReceipts) -> rethResult<H256> {
+    fn state_root(
+        &self,
+        _post_state: &BundleStateWithReceipts,
+    ) -> rethResult<H256> {
         Err(rethError::Provider(
             ProviderError::StateRootNotAvailableForHistoricalBlock,
         ))
