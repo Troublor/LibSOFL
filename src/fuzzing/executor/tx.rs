@@ -101,7 +101,7 @@ where
             BcState::transit(bc_state, spec, &mut inspector).map_err(|_| {
                 libafl::Error::IllegalArgument(
                     "failed to execute transaction".to_string(),
-                    libafl::ErrorBacktrace::new(),
+                    libafl_bolts::ErrorBacktrace::new(),
                 )
             })?;
         let exit_kind = libafl::prelude::ExitKind::Ok;

@@ -46,12 +46,12 @@ impl<S, P: TransactionsProvider> Generator<TxInput, S>
                     .map_err(|e| {
                         libafl::Error::Unknown(
                             format!("failed to fetch txs: {:?}", e),
-                            libafl::ErrorBacktrace::default(),
+                            libafl_bolts::ErrorBacktrace::default(),
                         )
                     })?
                     .ok_or(libafl::Error::Unknown(
                         format!("failed to fetch txs: {:?}", self.bn),
-                        libafl::ErrorBacktrace::default(),
+                        libafl_bolts::ErrorBacktrace::default(),
                     ))?
                     .into_iter()
                     .map(|tx| tx.into())

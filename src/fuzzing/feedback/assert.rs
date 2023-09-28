@@ -1,7 +1,8 @@
 use libafl::{
-    prelude::{Feedback, Named, UsesInput},
+    prelude::{Feedback, UsesInput},
     state::HasClientPerfMonitor,
 };
+use libafl_bolts::Named;
 use revm_primitives::ExecutionResult;
 
 use crate::fuzzing::observer::result::ExecutionResultObserver;

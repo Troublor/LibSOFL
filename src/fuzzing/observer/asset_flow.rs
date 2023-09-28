@@ -1,6 +1,7 @@
 use libafl::prelude::{
-    DifferentialObserver, Named, Observer, ObserversTuple, UsesInput,
+    DifferentialObserver, Observer, ObserversTuple, UsesInput,
 };
+use libafl_bolts::Named;
 use revm::Database;
 
 use crate::engine::inspectors::asset_flow::{

@@ -1,4 +1,5 @@
-use libafl::prelude::{Named, Observer, UsesInput};
+use libafl::prelude::{Observer, UsesInput};
+use libafl_bolts::Named;
 use revm::Database;
 use revm_primitives::ExecutionResult;
 use serde::{Deserialize, Serialize};

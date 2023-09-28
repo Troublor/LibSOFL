@@ -1,4 +1,5 @@
-use libafl::prelude::{Feedback, HasClientPerfMonitor, Named, UsesInput};
+use libafl::prelude::{Feedback, HasClientPerfMonitor, UsesInput};
+use libafl_bolts::Named;
 
 #[derive(Debug)]
 pub struct NeverFeedback {}
