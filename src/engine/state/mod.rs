@@ -8,13 +8,13 @@ use reth_provider::{
     EvmEnvProvider, StateProviderBox, StateProviderFactory,
     TransactionsProvider,
 };
-use reth_revm::database::State as WrappedDB;
-use revm::{db::CacheDB, db::EmptyDB, Database, DatabaseCommit, EVM};
+use reth_revm::database::StateProviderDatabase as WrappedDB;
+use revm::{db::CacheDB, db::EmptyDB, Database, DatabaseCommit, EVM, Inspector};
 use revm_primitives::{
     db::DatabaseRef, AccountInfo, ExecutionResult, Halt, U256,
 };
 
-use crate::engine::inspectors::{no_inspector, MultiTxInspector};
+use crate::engine::inspectors::{no_inspector, TxHook};
 use crate::engine::transactions::position::TxPosition;
 use crate::error::SoflError;
 
@@ -38,7 +38,7 @@ pub type StateProviderDB<'a> = WrappedDB<StateProviderBox<'a>>;
 
 pub type ForkedState<'a> = CacheDB<StateProviderDB<'a>>;
 
-pub type ForkedStateDbError = reth_interfaces::Error;
+pub type ForkedStateDbError = reth_interfaces::RethError;
 
 pub type FreshState = CacheDB<EmptyDB>;
 
@@ -51,7 +51,7 @@ impl BcStateBuilder {
     >(
         p: &P,
         pos: impl Into<TxPosition>,
-    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::Error>>
+    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::RethError>>
     {
         let pos = pos.into();
         let bn = pos.get_block_number(p).map_err(|_| SoflError::Fork(pos))?;
@@ -85,7 +85,7 @@ impl BcStateBuilder {
     >(
         p: &P,
         pos: impl Into<TxPosition>,
-    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::Error>>
+    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::RethError>>
     {
         let mut pos = pos.into();
         pos.shift(p, 1).map_err(|_| SoflError::Fork(pos))?;
@@ -95,7 +95,7 @@ impl BcStateBuilder {
     /// fork from the current latest blockchain state
     pub fn latest<P: StateProviderFactory + EvmEnvProvider>(
         p: &P,
-    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::Error>>
+    ) -> Result<CacheDB<StateProviderDB<'_>>, SoflError<reth_interfaces::RethError>>
     {
         let sp = p.latest().map_err(SoflError::Reth)?;
         let wrapped = WrappedDB::new(sp);
@@ -134,7 +134,7 @@ impl BcState {
     where
         BS: Database + DatabaseCommit,
         T: Into<TransitionSpec>,
-        I: MultiTxInspector<BS>,
+        I: TxHook<BS> + Inspector<BS>,
     {
         let TransitionSpec { cfg, block, txs } = spec.into();
         let mut evm = EVM::new();
@@ -175,7 +175,7 @@ impl BcState {
     where
         BS: DatabaseRef<Error = E> + Database<Error = E> + DatabaseCommit,
         T: Into<TransitionSpec>,
-        I: MultiTxInspector<CacheDB<&'a BS>>,
+        I: TxHook<CacheDB<&'a BS>> + Inspector<CacheDB<&'a BS>>,
     {
         let state = BcStateBuilder::fork(state);
         let (_, results) = BcState::transit(state, spec, inspector)?;

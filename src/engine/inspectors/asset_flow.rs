@@ -641,7 +641,6 @@ impl<BS: Database> Inspector<BS> for AssetFlowInspector {
         &mut self,
         _data: &mut revm::EVMData<'_, BS>,
         _inputs: &mut revm::interpreter::CallInputs,
-        _is_static: bool,
     ) -> (
         revm::interpreter::InstructionResult,
         revm::interpreter::Gas,
@@ -686,7 +685,6 @@ impl<BS: Database> Inspector<BS> for AssetFlowInspector {
         remaining_gas: revm::interpreter::Gas,
         ret: revm::interpreter::InstructionResult,
         out: revm_primitives::Bytes,
-        _is_static: bool,
     ) -> (
         revm::interpreter::InstructionResult,
         revm::interpreter::Gas,
@@ -727,7 +725,7 @@ impl<BS: Database> Inspector<BS> for AssetFlowInspector {
     }
 }
 
-impl<BS: Database> super::MultiTxInspector<BS> for AssetFlowInspector {
+impl<BS: Database> super::TxHook<BS> for AssetFlowInspector {
     fn transaction(
         &mut self,
         _tx: &revm_primitives::TxEnv,

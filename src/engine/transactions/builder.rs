@@ -96,7 +96,7 @@ impl TxBuilder {
     }
 
     pub fn fit_evm_cfg(mut self, cfg: CfgEnv) -> Self {
-        self.chain_id = Some(ToElementary::cvt(cfg.chain_id));
+        self.chain_id = Some(cfg.chain_id);
         self
     }
 

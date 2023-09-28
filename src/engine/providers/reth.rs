@@ -6,7 +6,7 @@ use reth_blockchain_tree::{
     TreeExternals,
 };
 use reth_db::mdbx::{Env, WriteMap};
-use reth_interfaces::{consensus::Consensus, Error as rethError};
+use reth_interfaces::{consensus::Consensus, RethError as rethError};
 use reth_primitives::{ChainSpec, ChainSpecBuilder};
 use reth_provider::{providers::BlockchainProvider, ProviderFactory};
 use reth_revm::Factory;
@@ -69,6 +69,7 @@ impl BcProviderBuilder {
             tree_externals,
             sender,
             BlockchainTreeConfig::default(),
+            None, // TODO: check if this is correct
         )?;
         let shareable_blockchain_tree =
             ShareableBlockchainTree::new(blockchain_tree);

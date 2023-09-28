@@ -4,7 +4,7 @@ use revm::{
     },
     Database, EVMData, Inspector,
 };
-use revm_primitives::{Bytes, B160, B256};
+use revm_primitives::{Bytes, B160, B256, U256};
 
 #[derive(Default)]
 pub struct CombinedInspector<'a, BS: Database> {
@@ -42,11 +42,10 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
         &mut self,
         _interp: &mut Interpreter,
         _data: &mut EVMData<'_, BS>,
-        _is_static: bool,
     ) -> InstructionResult {
         self.inspectors
             .iter_mut()
-            .map(|insp| insp.initialize_interp(_interp, _data, _is_static))
+            .map(|insp| insp.initialize_interp(_interp, _data))
             .filter(|res| *res != InstructionResult::Continue)
             .collect::<Vec<InstructionResult>>() // collect is necessary here since we need to ensure all inspectors are called.
             .pop()
@@ -65,11 +64,10 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
         &mut self,
         _interp: &mut Interpreter,
         _data: &mut EVMData<'_, BS>,
-        _is_static: bool,
     ) -> InstructionResult {
         self.inspectors
             .iter_mut()
-            .map(|insp| insp.step(_interp, _data, _is_static))
+            .map(|insp| insp.step(_interp, _data))
             .filter(|res| *res != InstructionResult::Continue)
             .collect::<Vec<InstructionResult>>() // collect is necessary here since we need to ensure all inspectors are called.
             .pop()
@@ -96,12 +94,11 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
         &mut self,
         _interp: &mut Interpreter,
         _data: &mut EVMData<'_, BS>,
-        _is_static: bool,
         _eval: InstructionResult,
     ) -> InstructionResult {
         self.inspectors
             .iter_mut()
-            .map(|insp| insp.step_end(_interp, _data, _is_static, _eval))
+            .map(|insp| insp.step_end(_interp, _data, _eval))
             .filter(|res| *res != InstructionResult::Continue)
             .collect::<Vec<InstructionResult>>() // collect is necessary here since we need to ensure all inspectors are called.
             .pop()
@@ -115,11 +112,10 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
         &mut self,
         _data: &mut EVMData<'_, BS>,
         _inputs: &mut CallInputs,
-        _is_static: bool,
     ) -> (InstructionResult, Gas, Bytes) {
         self.inspectors
             .iter_mut()
-            .map(|insp| insp.call(_data, _inputs, _is_static))
+            .map(|insp| insp.call(_data, _inputs))
             .filter(|(res, _, _)| *res != InstructionResult::Continue)
             .collect::<Vec<(InstructionResult, Gas, Bytes)>>() // collect is necessary here since we need to ensure all inspectors are called.
             .pop()
@@ -137,7 +133,6 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
         remaining_gas: Gas,
         ret: InstructionResult,
         out: Bytes,
-        _is_static: bool,
     ) -> (InstructionResult, Gas, Bytes) {
         self.inspectors
             .iter_mut()
@@ -148,7 +143,6 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
                     remaining_gas,
                     ret,
                     out.clone(),
-                    _is_static,
                 )
             })
             .filter(|(res, g, o)| {
@@ -218,9 +212,9 @@ impl<'a, BS: Database> Inspector<BS> for CombinedInspector<'a, BS> {
     }
 
     #[doc = " Called when a contract has been self-destructed with funds transferred to target."]
-    fn selfdestruct(&mut self, _contract: B160, _target: B160) {
+    fn selfdestruct(&mut self, _contract: B160, _target: B160, _value: U256) {
         self.inspectors.iter_mut().for_each(|insp| {
-            insp.selfdestruct(_contract, _target);
+            insp.selfdestruct(_contract, _target, _value);
         })
     }
 }

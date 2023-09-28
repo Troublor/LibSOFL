@@ -215,7 +215,7 @@ type Calls = (Vec<(TxHash, Address)>, Vec<Address>);
 fn analyze_block<P: BcProvider>(
     provider: &P,
     block: impl Into<BlockHashOrNumber>,
-) -> Result<Calls, SoflError<reth_interfaces::Error>> {
+) -> Result<Calls, SoflError<reth_interfaces::RethError>> {
     let block = block.into();
     let txs = provider.transactions_by_block(block)?;
     let txs = match txs {

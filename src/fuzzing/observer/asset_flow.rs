@@ -4,8 +4,9 @@ use libafl::prelude::{
 use libafl_bolts::Named;
 use revm::Database;
 
-use crate::engine::inspectors::asset_flow::{
-    AssetFlowInspector, AssetTransfer,
+use crate::engine::inspectors::{
+    asset_flow::{AssetFlowInspector, AssetTransfer},
+    InspectorTuple, NoInspector,
 };
 
 use super::{DifferentialEvmObserver, EvmObserver};
@@ -83,7 +84,7 @@ impl<S: UsesInput, BS: Database>
         <(AssetFlowObserver, ()) as super::EvmObserversTuple<S, BS>>::Inspector,
         libafl::Error,
     > {
-        Ok((AssetFlowInspector::new(), ()))
+        Ok(AssetFlowInspector::new().into())
     }
 
     fn get_second_inspector(
@@ -94,17 +95,17 @@ impl<S: UsesInput, BS: Database>
         <(AssetFlowObserver, ()) as super::EvmObserversTuple<S, BS>>::Inspector,
         libafl::Error,
     > {
-        Ok((AssetFlowInspector::new(), ()))
+        Ok(AssetFlowInspector::new().into())
     }
 
     fn on_first_executed(
         &mut self,
         _post_state: &BS,
-        _inspector: (AssetFlowInspector, ()),
+        _inspector: InspectorTuple<BS, AssetFlowInspector, NoInspector>,
         _results: Vec<revm_primitives::ExecutionResult>,
         _input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
-        for mut transfers in _inspector.0.transfers.into_iter() {
+        for mut transfers in _inspector.left.transfers.into_iter() {
             self.first_flows.append(&mut transfers);
         }
         Ok(())
@@ -113,11 +114,11 @@ impl<S: UsesInput, BS: Database>
     fn on_second_executed(
         &mut self,
         _post_state: &BS,
-        _inspector: (AssetFlowInspector, ()),
+        _inspector: InspectorTuple<BS, AssetFlowInspector, NoInspector>,
         _results: Vec<revm_primitives::ExecutionResult>,
         _input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
-        for mut transfers in _inspector.0.transfers.into_iter() {
+        for mut transfers in _inspector.left.transfers.into_iter() {
             self.second_flows.append(&mut transfers);
         }
         Ok(())

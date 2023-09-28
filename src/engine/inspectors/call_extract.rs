@@ -4,7 +4,7 @@ use revm_primitives::Bytes;
 
 use crate::knowledge::contract::msg_call::{Creation, Invocation};
 
-use super::MultiTxInspector;
+use super::TxHook;
 
 #[derive(Debug, Default)]
 pub struct CallExtractInspector {
@@ -61,7 +61,6 @@ impl<BS: Database> Inspector<BS> for CallExtractInspector {
         remaining_gas: revm::interpreter::Gas,
         ret: revm::interpreter::InstructionResult,
         out: Bytes,
-        _is_static: bool,
     ) -> (
         revm::interpreter::InstructionResult,
         revm::interpreter::Gas,
@@ -84,7 +83,7 @@ impl<BS: Database> Inspector<BS> for CallExtractInspector {
     }
 }
 
-impl<BS: Database> MultiTxInspector<BS> for CallExtractInspector {}
+impl<BS: Database> TxHook<BS> for CallExtractInspector {}
 
 #[cfg(test)]
 mod tests_with_dep {

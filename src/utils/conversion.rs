@@ -194,6 +194,9 @@ impl Convert<ethersBlock<ethersTxHash>, Option<SealedHeader>> for ToPrimitive {
             // correct
             base_fee_per_gas: block.base_fee_per_gas.map(|f| f.as_u64()),
             extra_data: block.extra_data.0.into(),
+            blob_gas_used: None, // TODO: check if this is correct
+            excess_blob_gas: None, // TODO: check if this is correct
+            parent_beacon_block_root: None, // TODO: check if this is correct
         };
         let hash = block.hash.unwrap().0.into();
         Some(SealedHeader { header, hash })

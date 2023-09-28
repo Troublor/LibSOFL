@@ -45,7 +45,7 @@ impl<S: UsesInput, BS: Database> EvmObserver<S, BS>
         _pre_state: &BS,
         _input: &S::Input,
     ) -> Result<NoInspector, libafl::Error> {
-        Ok(())
+        Ok(NoInspector {})
     }
 }
 

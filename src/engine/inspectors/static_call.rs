@@ -1,7 +1,7 @@
 use revm::{interpreter::opcode, Database, Inspector};
 use revm_primitives::U256;
 
-use super::MultiTxInspector;
+use super::TxHook;
 
 /// An inspector that disallow any state change.
 #[derive(Default)]
@@ -30,7 +30,6 @@ impl<BS: Database> Inspector<BS> for StaticCallEnforceInspector {
         &mut self,
         _data: &mut revm::EVMData<'_, BS>,
         _inputs: &mut revm::interpreter::CallInputs,
-        _is_static: bool,
     ) -> (
         revm::interpreter::InstructionResult,
         revm::interpreter::Gas,
@@ -55,7 +54,6 @@ impl<BS: Database> Inspector<BS> for StaticCallEnforceInspector {
         &mut self,
         _interp: &mut revm::interpreter::Interpreter,
         _data: &mut revm::EVMData<'_, BS>,
-        _is_static: bool,
     ) -> revm::interpreter::InstructionResult {
         if _interp.current_opcode() == opcode::SSTORE {
             revm::interpreter::InstructionResult::StateChangeDuringStaticCall
@@ -65,7 +63,7 @@ impl<BS: Database> Inspector<BS> for StaticCallEnforceInspector {
     }
 }
 
-impl<BS: Database> MultiTxInspector<BS> for StaticCallEnforceInspector {
+impl<BS: Database> TxHook<BS> for StaticCallEnforceInspector {
     fn transaction(
         &mut self,
         _tx: &revm_primitives::TxEnv,

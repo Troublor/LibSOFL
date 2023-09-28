@@ -21,11 +21,10 @@ mod tests_nodep {
         let receiver = Address::from(1);
 
         // set cfg and env
-        let cfg = CfgEnv {
-            disable_block_gas_limit: true,
-            disable_base_fee: true,
-            ..Default::default()
-        };
+        let mut cfg = CfgEnv::default();
+        cfg.disable_block_gas_limit = true;
+        cfg.disable_base_fee = true;
+
         let block_env = BlockEnv {
             gas_limit: U256::from(1000000),
             ..Default::default()
@@ -37,11 +36,13 @@ mod tests_nodep {
             let acc = AccountInfo::new(
                 U256::from(1000),
                 Default::default(),
+                Default::default(),
                 Bytecode::new(),
             );
             state.insert_account_info(spender, acc);
             let acc = AccountInfo::new(
                 U256::from(0),
+                Default::default(),
                 Default::default(),
                 Bytecode::new(),
             );

@@ -14,8 +14,8 @@ use futures::future::join_all;
 use reqwest::header::HeaderMap;
 use reqwest::{Client, Url};
 use reth_db::models::StoredBlockBodyIndices;
-use reth_interfaces::Error as rethError;
-use reth_interfaces::Result as rethResult;
+use reth_interfaces::RethError as rethError;
+use reth_interfaces::RethResult as rethResult;
 use reth_network_api::NetworkError;
 use reth_primitives::{
     Account, Address, Block, BlockHash, BlockHashOrNumber, BlockNumber,
@@ -26,7 +26,7 @@ use reth_primitives::{
 };
 use reth_provider::{
     AccountReader, BlockHashReader, BlockIdReader, BlockNumReader, BlockReader,
-    BlockSource, EvmEnvProvider, HeaderProvider, PostState, ProviderError,
+    BlockSource, EvmEnvProvider, HeaderProvider, BundleStateWithReceipts, ProviderError,
     ReceiptProvider, StateProvider, StateProviderFactory, StateRootProvider,
     TransactionsProvider, WithdrawalsProvider,
 };
@@ -304,6 +304,10 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
         todo!()
     }
 
+    fn transaction_by_id_no_hash(&self, _id: TxNumber) -> rethResult<Option<TransactionSignedNoHash>> {
+        todo!()
+    }
+
     #[doc = " Get transaction by transaction hash."]
     fn transaction_by_hash(
         &self,
@@ -362,6 +366,7 @@ impl<P: JsonRpcClient> TransactionsProvider for JsonRpcBcProvider<P> {
             block_hash: receipt.block_hash.unwrap().0.into(),
             block_number: receipt.block_number.unwrap().as_u64(),
             base_fee: block.base_fee_per_gas.map(|f| f.as_u64()),
+            excess_blob_gas: None, // TODO: check if this is correct
         };
         Ok(Some((tx, meta)))
     }
@@ -791,7 +796,7 @@ impl<P: JsonRpcClient> StateProviderFactory for JsonRpcBcProvider<P> {
 
     fn pending_with_provider(
         &self,
-        _post_state_data: Box<dyn reth_provider::PostStateDataProvider>,
+        _post_state_data: Box<dyn reth_provider::BundleStateDataProvider>,
     ) -> rethResult<reth_provider::StateProviderBox<'_>> {
         todo!()
     }
@@ -916,7 +921,7 @@ impl<P: JsonRpcClient> AccountReader for JsonRpcStateProvider<P> {
 
 impl<P: JsonRpcClient> StateRootProvider for JsonRpcStateProvider<P> {
     #[doc = " Returns the state root of the PostState on top of the current state."]
-    fn state_root(&self, _post_state: PostState) -> rethResult<H256> {
+    fn state_root(&self, _post_state: &BundleStateWithReceipts) -> rethResult<H256> {
         Err(rethError::Provider(
             ProviderError::StateRootNotAvailableForHistoricalBlock,
         ))
@@ -990,7 +995,6 @@ mod tests_nodep {
 
 #[cfg(test)]
 mod tests_for_jsonrpc {
-
     use reth_provider::BlockNumReader;
 
     use crate::engine::providers::rpc::JsonRpcBcProvider;
@@ -1040,9 +1044,9 @@ mod tests_for_jsonrpc {
             let sealed_header = sealed_header.unwrap();
             assert_eq!(sealed_header.number, 14000000);
             assert_eq!(
-            hex::encode(sealed_header.hash.as_slice()),
-            "9bff49171de27924fa958faf7b7ce605c1ff0fdee86f4c0c74239e6ae20d9446"
-        );
+                hex::encode(sealed_header.hash.as_slice()),
+                "9bff49171de27924fa958faf7b7ce605c1ff0fdee86f4c0c74239e6ae20d9446"
+            );
             assert_eq!(sealed_header.gas_used, 8119826)
         }
     }
@@ -1061,7 +1065,7 @@ mod tests_for_jsonrpc {
             let r =
                 provider.fill_env_at(&mut cfg, &mut block_env, 14000000.into());
             assert!(r.is_ok());
-            assert_eq!(cfg.chain_id, U256::from(1));
+            assert_eq!(cfg.chain_id, 1);
             assert_eq!(block_env.number, U256::from(14000000));
             assert_eq!(
                 block_env.difficulty,

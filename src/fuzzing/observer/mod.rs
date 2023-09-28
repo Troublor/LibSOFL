@@ -2,10 +2,12 @@ use libafl::prelude::{
     DifferentialObserver, DifferentialObserversTuple, Observer, ObserversTuple,
     UsesInput,
 };
-use revm::Database;
+use revm::{inspectors::NoOpInspector, Database};
 use revm_primitives::ExecutionResult;
 
-use crate::engine::inspectors::MultiTxInspector;
+use crate::engine::inspectors::{
+    InspectorTuple, InspectorWithTxHook, NoInspector,
+};
 
 pub mod asset_flow;
 pub mod result;
@@ -16,7 +18,7 @@ where
     S: UsesInput,
     BS: Database,
 {
-    type Inspector: MultiTxInspector<BS>;
+    type Inspector: InspectorWithTxHook<BS>;
 
     /// Get the EVM inspector of associated with observer.
     /// The inspector is used to inspect the EVM state during transaction execution.
@@ -50,7 +52,7 @@ where
 pub trait EvmObserversTuple<S: UsesInput, BS: Database>:
     ObserversTuple<S>
 {
-    type Inspector: MultiTxInspector<BS>;
+    type Inspector: InspectorWithTxHook<BS>;
 
     fn get_inspector(
         &mut self,
@@ -68,14 +70,14 @@ pub trait EvmObserversTuple<S: UsesInput, BS: Database>:
 }
 
 impl<S: UsesInput, BS: Database> EvmObserversTuple<S, BS> for () {
-    type Inspector = ();
+    type Inspector = NoOpInspector;
 
     fn get_inspector(
         &mut self,
         _pre_state: &BS,
         _input: &S::Input,
     ) -> Result<Self::Inspector, libafl::Error> {
-        Ok(())
+        Ok(NoOpInspector {})
     }
 
     fn on_executed(
@@ -96,7 +98,7 @@ where
     Head: EvmObserver<S, BS>,
     Tail: EvmObserversTuple<S, BS>,
 {
-    type Inspector = (Head::Inspector, Tail::Inspector);
+    type Inspector = InspectorTuple<BS, Head::Inspector, Tail::Inspector>;
 
     fn get_inspector(
         &mut self,
@@ -105,7 +107,7 @@ where
     ) -> Result<Self::Inspector, libafl::Error> {
         let insp = self.0.get_inspector(pre_state, input)?;
         let insps = self.1.get_inspector(pre_state, input)?;
-        Ok((insp, insps))
+        Ok(InspectorTuple::new(insp, insps))
     }
 
     fn on_executed(
@@ -115,7 +117,7 @@ where
         results: Vec<ExecutionResult>,
         input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
-        let (insp, insps) = inspector;
+        let (insp, insps) = inspector.into();
         self.0
             .on_executed(post_state, insp, results.clone(), input)?;
         self.1.on_executed(post_state, insps, results, input)
@@ -171,8 +173,8 @@ where
     OTA: EvmObserversTuple<S, BS>,
     OTB: EvmObserversTuple<S, BS>,
 {
-    type FirstInspector: MultiTxInspector<BS>;
-    type SecondInspector: MultiTxInspector<BS>;
+    type FirstInspector: InspectorWithTxHook<BS>;
+    type SecondInspector: InspectorWithTxHook<BS>;
 
     fn get_first_inspector(
         &mut self,
@@ -210,29 +212,29 @@ where
     OTA: EvmObserversTuple<S, BS>,
     OTB: EvmObserversTuple<S, BS>,
 {
-    type FirstInspector = ();
-    type SecondInspector = ();
+    type FirstInspector = NoInspector;
+    type SecondInspector = NoInspector;
 
     fn get_first_inspector(
         &mut self,
         _pre_state: &BS,
         _input: &<S as UsesInput>::Input,
-    ) -> Result<(), libafl::Error> {
-        Ok(())
+    ) -> Result<NoOpInspector, libafl::Error> {
+        Ok(NoInspector {})
     }
 
     fn get_second_inspector(
         &mut self,
         _pre_state: &BS,
         _input: &<S as UsesInput>::Input,
-    ) -> Result<(), libafl::Error> {
-        Ok(())
+    ) -> Result<NoOpInspector, libafl::Error> {
+        Ok(NoInspector {})
     }
 
     fn on_first_executed(
         &mut self,
         _post_state: &BS,
-        _inspector: (),
+        _inspector: NoInspector,
         _results: Vec<ExecutionResult>,
         _input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
@@ -242,7 +244,7 @@ where
     fn on_second_executed(
         &mut self,
         _post_state: &BS,
-        _inspector: (),
+        _inspector: NoInspector,
         _results: Vec<ExecutionResult>,
         _input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
@@ -260,14 +262,15 @@ where
     Head: DifferentialEvmObserver<S, BS, OTA, OTB>,
     Tail: DifferentialEvmObserverTuple<S, BS, OTA, OTB>,
 {
-    type FirstInspector = (
+    type FirstInspector = InspectorTuple<
+        BS,
         OTA::Inspector,
         <Tail as DifferentialEvmObserverTuple<S, BS, OTA, OTB>>::FirstInspector,
-    );
-    type SecondInspector = (
+    >;
+    type SecondInspector = InspectorTuple<BS,
         OTB::Inspector,
         <Tail as DifferentialEvmObserverTuple<S, BS, OTA, OTB>>::SecondInspector,
-    );
+    >;
 
     fn get_first_inspector(
         &mut self,
@@ -276,7 +279,7 @@ where
     ) -> Result<Self::FirstInspector, libafl::Error> {
         let insp = self.0.get_first_inspector(pre_state, input)?;
         let insps = self.1.get_first_inspector(pre_state, input)?;
-        Ok((insp, insps))
+        Ok(InspectorTuple::new(insp, insps))
     }
 
     fn get_second_inspector(
@@ -286,7 +289,7 @@ where
     ) -> Result<Self::SecondInspector, libafl::Error> {
         let insp = self.0.get_second_inspector(pre_state, input)?;
         let insps = self.1.get_second_inspector(pre_state, input)?;
-        Ok((insp, insps))
+        Ok(InspectorTuple::new(insp, insps))
     }
 
     fn on_first_executed(
@@ -296,7 +299,7 @@ where
         results: Vec<ExecutionResult>,
         input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
-        let (insp, insps) = inspector;
+        let (insp, insps) = inspector.into();
         self.0
             .on_first_executed(post_state, insp, results.clone(), input)?;
         self.1.on_first_executed(post_state, insps, results, input)
@@ -309,7 +312,7 @@ where
         results: Vec<ExecutionResult>,
         input: &<S as UsesInput>::Input,
     ) -> Result<(), libafl::Error> {
-        let (insp, insps) = inspector;
+        let (insp, insps) = inspector.into();
         self.0
             .on_second_executed(post_state, insp, results.clone(), input)?;
         self.1.on_second_executed(post_state, insps, results, input)

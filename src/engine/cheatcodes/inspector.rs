@@ -7,7 +7,7 @@ use revm::{
 };
 use revm_primitives::U256;
 
-use crate::engine::inspectors::MultiTxInspector;
+use crate::engine::inspectors::TxHook;
 
 /// Returns [InstructionResult::Continue] on an error, discarding the error.
 ///
@@ -59,7 +59,6 @@ where
         &mut self,
         interpreter: &mut Interpreter,
         _data: &mut EVMData<'_, DB>,
-        _: bool,
     ) -> InstructionResult {
         // Record writes and reads if `record` has been called
         if let Some(storage_accesses) = &mut self.accesses {
@@ -97,4 +96,4 @@ where
     }
 }
 
-impl<BS> MultiTxInspector<BS> for CheatcodeInspector where BS: Database {}
+impl<BS> TxHook<BS> for CheatcodeInspector where BS: Database {}

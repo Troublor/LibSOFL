@@ -1,4 +1,4 @@
-use libsofl::engine::inspectors::MultiTxInspector;
+use libsofl::engine::inspectors::TxHook;
 use revm::{Database, Inspector};
 use revm_primitives::{Address, Bytes};
 
@@ -49,7 +49,6 @@ impl<BS: Database> Inspector<BS> for InternalTransactionInspector {
         remaining_gas: revm::interpreter::Gas,
         ret: revm::interpreter::InstructionResult,
         out: Bytes,
-        _is_static: bool,
     ) -> (
         revm::interpreter::InstructionResult,
         revm::interpreter::Gas,
@@ -62,7 +61,7 @@ impl<BS: Database> Inspector<BS> for InternalTransactionInspector {
     }
 }
 
-impl<BS: Database> MultiTxInspector<BS> for InternalTransactionInspector {
+impl<BS: Database> TxHook<BS> for InternalTransactionInspector {
     fn transaction(
         &mut self,
         _tx: &revm_primitives::TxEnv,

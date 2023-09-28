@@ -3,7 +3,7 @@ use std::{ops::Range, str::FromStr};
 use criterion::{criterion_group, Bencher, Criterion};
 use libsofl::engine::{
     inspectors::{
-        call_extract::CallExtractInspector, no_inspector, MultiTxInspector,
+        call_extract::CallExtractInspector, no_inspector, InspectorWithTxHook,
     },
     providers::{BcProvider, BcProviderBuilder},
     state::{env::TransitionSpecBuilder, BcState, BcStateBuilder, ForkedState},
@@ -14,7 +14,7 @@ fn reproduce_block<
     'a,
     P: BcProvider,
     B: Into<BlockHashOrNumber>,
-    I: MultiTxInspector<ForkedState<'a>>,
+    I: InspectorWithTxHook<ForkedState<'a>>,
 >(
     p: &'a P,
     block: B,
@@ -97,7 +97,7 @@ pub fn reproduce_tx<
     'a,
     P: BcProvider,
     T: Into<TxHash>,
-    I: MultiTxInspector<ForkedState<'a>>,
+    I: InspectorWithTxHook<ForkedState<'a>>,
 >(
     p: &'a P,
     tx: T,

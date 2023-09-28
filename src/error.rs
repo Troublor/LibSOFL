@@ -31,7 +31,7 @@ pub enum SoflError<DBERR = Infallible> {
     Reth(
         #[from]
         #[source]
-        reth_interfaces::Error,
+        reth_interfaces::RethError,
     ),
 
     /// Wrapper of BcState::DbErr

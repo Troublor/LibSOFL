@@ -6,13 +6,14 @@ use revm_primitives::{
     BlockEnv, Bytes, CfgEnv, ExecutionResult, Output, U256,
 };
 
+use crate::engine::inspectors::{InspectorTuple, InspectorWithTxHook};
 use crate::{
     engine::transactions::builder::TxBuilder, error::SoflError,
     utils::addresses::DEFAULT_CALLER_ADDRESS,
 };
 
 use super::{
-    inspectors::{static_call::StaticCallEnforceInspector, MultiTxInspector},
+    inspectors::static_call::StaticCallEnforceInspector,
     state::{env::TransitionSpecBuilder, BcState},
 };
 
@@ -88,7 +89,7 @@ impl HighLevelCaller {
     pub fn static_call<
         'a,
         BS: Database + DatabaseCommit,
-        I: MultiTxInspector<&'a mut BS>,
+        I: InspectorWithTxHook<&'a mut BS>,
     >(
         &self,
         state: &'a mut BS,
@@ -107,11 +108,9 @@ impl HighLevelCaller {
             "input: {:?}",
             hex::encode(spec.txs.get(0).unwrap().data.as_ref())
         );
-        let (_, mut result) = BcState::transit(
-            state,
-            spec,
-            &mut (&mut StaticCallEnforceInspector::default(), inspector),
-        )?;
+        let mut enforce_insp = StaticCallEnforceInspector::default();
+        let mut insp = InspectorTuple::new(&mut enforce_insp, inspector);
+        let (_, mut result) = BcState::transit(state, spec, &mut insp)?;
         let result = result.pop().unwrap();
         match result {
             ExecutionResult::Success { output, .. } => {
@@ -127,7 +126,7 @@ impl HighLevelCaller {
     pub fn create<
         'a,
         BS: Database + DatabaseCommit,
-        I: MultiTxInspector<&'a mut BS>,
+        I: InspectorWithTxHook<&'a mut BS>,
     >(
         &self,
         state: &'a mut BS,
@@ -158,7 +157,7 @@ impl HighLevelCaller {
     pub fn call<
         'a,
         BS: Database + DatabaseCommit,
-        I: MultiTxInspector<&'a mut BS>,
+        I: InspectorWithTxHook<&'a mut BS>,
     >(
         &self,
         state: &'a mut BS,
@@ -191,7 +190,7 @@ impl HighLevelCaller {
     pub fn view<
         'a,
         BS: Database + DatabaseCommit,
-        I: MultiTxInspector<&'a mut BS>,
+        I: InspectorWithTxHook<&'a mut BS>,
     >(
         &self,
         state: &'a mut BS,
@@ -209,7 +208,7 @@ impl HighLevelCaller {
     pub fn invoke<
         'a,
         BS: Database + DatabaseCommit,
-        I: MultiTxInspector<&'a mut BS>,
+        I: InspectorWithTxHook<&'a mut BS>,
     >(
         &self,
         state: &'a mut BS,
@@ -228,7 +227,7 @@ impl HighLevelCaller {
     pub fn view_ignore_return<
         'a,
         BS: Database + DatabaseCommit,
-        I: MultiTxInspector<&'a mut BS>,
+        I: InspectorWithTxHook<&'a mut BS>,
     >(
         &self,
         state: &'a mut BS,
@@ -245,7 +244,7 @@ impl HighLevelCaller {
     pub fn invoke_ignore_return<
         'a,
         BS: Database + DatabaseCommit,
-        I: MultiTxInspector<&'a mut BS>,
+        I: InspectorWithTxHook<&'a mut BS>,
     >(
         &self,
         state: &'a mut BS,
