@@ -66,11 +66,10 @@ impl<P: MsgCallProvider> FunctionParamKnowledge<P> {
 
     pub fn gen_func_arg(
         &mut self,
-        contract: Address,
+        _contract: Address,
         _func: &Function,
         _arg_index: usize,
     ) -> Token {
-        if !self.seeds.contains_key(&contract) {}
         todo!()
     }
 }

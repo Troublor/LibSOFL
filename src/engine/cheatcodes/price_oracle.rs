@@ -522,7 +522,7 @@ mod tests_with_db {
                 .unwrap();
         let price3 = cheatcodes.get_price_in_ether(&mut state, busd).unwrap();
 
-        let mut prices = vec![price0, price1, price2, price3];
+        let mut prices = [price0, price1, price2, price3];
         prices.sort();
 
         let delta = prices[3] - prices[0];
@@ -608,7 +608,7 @@ mod tests_with_dep {
                 .unwrap();
         let price3 = cheatcodes.get_price_in_ether(&mut state, busd).unwrap();
 
-        let mut prices = vec![price0, price1, price2, price3];
+        let mut prices = [price0, price1, price2, price3];
         prices.sort();
 
         let delta = prices[3] - prices[0];
