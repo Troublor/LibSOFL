@@ -259,11 +259,13 @@ impl InMemoryCache {
             .collect();
         if !invocations.is_empty() {
             // save to db
-            knowledge::contract::entities::invocation::Entity::insert_many(
-                invocations,
-            )
-            .exec(self.db.as_ref())
-            .await?;
+            for chunk in invocations.chunks(10000) {
+                knowledge::contract::entities::invocation::Entity::insert_many(
+                    Vec::from(chunk),
+                )
+                .exec(self.db.as_ref())
+                .await?;
+            }
         }
         Ok(())
     }
