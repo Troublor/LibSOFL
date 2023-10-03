@@ -9,8 +9,8 @@ pub struct Migrator;
 impl MigratorTrait for Migrator {
     fn migrations() -> Vec<Box<dyn MigrationTrait>> {
         vec![
-            Box::new(extract_call::Migration),
             Box::new(create_metadata::Migration),
+            Box::new(extract_call::Migration),
         ]
     }
 }

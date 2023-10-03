@@ -175,6 +175,37 @@ impl BcState {
         results,
     ))
     }
+
+    /// transit without inspector
+    /// NOTE: this is more efficient than using `transit` with no_inspector().
+    pub fn transit_without_inspector<BS, T>(
+        state: BS,
+        spec: T,
+    ) -> Result<(BS, Vec<ExecutionResult>), SoflError<BS::Error>>
+    where
+        BS: Database + DatabaseCommit,
+        T: Into<TransitionSpec>,
+    {
+        let TransitionSpec { cfg, block, txs } = spec.into();
+        let mut evm = EVM::new();
+        evm.env.cfg = cfg;
+        evm.env.block = block;
+        evm.database(state);
+        let mut results = Vec::new();
+        for tx in txs.into_iter() {
+            evm.env.tx = tx;
+            let result = evm.transact_commit().map_err(SoflError::Evm)?;
+            // inspector post-transaction hook
+            results.push(result);
+        }
+        Ok((
+        evm.db.expect(
+            "impossible: db does not exists while database has been set in evm",
+        ),
+        results,
+    ))
+    }
+
     pub fn dry_run<'a, E, BS, I, T>(
         state: &'a BS,
         spec: T,

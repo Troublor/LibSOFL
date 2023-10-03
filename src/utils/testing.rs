@@ -73,6 +73,14 @@ pub async fn get_testing_db() -> sea_orm::DatabaseConnection {
         .unwrap();
     let sql = schema
         .create_table_from_entity(
+            knowledge::contract::entities::creation::Entity,
+        )
+        .to_owned();
+    db.execute(db.get_database_backend().build(&sql))
+        .await
+        .unwrap();
+    let sql = schema
+        .create_table_from_entity(
             knowledge::contract::entities::invocation::Entity,
         )
         .to_owned();

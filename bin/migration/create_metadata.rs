@@ -10,22 +10,18 @@ impl MigrationTrait for Migration {
         let schema = Schema::new(manager.get_database_backend());
         manager
             .create_table(schema.create_table_from_entity(
-                libsofl::knowledge::contract::entities::contract::Entity,
-            ))
-            .await?;
-        manager
-            .create_table(schema.create_table_from_entity(
-                libsofl::knowledge::contract::entities::invocation::Entity,
+                libsofl::knowledge::entities::metadata::Entity,
             ))
             .await
     }
 
     async fn down(&self, manager: &SchemaManager) -> Result<(), DbErr> {
         manager
-            .drop_table(Table::drop().table(libsofl::knowledge::contract::entities::invocation::Entity).to_owned())
-            .await?;
-        manager
-            .drop_table(Table::drop().table(libsofl::knowledge::contract::entities::contract::Entity).to_owned())
+            .drop_table(
+                Table::drop()
+                    .table(libsofl::knowledge::entities::metadata::Entity)
+                    .to_owned(),
+            )
             .await
     }
 }

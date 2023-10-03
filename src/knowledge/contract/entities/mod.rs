@@ -1,5 +1,7 @@
 pub mod contract;
+pub mod creation;
 pub mod invocation;
+use revm_primitives::hex;
 use sea_orm;
 use sea_orm::entity::prelude::*;
 use sea_orm::sea_query;
@@ -53,6 +55,20 @@ impl<const BITS: usize, const LIMBS: usize> From<Vec<u8>>
     }
 }
 
+impl<const BITS: usize, const LIMBS: usize> From<String> for Bits<BITS, LIMBS> {
+    fn from(value: String) -> Self {
+        let bytes = hex::decode(value).expect("invalid hex string");
+        bytes.into()
+    }
+}
+
+impl<const BITS: usize, const LIMBS: usize> From<Bits<BITS, LIMBS>> for String {
+    fn from(value: Bits<BITS, LIMBS>) -> Self {
+        let bytes = value.to_be_bytes_vec();
+        hex::encode(bytes)
+    }
+}
+
 impl<const BITS: usize, const LIMBS: usize> From<&[u8]> for Bits<BITS, LIMBS> {
     /// Converts a vector of big-endian bytes into a Bits.
     fn from(value: &[u8]) -> Self {
@@ -70,8 +86,9 @@ impl<const BITS: usize, const LIMBS: usize> sea_orm::TryFromU64
 
 impl<const BITS: usize, const LIMBS: usize> From<Bits<BITS, LIMBS>> for Value {
     fn from(value: Bits<BITS, LIMBS>) -> Self {
-        let bytes: Vec<u8> = value.to_be_bytes_vec();
-        Value::Bytes(Some(Box::new(bytes)))
+        // let bytes: Vec<u8> = value.to_be_bytes_vec();
+        // Value::Bytes(Some(Box::new(bytes)))
+        Value::String(Some(Box::new(value.into())))
     }
 }
 
@@ -82,7 +99,7 @@ impl<const BITS: usize, const LIMBS: usize> sea_orm::TryGetable
         res: &QueryResult,
         index: I,
     ) -> Result<Self, sea_orm::TryGetError> {
-        let bytes: Vec<u8> = res.try_get_by(index)?;
+        let bytes: String = res.try_get_by(index)?;
         Ok(bytes.into())
     }
 }
@@ -92,7 +109,8 @@ impl<const BITS: usize, const LIMBS: usize> sea_query::ValueType
 {
     fn try_from(v: Value) -> Result<Self, sea_query::ValueTypeErr> {
         match v {
-            Value::Bytes(Some(bytes)) => Ok((*bytes).into()),
+            // Value::Bytes(Some(bytes)) => Ok((*bytes).into()),
+            Value::String(Some(hex)) => Ok((*hex).into()),
             _ => Err(sea_query::ValueTypeErr),
         }
     }
@@ -102,11 +120,13 @@ impl<const BITS: usize, const LIMBS: usize> sea_query::ValueType
     }
 
     fn array_type() -> sea_query::ArrayType {
-        sea_query::ArrayType::Bytes
+        // sea_query::ArrayType::Bytes
+        sea_query::ArrayType::String
     }
 
     fn column_type() -> ColumnType {
-        sea_query::ColumnType::Binary(BlobSize::Tiny)
+        // sea_query::ColumnType::Binary(BlobSize::Tiny)
+        sea_query::ColumnType::String(None)
     }
 }
 
@@ -114,7 +134,8 @@ impl<const BITS: usize, const LIMBS: usize> sea_query::Nullable
     for Bits<BITS, LIMBS>
 {
     fn null() -> Value {
-        Value::Bytes(None)
+        // Value::Bytes(None)
+        Value::String(None)
     }
 }
 
@@ -123,8 +144,8 @@ mod tests_nodep {
     use ethers::types::Chain;
     use reth_primitives::TxHash;
     use sea_orm::{
-        ActiveValue, ConnectionTrait, Database, DatabaseConnection, DbBackend,
-        EntityTrait, Schema,
+        ActiveValue, ColumnTrait, ConnectionTrait, Database,
+        DatabaseConnection, DbBackend, EntityTrait, QueryFilter, Schema,
     };
 
     use crate::utils::{
@@ -139,6 +160,11 @@ mod tests_nodep {
         let schema = Schema::new(DbBackend::Sqlite);
         // Create the database
         let sql = schema.create_table_from_entity(super::contract::Entity);
+        db.execute(db.get_database_backend().build(&sql))
+            .await
+            .unwrap();
+        // Create the database
+        let sql = schema.create_table_from_entity(super::creation::Entity);
         db.execute(db.get_database_backend().build(&sql))
             .await
             .unwrap();
@@ -159,24 +185,35 @@ mod tests_nodep {
         let hash: TxHash = ToPrimitive::cvt("0x12345678");
         let contract = super::contract::ActiveModel {
             address: ActiveValue::Set(addr.into()),
-            create_tx: ActiveValue::Set(hash.into()),
         };
         let res = super::contract::Entity::insert(contract)
             .exec(&db)
             .await
             .unwrap();
-        assert_eq!(res.last_insert_id, addr.into());
-
-        // test query
-        let res =
-            super::contract::Entity::find_by_id(super::Address::from(addr))
-                .one(&db)
-                .await
-                .unwrap();
-        assert!(res.is_some());
-        let contract = res.unwrap();
+        let contract = super::contract::Entity::find_by_id(res.last_insert_id)
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
         assert_eq!(contract.address, addr.into());
-        assert_eq!(contract.create_tx, hash.into());
+
+        // insert creation
+        let creation = super::creation::ActiveModel {
+            contract: ActiveValue::Set(contract.address),
+            create_tx: ActiveValue::Set(hash.into()),
+            index: ActiveValue::Set(0),
+        };
+        super::creation::Entity::insert(creation)
+            .exec(&db)
+            .await
+            .unwrap();
+        let res = super::creation::Entity::find()
+            .filter(super::creation::Column::Contract.eq(contract.address))
+            .one(&db)
+            .await
+            .unwrap()
+            .unwrap();
+        assert_eq!(res.create_tx, hash.into());
 
         // test insert invocation
         let invocation = super::invocation::ActiveModel {
@@ -188,7 +225,27 @@ mod tests_nodep {
             .exec(&db)
             .await
             .unwrap();
-        assert_eq!(res.last_insert_id, addr.into());
+        let invocation =
+            super::invocation::Entity::find_by_id(res.last_insert_id)
+                .one(&db)
+                .await
+                .unwrap()
+                .unwrap();
+        assert_eq!(invocation.contract, addr.into());
+
+        // test query
+        let mut res = super::contract::Entity::find()
+            .find_with_related(super::creation::Entity)
+            .filter(
+                super::contract::Column::Address.eq(super::Address::from(addr)),
+            )
+            .all(&db)
+            .await
+            .unwrap();
+        assert!(!res.is_empty());
+        let (contract, creations) = res.pop().unwrap();
+        assert_eq!(contract.address, addr.into());
+        assert_eq!(creations[0].create_tx, hash.into());
     }
 
     #[tokio::test]

@@ -1,13 +1,13 @@
 use sea_orm::entity::prelude::*;
 
 #[derive(Clone, Debug, PartialEq, Eq, DeriveEntityModel)]
-#[sea_orm(table_name = "invocation")]
+#[sea_orm(table_name = "creation")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub contract: super::Address,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub from_block: u32,
-    pub to_block: u32,
+    pub create_tx: super::Hash,
+    pub index: i32,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

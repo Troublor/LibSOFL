@@ -1,0 +1,9 @@
+services:
+  postgres:
+    image: postgres:16
+    environment:
+      - POSTGRES_HOST_AUTH_METHOD=trust
+    ports:
+      - "15432:5432"
+    volumes:
+      - /ssddata1/blockchain/libsofl-data/postgresql:/var/lib/postgresql
