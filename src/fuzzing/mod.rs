@@ -2,8 +2,10 @@ pub mod corpus;
 pub mod executor;
 pub mod feedback;
 pub mod generator;
+pub mod interfaces;
 pub mod mutator;
 pub mod observer;
+pub mod state;
 
 // #[cfg(test)]
 // mod tests_others {

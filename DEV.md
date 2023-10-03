@@ -41,3 +41,7 @@ Use the command to run each group separately:
 ```
 cargo test [tests_nodep|tests_with_db|tests_with_jsonrpc]
 ```
+
+## Design Principles
+
+- `fuzzing` module should be decoupled from `reth`, since we are intended to support any EVM-compatible blockchain. 
