@@ -1,6 +1,0 @@
-[submodule "reth"]
-	path = reth
-	url = git@github.com:Troublor/reth.git
-[submodule "revm"]
-	path = revm
-	url = git@github.com:Troublor/revm.git
