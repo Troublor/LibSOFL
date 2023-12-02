@@ -28,6 +28,10 @@ path = "bin/pom/main.rs"
 name = "c4c"
 path = "bin/c4c/main.rs"
 
+[[bin]]
+name = "paa"
+path = "bin/paa/main.rs"
+
 [features]
 
 test-use-jsonrpc = []
@@ -49,7 +53,7 @@ lazy_static = "1.4.0"
 libafl = "0.11.1"
 libafl_bolts = "0.11.1"
 
-# user interface 
+# user interface
 clap = { version = "4.3.19", features = ["derive"] }
 toml = "0.7.6"
 config = "0.13.1"
@@ -65,11 +69,11 @@ sea-orm = { version = "^0", features = [
 ] }
 sea-orm-migration = { version = "^0" }
 
-# concurrency & async 
+# concurrency & async
 tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
 async-std = { version = "^1", features = ["attributes", "tokio1"] }
 
-# Ethereum periphery 
+# Ethereum periphery
 ethers = "2.0.10"
 ethers-providers = { version = "2.0.10", features = ["ws"] }
 ethers-solc = { version = "2.0.10", features = ["svm-solc"] }

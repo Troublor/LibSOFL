@@ -1,7 +1,10 @@
 use crate::config::flags::SoflConfig;
+use crate::error::SoflError;
+use ethers::abi::ethabi;
+use ethers::prelude::account::NormalTransaction;
+use revm_primitives::{Address, Hash};
 
 #[derive(
-    Clone,
     Debug,
     derive_more::AsRef,
     derive_more::AsMut,
@@ -110,8 +113,10 @@ impl RateLimitController {
 #[cfg(test)]
 mod tests_with_dep {
     use ethers::types::Chain;
+    use std::thread;
 
     use crate::utils::addresses::ADDRESS_BOOK;
+    use crate::utils::conversion::{Convert, ToPrimitive};
 
     #[test]
     fn test_control_request_rate() {
@@ -132,6 +137,43 @@ mod tests_with_dep {
                 r,
                 Err(ethers::etherscan::errors::EtherscanError::RateLimitExceeded)
             ));
+        }
+    }
+
+    #[test]
+    fn test_get_txs_to_contract() {
+        let etherscan = super::EtherscanClient::default();
+        let txs = etherscan
+            .get_txs_to_contract(ToPrimitive::cvt(
+                "0x25c0610A24fE3d229d199D9c55E628b68EB7032f",
+            ))
+            .unwrap();
+        assert!(txs.len() > 0);
+    }
+
+    #[test]
+    fn test_async_in_thread() {
+        let mut threads = Vec::new();
+        for _ in 0..5 {
+            let runtime = tokio::runtime::Runtime::new().unwrap();
+            let th = thread::spawn(move || {
+                let _ = runtime.block_on(async {
+                    let etherscan = super::EtherscanClient::default();
+                    etherscan
+                        .contract_abi(
+                            ADDRESS_BOOK
+                                .weth
+                                .on_chain(Chain::Mainnet)
+                                .unwrap()
+                                .into(),
+                        )
+                        .await
+                });
+            });
+            threads.push(th);
+        }
+        for th in threads {
+            th.join().unwrap();
         }
     }
 }
