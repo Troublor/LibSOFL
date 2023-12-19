@@ -1,30 +1,33 @@
 use std::str::FromStr;
 
-use libsofl::engine::cheatcodes::CheatCodes;
+use libsofl::engine::providers::reth::RethBcProvider;
 use libsofl::engine::providers::rpc::JsonRpcBcProvider;
-use libsofl::engine::state::BcStateBuilder;
+use libsofl::engine::providers::BcProviderBuilder;
+use libsofl::engine::state::env::TransitionSpec;
+use libsofl::engine::state::{BcState, BcStateBuilder};
 use libsofl::engine::transactions::position::TxPosition;
-use reth_primitives::Address;
+use libsofl::engine::{
+    cheatcodes::CheatCodes, transactions::builder::TxBuilder,
+};
+use reth_primitives::{Address, TxHash};
 
 fn main() {
-    let bp = JsonRpcBcProvider::default();
+    let bp = BcProviderBuilder::default_db().unwrap();
 
-    let fork_at = TxPosition::new(17000001, 0);
-    let mut _state = BcStateBuilder::fork_at(&bp, fork_at).unwrap();
-
-    let mut _cheatcodes = CheatCodes::new();
-
-    let _uniswap_v2 =
-        Address::from_str("0x004375Dff511095CC5A197A54140a24eFEF3A416")
-            .unwrap();
-    let _uniswap_v3 =
-        Address::from_str("0x7668B2Ea8490955F68F5c33E77FE150066c94fb9")
-            .unwrap();
-    let _curve_stable_swap =
-        Address::from_str("0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7")
-            .unwrap();
-    let _random =
-        Address::from_str("0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2")
-            .unwrap();
-    println!("5");
+    let attack_tx_hash = TxHash::from_str(
+        "0xaa79afe1a556284a16117bea20bcfad49f4c3ab3a371ba06b5ebdcebc0b6a331",
+    )
+    .unwrap();
+    let victim_tx_hash = TxHash::from_str(
+        "0xca04cec2436f9ad5b13345da20d8b2a569bbaa8be2d4e6ba640fe6f0ff4c28e7",
+    )
+    .unwrap();
+    let mut state =
+        BcStateBuilder::fork_before_tx(&bp, attack_tx_hash).unwrap();
+    let attack_tx = TransitionSpec::from_tx_hash(&bp, attack_tx_hash).unwrap();
+    let victim_tx = TransitionSpec::from_tx_hash(&bp, victim_tx_hash).unwrap();
+    let (_, mut rs) =
+        BcState::transit_without_inspector(state, victim_tx).unwrap();
+    let r = rs.remove(0);
+    println!("victim tx result: {:?}", r);
 }
