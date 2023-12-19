@@ -29,8 +29,10 @@ impl TransitionSpec {
         let txs = p
             .transactions_by_block(pos.block)
             .map_err(SoflError::Reth)?
-            .ok_or(SoflError::Fork(pos))?;
-        let tx = txs.get(pos.index as usize).ok_or(SoflError::Fork(pos))?;
+            .ok_or(SoflError::PosNotFound(pos))?;
+        let tx = txs
+            .get(pos.index as usize)
+            .ok_or(SoflError::PosNotFound(pos))?;
         let sender = tx.recover_signer().expect(
             "impossible: cannot recover signer from a signed transaction",
         );

@@ -4,7 +4,7 @@ use std::{
     ops::{Add, AddAssign, Shl, ShlAssign, Shr, ShrAssign, Sub, SubAssign},
 };
 
-use reth_primitives::BlockHashOrNumber;
+use reth_primitives::{BlockHashOrNumber, TransactionMeta};
 
 use reth_provider::{BlockNumReader, TransactionsProvider};
 use revm_primitives::{B256, U256};
@@ -72,6 +72,15 @@ impl TxPosition {
         Self {
             block: BlockHashOrNumber::from(block),
             index,
+        }
+    }
+}
+
+impl From<TransactionMeta> for TxPosition {
+    fn from(meta: TransactionMeta) -> Self {
+        Self {
+            block: meta.block_number.into(),
+            index: meta.index,
         }
     }
 }

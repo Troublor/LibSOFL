@@ -3,9 +3,9 @@ pub mod fork;
 pub mod fresh;
 
 use auto_impl::auto_impl;
-use reth_primitives::Address;
+use reth_primitives::{Address, TxHash};
 use reth_provider::{
-    EvmEnvProvider, StateProviderBox, StateProviderFactory,
+    EvmEnvProvider, ReceiptProvider, StateProviderBox, StateProviderFactory,
     TransactionsProvider,
 };
 use reth_revm::database::StateProviderDatabase as WrappedDB;
@@ -47,6 +47,43 @@ pub type FreshState = CacheDB<EmptyDB>;
 pub struct BcStateBuilder;
 
 impl BcStateBuilder {
+    /// Create a forked state at the state before the execution of the given onchain transaction.
+    /// This function is ofen used to replay a transaction.
+    pub fn fork_before_tx<
+        P: StateProviderFactory + EvmEnvProvider + TransactionsProvider,
+    >(
+        p: &P,
+        tx: TxHash,
+    ) -> Result<
+        CacheDB<StateProviderDB<'_>>,
+        SoflError<reth_interfaces::RethError>,
+    > {
+        let (_, tx_meta) = p
+            .transaction_by_hash_with_meta(tx)
+            .map_err(SoflError::<reth_interfaces::RethError>::Reth)?
+            .ok_or(SoflError::TxNotFound(tx))?;
+        let pos: TxPosition = tx_meta.into();
+        Self::fork_at(p, pos)
+    }
+
+    /// Create a forked state at the state after the execution of the given onchain transaction.
+    pub fn fork_after_tx<
+        P: StateProviderFactory + EvmEnvProvider + TransactionsProvider,
+    >(
+        p: &P,
+        tx: TxHash,
+    ) -> Result<
+        CacheDB<StateProviderDB<'_>>,
+        SoflError<reth_interfaces::RethError>,
+    > {
+        let (_, tx_meta) = p
+            .transaction_by_hash_with_meta(tx)
+            .map_err(SoflError::<reth_interfaces::RethError>::Reth)?
+            .ok_or(SoflError::TxNotFound(tx))?;
+        let pos: TxPosition = tx_meta.into();
+        Self::fork_from(p, pos)
+    }
+
     /// Create a forked state from the the state before the transaction at the position is executed.
     pub fn fork_at<
         P: StateProviderFactory + EvmEnvProvider + TransactionsProvider,
@@ -58,7 +95,9 @@ impl BcStateBuilder {
         SoflError<reth_interfaces::RethError>,
     > {
         let pos = pos.into();
-        let bn = pos.get_block_number(p).map_err(|_| SoflError::Fork(pos))?;
+        let bn = pos
+            .get_block_number(p)
+            .map_err(|_| SoflError::PosNotFound(pos))?;
         let sp = p
             .state_by_block_id((bn - 1).into())
             .map_err(SoflError::Reth)?;
@@ -70,7 +109,7 @@ impl BcStateBuilder {
             let txs = p
                 .transactions_by_block(pos.block)
                 .map_err(SoflError::Reth)?
-                .ok_or(SoflError::Fork(pos))?;
+                .ok_or(SoflError::PosNotFound(pos))?;
             // prepare
             let mut spec_builder =
                 TransitionSpecBuilder::new().at_block(p, pos.block);
@@ -94,7 +133,7 @@ impl BcStateBuilder {
         SoflError<reth_interfaces::RethError>,
     > {
         let mut pos = pos.into();
-        pos.shift(p, 1).map_err(|_| SoflError::Fork(pos))?;
+        pos.shift(p, 1).map_err(|_| SoflError::PosNotFound(pos))?;
         Self::fork_at(p, pos)
     }
 

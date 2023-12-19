@@ -1,9 +1,13 @@
-use reth_primitives::Address;
+use reth_primitives::{Address, TxHash};
+use reth_provider::TransactionsProvider;
 use revm_primitives::{BlockEnv, CfgEnv, U256};
 
-use crate::utils::conversion::{Convert, ToElementary};
+use crate::{
+    error::SoflError,
+    utils::conversion::{Convert, ToElementary},
+};
 
-use super::Tx;
+use super::{position::TxPosition, Tx};
 
 #[derive(Debug, Clone, Default)]
 pub struct TxBuilder {
@@ -22,6 +26,36 @@ pub struct TxBuilder {
 impl TxBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+impl TxBuilder {
+    pub fn from_tx_hash<P: TransactionsProvider>(
+        p: &P,
+        hash: impl Into<TxHash>,
+    ) -> Result<Tx, SoflError<reth_interfaces::RethError>> {
+        let hash = hash.into();
+        let tx = p
+            .transaction_by_hash(hash)
+            .map_err(SoflError::Reth)?
+            .ok_or(SoflError::TxNotFound(hash))?;
+        Ok(tx.into())
+    }
+
+    pub fn from_tx_position<P: TransactionsProvider>(
+        p: &P,
+        pos: impl Into<TxPosition>,
+    ) -> Result<Tx, SoflError<reth_interfaces::RethError>> {
+        let pos = pos.into();
+        let mut txs = p
+            .transactions_by_block(pos.block)
+            .map_err(SoflError::Reth)?
+            .ok_or(SoflError::PosNotFound(pos))?;
+        if pos.index >= txs.len() as u64 {
+            return Err(SoflError::PosNotFound(pos));
+        }
+        let tx = txs.remove(pos.index as usize);
+        Ok(tx.into())
     }
 }
 

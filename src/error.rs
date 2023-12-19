@@ -1,6 +1,7 @@
 use std::convert::Infallible;
 
 use ethers::etherscan;
+use reth_primitives::TxHash;
 
 use crate::engine::transactions::position::TxPosition;
 
@@ -44,7 +45,10 @@ pub enum SoflError<DBERR = Infallible> {
 
     /// Fork position not found
     #[error("fork position ({0}) not found")]
-    Fork(TxPosition),
+    PosNotFound(TxPosition),
+
+    #[error("fork before tx ({0}) not found")]
+    TxNotFound(TxHash),
 
     /// Wrapper of EVM error
     #[error("EVM error: {0:?}")]
