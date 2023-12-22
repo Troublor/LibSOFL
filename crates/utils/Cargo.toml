@@ -1,0 +1,16 @@
+[package]
+name = "libsofl-utils"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+libsofl-core = { path = "../core" }
+
+serde = { version = "1.0.164", features = ["derive"] }
+config = "0.13.1"
+tempfile = "3.8.1"
+tracing = "0.1.40"
+tracing-subscriber = { version = "0.3.18", features = ["std", "fmt", "json", "env-filter"] }

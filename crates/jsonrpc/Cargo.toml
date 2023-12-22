@@ -1,0 +1,19 @@
+[package]
+name = "libsofl-jsonrpc"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+libsofl-core = { path = "../core" }
+libsofl-utils = { path = "../utils" }
+
+serde = { version = "1.0.164", features = ["derive"] }
+tokio = "1.35.1"
+
+alloy-providers = { git = "https://github.com/alloy-rs/alloy" }
+alloy-transport = { git = "https://github.com/alloy-rs/alloy" }
+alloy-rpc-client = { git = "https://github.com/alloy-rs/alloy" }
+alloy-rpc-types = { git = "https://github.com/alloy-rs/alloy" }

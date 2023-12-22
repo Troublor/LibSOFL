@@ -1,0 +1,30 @@
+[package]
+name = "libsofl-reth"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+libsofl-core = { path = "../core" }
+libsofl-utils = { path = "../utils" }
+
+serde = { version = "1.0.164", features = ["derive"] }
+lazy_static = "1.4.0"
+tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
+
+#reth
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13", features = [
+    "arbitrary",
+] }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13", features = [
+    "mdbx",
+    "test-utils",
+] }
+reth-provider = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13", features = [
+    "test-utils",
+] }
+reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13" }
+reth-beacon-consensus = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13" }
+reth-blockchain-tree = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13" }
