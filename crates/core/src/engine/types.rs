@@ -5,6 +5,7 @@ use crate::blockchain::tx_position::TxPosition;
 
 // Low level types
 pub type Uint<const BITS: usize, const LIMBS: usize> = revm::primitives::ruint::Uint<BITS, LIMBS>;
+pub type Signed<const BITS: usize, const LIMBS: usize> = alloy_primitives::Signed<BITS, LIMBS>;
 pub type U64 = revm::primitives::ruint::Uint<64, 1>;
 pub type U128 = revm::primitives::ruint::Uint<128, 2>;
 pub type U256 = revm::primitives::U256;
