@@ -1,20 +1,17 @@
 use revm::db::CacheDB;
 
-use super::{
-    state::BcStateRef,
-    types::{AccountInfo, Address, Bytecode, Hash, StateChange, U256},
-};
+use super::types::{AccountInfo, Address, Bytecode, Hash, StateChange, U256};
 
 /// In-memory BcState implementation, using revm's CacheDB.
 #[derive(Debug, Clone, derive_more::AsRef, derive_more::Deref, derive_more::DerefMut)]
-pub struct MemoryBcState<S: BcStateRef>(
+pub struct MemoryBcState<S: revm::DatabaseRef>(
     #[as_ref]
     #[deref]
     #[deref_mut]
     revm::db::CacheDB<S>,
 );
 
-impl<S: BcStateRef> revm::Database for MemoryBcState<S> {
+impl<S: revm::DatabaseRef> revm::Database for MemoryBcState<S> {
     type Error = S::Error;
 
     #[doc = " Get basic account information."]
@@ -38,14 +35,14 @@ impl<S: BcStateRef> revm::Database for MemoryBcState<S> {
     }
 }
 
-impl<S: BcStateRef> revm::DatabaseCommit for MemoryBcState<S> {
+impl<S: revm::DatabaseRef> revm::DatabaseCommit for MemoryBcState<S> {
     #[doc = " Commit changes to the database."]
     fn commit(&mut self, changes: StateChange) {
         self.0.commit(changes)
     }
 }
 
-impl<S: BcStateRef> MemoryBcState<S> {
+impl<S: revm::DatabaseRef> MemoryBcState<S> {
     pub fn new(state_ref: S) -> Self {
         Self(revm::db::CacheDB::new(state_ref))
     }
@@ -58,7 +55,7 @@ impl MemoryBcState<revm::db::EmptyDB> {
     }
 }
 
-impl<S: BcStateRef + Clone> MemoryBcState<S> {
+impl<S: revm::DatabaseRef + Clone> MemoryBcState<S> {
     /// fork a new MemoryBcState from the current state.
     pub fn fork(&self) -> MemoryBcState<CacheDB<S>> {
         let c = self.0.clone();
@@ -73,20 +70,21 @@ mod tests {
     use crate::{
         conversion::ConvertTo,
         engine::{
+            inspector::no_inspector,
             memory::MemoryBcState,
             state::BcState,
             transition::TransitionSpecBuilder,
             types::{
-                AccountInfo, Address, BlockEnv, Bytecode, CfgEnv, ExecutionResult, TxEnv, U256, TransactTo,
+                AccountInfo, Address, BlockEnv, Bytecode, CfgEnv, ExecutionResult, TransactTo,
+                TxEnv, U256,
             },
-            inspector::no_inspector,
         },
     };
 
     #[test]
     fn test_fresh_state_with_plain_transfer() {
         let spender: Address = 0.cvt();
-        let receiver:Address = 1.cvt();
+        let receiver: Address = 1.cvt();
 
         // set cfg and env
         let mut cfg = CfgEnv::default();

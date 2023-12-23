@@ -3,13 +3,18 @@ name = "periphery"
 version = "0.1.0"
 edition = "2021"
 
+[features]
+default = ["test-using-jsonrpc"]
+test-using-jsonrpc = []
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 
 libsofl-core = { path = "../core" }
-libsofl-utils= { path = "../utils" }
+libsofl-utils = { path = "../utils" }
 libsofl-reth = { path = "../reth" }
+libsofl-jsonrpc = { path = "../jsonrpc" }
 
 paste = "1.0.14"
 lazy_static = "1.4.0"

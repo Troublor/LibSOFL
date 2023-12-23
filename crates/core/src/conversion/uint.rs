@@ -133,12 +133,12 @@ impl ConvertTo<Bytes> for &str {
 }
 impl<const BITS: usize, const LIMBS: usize> ConvertTo<Bytes> for Uint<BITS, LIMBS> {
     fn cvt(&self) -> Bytes {
-        self.to_be_bytes_trimmed_vec().into()
+        self.to_be_bytes_vec().into()
     }
 }
 impl<const BITS: usize, const LIMBS: usize> ConvertTo<Bytes> for Signed<BITS, LIMBS> {
     fn cvt(&self) -> Bytes {
-        self.into_raw().to_be_bytes_trimmed_vec().into()
+        self.into_raw().to_be_bytes_vec().into()
     }
 }
 impl ConvertTo<Bytes> for Address {

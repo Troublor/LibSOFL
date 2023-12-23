@@ -3,7 +3,7 @@ use std::{cmp::Ordering, fmt::Debug};
 
 use alloy_sol_types::SolCall;
 use libsofl_core::conversion::ConvertTo;
-use libsofl_core::engine::state::{BcState, BcStateEditable};
+use libsofl_core::engine::state::BcState;
 use libsofl_core::engine::types::{Address, U256};
 use libsofl_core::error::SoflError;
 use libsofl_utils::log::trace;
@@ -24,7 +24,7 @@ impl CheatCodes {
     ) -> Result<U256, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let mut price = U256::ZERO;
         let mut liquidity = U256::ZERO;
@@ -65,7 +65,7 @@ impl CheatCodes {
     ) -> Result<(U256, U256), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // check whether uniswap v3 exists
         let call = UniswapV2FactoryABI::feeToSetterCall {};
@@ -119,7 +119,7 @@ impl CheatCodes {
     ) -> Result<(Address, Address, U256), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let weth = ADDRESS_BOOK.weth.must_on_chain(Chain::Mainnet);
         let usdt = ADDRESS_BOOK.usdt.must_on_chain(Chain::Mainnet);
@@ -175,7 +175,7 @@ impl CheatCodes {
     ) -> Result<U256, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let token_decimals = self.get_erc20_decimals(state, token)?;
         let raw_balance = self.get_erc20_balance(state, token, pool)?;
@@ -211,7 +211,7 @@ impl CheatCodes {
     ) -> Result<Address, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let call = UniswapV2FactoryABI::getPairCall {
             _0: token1,
@@ -239,7 +239,7 @@ impl CheatCodes {
     ) -> Result<(U256, U256), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // check whether uniswap v3 exists
         {
@@ -290,7 +290,7 @@ impl CheatCodes {
     ) -> Result<HPMultipler, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let call = UniswapV3PoolABI::slot0Call {};
         // price is Q64.96
@@ -332,7 +332,7 @@ impl CheatCodes {
     ) -> Result<(Address, Address, U256), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let fees = &[500u64, 3000u64, 10000u64];
 
@@ -389,7 +389,7 @@ impl CheatCodes {
     ) -> Result<Address, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let call = UniswapV3FactoryABI::getPoolCall {
             _0: token1,
@@ -412,7 +412,7 @@ impl CheatCodes {
 #[cfg(test)]
 mod tests_with_dep {
     use libsofl_core::{
-        blockchain::tx_position::TxPosition,
+        blockchain::{provider::BcStateProvider, tx_position::TxPosition},
         conversion::ConvertTo,
         engine::types::{Address, U256},
     };

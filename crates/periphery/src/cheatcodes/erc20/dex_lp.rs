@@ -6,7 +6,7 @@ use libsofl_core::{
     conversion::ConvertTo,
     engine::{
         inspector::no_inspector,
-        state::{BcState, BcStateEditable},
+        state::BcState,
         types::{Address, U256},
     },
     error::SoflError,
@@ -29,7 +29,7 @@ impl CheatCodes {
     ) -> Result<Option<U256>, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let (pool, pool_ty) = token_ty.get_pool(token).ok_or_else(|| {
             SoflError::Custom(format!(
@@ -86,7 +86,7 @@ impl CheatCodes {
     ) -> Result<(), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let mut caller = self.caller.clone();
         caller.address = account;
@@ -208,7 +208,7 @@ impl CheatCodes {
     ) -> Result<(), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // prepare a caller
         let mut caller = self.caller.clone();
@@ -228,7 +228,7 @@ impl CheatCodes {
 #[cfg(test)]
 mod tests_with_dep {
     use libsofl_core::{
-        blockchain::tx_position::TxPosition,
+        blockchain::{tx_position::TxPosition, provider::BcStateProvider},
         conversion::ConvertTo,
         engine::types::{Address, U256},
     };

@@ -11,7 +11,7 @@ use alloy_json_abi::Function;
 use libsofl_core::{
     conversion::ConvertTo,
     engine::{
-        state::{BcState, BcStateEditable},
+        state::BcState,
         types::{Address, Bytecode, Bytes, B256, U256},
     },
     error::SoflError,
@@ -90,7 +90,7 @@ impl CheatCodes {
     /// Find the storage slot that is read by executing the given calldata.
     fn find_slot<S>(&mut self, state: &mut S, to: Address, calldata: Bytes) -> Option<U256>
     where
-        S: BcState + BcStateEditable,
+        S: BcState,
         S::Error: Debug,
     {
         // staticcall to get the slot, where we force the return type as u256
@@ -180,7 +180,7 @@ impl CheatCodes {
         calldata: Bytes,
     ) -> Result<Bytes, SoflError>
     where
-        S: BcState + BcStateEditable,
+        S: BcState,
         S::Error: Debug,
     {
         // let rtypes: Vec<ParamType> =
@@ -258,7 +258,7 @@ impl CheatCodes {
     ) -> Result<Option<U256>, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let account_info = state
             .basic(to)
@@ -307,7 +307,7 @@ impl CheatCodes {
     ) -> Result<Option<U256>, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let rdata = state
             .storage(to, slot)
@@ -326,7 +326,7 @@ impl CheatCodes {
 
 // Functions that does not need to access cache
 impl CheatCodes {
-    pub fn get_balance<S: BcState + BcStateEditable>(
+    pub fn get_balance<S: BcState>(
         &mut self,
         state: &mut S,
         account: Address,
@@ -340,7 +340,7 @@ impl CheatCodes {
             .map_or(Ok(U256::from(0)), |info| Ok(info.balance))
     }
 
-    pub fn get_code_hash<S: BcState + BcStateEditable>(
+    pub fn get_code_hash<S: BcState>(
         &mut self,
         state: &mut S,
         account: Address,
@@ -354,7 +354,7 @@ impl CheatCodes {
             .map_or(Ok(B256::ZERO), |info| Ok(info.code_hash))
     }
 
-    pub fn get_code<S: BcState + BcStateEditable>(
+    pub fn get_code<S: BcState>(
         &mut self,
         state: &mut S,
         account: Address,
@@ -376,7 +376,7 @@ impl CheatCodes {
         }
     }
 
-    pub fn set_balance<S: BcState + BcStateEditable>(
+    pub fn set_balance<S: BcState>(
         &mut self,
         state: &mut S,
         address: Address,
@@ -406,7 +406,7 @@ impl CheatCodes {
 mod tests_with_dep {
     use crate::test::get_test_bc_provider;
     use libsofl_core::{
-        blockchain::tx_position::TxPosition,
+        blockchain::{provider::BcStateProvider, tx_position::TxPosition},
         conversion::ConvertTo,
         engine::types::{Address, U256},
     };

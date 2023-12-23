@@ -121,4 +121,9 @@ impl Tx for RethTx {
     fn logs(&self) -> Option<Vec<Log>> {
         self.logs.clone()
     }
+
+    #[doc = " Returns the recipient of the transaction."]
+    fn to(&self) -> Option<Address> {
+        self.tx.to()
+    }
 }

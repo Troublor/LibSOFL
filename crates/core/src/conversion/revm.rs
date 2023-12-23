@@ -3,8 +3,8 @@ use std::str::FromStr;
 use crate::{
     blockchain::tx_position::TxPosition,
     engine::types::{
-        Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytes, Hash, TxHash, TxHashOrPosition,
-        B256, U256,
+        Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytecode, Bytes, Hash, TxHash,
+        TxHashOrPosition, U256,
     },
 };
 
@@ -125,6 +125,19 @@ impl ConvertTo<TxHashOrPosition> for TxPosition {
 impl ConvertTo<TxHashOrPosition> for TxHash {
     fn cvt(&self) -> TxHashOrPosition {
         TxHashOrPosition::Hash(*self)
+    }
+}
+
+///*** Convert to Bytecode */
+impl<T: ConvertTo<Bytes>> ConvertTo<Bytecode> for T {
+    fn cvt(&self) -> Bytecode {
+        let bytes: Bytes = self.cvt();
+        Bytecode::new_raw(bytes)
+    }
+}
+impl ConvertTo<Bytecode> for Bytes {
+    fn cvt(&self) -> Bytecode {
+        Bytecode::new_raw(self.clone())
     }
 }
 

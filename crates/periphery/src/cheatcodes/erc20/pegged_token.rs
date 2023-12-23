@@ -6,7 +6,7 @@ use libsofl_core::{
     conversion::ConvertTo,
     engine::{
         inspector::no_inspector,
-        state::{BcState, BcStateEditable},
+        state::BcState,
         types::{Address, U256},
     },
     error::SoflError,
@@ -30,7 +30,7 @@ impl CheatCodes {
     ) -> Result<Option<U256>, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let balance_before = self.get_erc20_balance(state, token, account)?;
 
@@ -88,7 +88,7 @@ impl CheatCodes {
     ) -> Result<(), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let mut caller = self.caller.clone();
         caller.address = account;
@@ -136,7 +136,7 @@ impl CheatCodes {
     ) -> Result<(), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let mut caller = self.caller.clone();
         caller.address = account;
@@ -185,7 +185,9 @@ impl CheatCodes {
         self.set_erc20_allowance(state, base_token, account, token, U256::MAX)?;
 
         let func = self.parse_abi("deposit(uint256)")?;
-        let calldata = func.abi_encode_input(&[amount_in.into()]).expect("encode failed");
+        let calldata = func
+            .abi_encode_input(&[amount_in.into()])
+            .expect("encode failed");
         caller.call(state, token, calldata.cvt(), None, no_inspector())?;
 
         Ok(())
@@ -194,10 +196,13 @@ impl CheatCodes {
 
 #[cfg(test)]
 mod tests_with_dep {
-    use libsofl_core::{blockchain::tx_position::TxPosition, conversion::ConvertTo, engine::types::U256};
+    use libsofl_core::{
+        blockchain::{provider::BcStateProvider, tx_position::TxPosition},
+        conversion::ConvertTo,
+        engine::types::U256,
+    };
 
     use crate::{cheatcodes::CheatCodes, math::approx_eq, test::get_test_bc_provider};
-
 
     #[test]
     fn test_set_depegged_token() {

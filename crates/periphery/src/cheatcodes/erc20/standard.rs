@@ -5,7 +5,7 @@ use libsofl_core::{
     conversion::ConvertTo,
     engine::{
         inspector::no_inspector,
-        state::{BcState, BcStateEditable},
+        state::BcState,
         types::{Address, U256},
     },
     error::SoflError,
@@ -26,12 +26,13 @@ impl CheatCodes {
     ) -> Result<U256, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // signature: balanceOf(address) -> 0x70a08231
         let call = ERC20ABI::balanceOfCall { owner: account };
         let calldata = call.abi_encode();
         let ret = self.cheat_read(state, token, calldata.cvt())?;
+        println!("ret: {:?}", ret);
         ERC20ABI::balanceOfCall::abi_decode_returns(&ret, true)
             .map(|r| r.balance)
             .map_err(|e| SoflError::Abi(format!("failed to decode balanceOf return: {}", e)))
@@ -44,7 +45,7 @@ impl CheatCodes {
     ) -> Result<U256, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // signature: totalSupply() -> 0x18160ddd
         let call = ERC20ABI::totalSupplyCall {};
@@ -62,7 +63,7 @@ impl CheatCodes {
     ) -> Result<U256, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // signature: decimals() -> 0x313ce567
         let call = ERC20ABI::decimalsCall {};
@@ -82,7 +83,7 @@ impl CheatCodes {
     ) -> Result<U256, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // signature: allowance(address,address) -> 0xdd62ed3e
         let call = ERC20ABI::allowanceCall {
@@ -107,7 +108,7 @@ impl CheatCodes {
     ) -> Result<Option<U256>, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // signature: allowance(address,address) -> 0xdd62ed3e
         let call = ERC20ABI::allowanceCall {
@@ -128,7 +129,7 @@ impl CheatCodes {
     ) -> Result<(), SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // signature: transferFrom(address,address,uint256) -> 0x23b872dd
         let call = ERC20ABI::transferCall { to, value: amount };
@@ -163,7 +164,7 @@ impl CheatCodes {
     ) -> Result<Option<U256>, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let balance_before = self.get_erc20_balance(state, token, account)?;
         let balance_after = balance_before + amount;
@@ -180,7 +181,7 @@ impl CheatCodes {
     ) -> Result<Option<U256>, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // first check whether the token is a LP token for a DEX pool
         let token_ty = self.get_contract_type(state, token)?;
@@ -223,7 +224,7 @@ impl CheatCodes {
 mod tests_with_dep {
     use alloy_sol_types::SolCall;
     use libsofl_core::{
-        blockchain::tx_position::TxPosition,
+        blockchain::{provider::BcStateProvider, tx_position::TxPosition},
         conversion::ConvertTo,
         engine::{
             inspector::no_inspector,

@@ -20,7 +20,7 @@ pub type Bytecode = revm::primitives::Bytecode;
 
 #[derive(Clone, Debug, derive_more::Deref)]
 #[deref(forward)]
-pub struct Hex (String);
+pub struct Hex(String);
 
 pub type BlockNumber = alloy_primitives::BlockNumber;
 pub type BlockHash = alloy_primitives::BlockHash;
@@ -53,8 +53,8 @@ pub type StorageValue = alloy_primitives::StorageValue;
 pub type Storage = revm::primitives::HashMap<U256, revm::primitives::StorageSlot>;
 pub type StorageSlot = revm::primitives::StorageSlot;
 
-pub use revm::Inspector;
 pub use revm::interpreter::opcode;
+pub use revm::Inspector;
 pub type InstructionResult = revm::interpreter::InstructionResult;
 pub type Interpreter<'a> = revm::interpreter::Interpreter<'a>;
 pub type EVMData<'a, D> = revm::EVMData<'a, D>;
@@ -70,6 +70,8 @@ pub type ExecutionResult = revm::primitives::ExecutionResult;
 pub type Output = revm::primitives::Output;
 pub type CreateScheme = revm::primitives::CreateScheme;
 
+pub const KECCAK_EMPTY: B256 = revm::primitives::KECCAK_EMPTY;
+pub use revm::primitives::keccak256;
 
 #[cfg(test)]
 mod tests {

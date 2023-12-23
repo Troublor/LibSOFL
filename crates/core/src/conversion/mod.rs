@@ -1,5 +1,5 @@
-pub mod uint;
 pub mod revm;
+pub mod uint;
 pub trait ConvertTo<T> {
     fn cvt(&self) -> T;
 }
@@ -13,5 +13,3 @@ impl<T: ConvertTo<U>, U> ConvertFrom<T> for U {
         from.cvt()
     }
 }
-
-pub struct Convertor {}

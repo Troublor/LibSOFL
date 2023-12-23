@@ -1,6 +1,9 @@
 use revm_primitives::StorageSlot;
 
 use crate::error::SoflError;
+pub use revm::Database;
+pub use revm::DatabaseCommit;
+pub use revm::DatabaseRef;
 
 use super::{
     inspector::EvmInspector,
@@ -19,7 +22,7 @@ pub trait BcState: revm::Database + revm::DatabaseCommit {
         mut inspector: &mut I,
     ) -> Result<Vec<ExecutionResult>, SoflError>
     where
-        Self::Error: std::fmt::Debug,
+        <Self as revm::Database>::Error: std::fmt::Debug,
         Self: 'a,
         I: EvmInspector<&'a mut Self>,
     {
@@ -165,24 +168,17 @@ pub trait BcState: revm::Database + revm::DatabaseCommit {
     fn apply_changes<'a>(&'a mut self, changes: Vec<StateChange>) {
         changes.into_iter().for_each(|c| self.commit(c));
     }
-}
 
-/// Any type that implements revm::Database auto-implements BcState.
-impl<T: revm::Database + revm::DatabaseCommit> BcState for T {}
-
-/// BcState wraps revm's DatabaseCommit trait.
-/// It provides a set of basic methods to edit the state of the blockchain.
-pub trait BcStateEditable: BcState + revm::DatabaseCommit
-where
-    Self::Error: std::fmt::Debug,
-{
     /// Set a new value to a storage slot of an account.
     fn insert_account_storage(
         &mut self,
         address: Address,
         slot: U256,
         value: U256,
-    ) -> Result<(), SoflError> {
+    ) -> Result<(), SoflError>
+    where
+        <Self as revm::Database>::Error: std::fmt::Debug,
+    {
         let account = self
             .basic(address)
             .map_err(|e| SoflError::BcState(format!("failed to get account basic: {:?}", e)))?
@@ -215,12 +211,16 @@ where
     }
 }
 
-/// Any type that implements BcState and revm::DatabaseCommit auto-implements BcStateEditable.
-impl<T: revm::DatabaseCommit + BcState> BcStateEditable for T where T::Error: std::fmt::Debug {}
+/// Any type that implements revm::Database auto-implements BcState.
+impl<T: revm::Database + revm::DatabaseCommit> BcState for T {}
 
-/// BcStateRef wraps revm's DatabaseRef trait.
-/// Implementations of BcStateRef can be used to fork a BcState.
-pub trait BcStateRef: revm::db::DatabaseRef {}
+// /// BcState wraps revm's DatabaseCommit trait.
+// /// It provides a set of basic methods to edit the state of the blockchain.
+// pub trait BcStateEditable: BcState + revm::DatabaseCommit
+// where
+//     Self::Error: std::fmt::Debug,
+// {
+// }
 
-/// Any type that implements revm::DatabaseRef auto-implements BcStateRef.
-impl<T> BcStateRef for T where T: revm::db::DatabaseRef {}
+// /// Any type that implements BcState and revm::DatabaseCommit auto-implements BcStateEditable.
+// impl<T: revm::DatabaseCommit + BcState> BcStateEditable for T where T::Error: std::fmt::Debug {}

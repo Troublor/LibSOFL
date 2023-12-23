@@ -5,7 +5,7 @@ use alloy_sol_types::{SolCall, SolType};
 use libsofl_core::{
     conversion::ConvertTo,
     engine::{
-        state::{BcState, BcStateEditable},
+        state::BcState,
         types::{Address, U256},
     },
     error::SoflError,
@@ -111,7 +111,7 @@ impl CheatCodes {
     ) -> Result<ContractType, SoflError>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         if let Some(ty) = self.__get_contract_type(state, address) {
             Ok(ty)
@@ -127,7 +127,7 @@ impl CheatCodes {
     ) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // dex
         check_and_return!(self.__check_uniswap_v2(state, address));
@@ -154,7 +154,7 @@ impl CheatCodes {
     ) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         println!("token: {:?}", token);
         let func = self
@@ -184,7 +184,7 @@ impl CheatCodes {
     ) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let func = self
             .parse_abi("underlyingAssetAddress() returns (address)")
@@ -233,7 +233,7 @@ impl CheatCodes {
     ) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // check CurveStableSwap
         {
@@ -292,7 +292,7 @@ impl CheatCodes {
     fn __check_uniswap_v2<S>(&mut self, state: &mut S, address: Address) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // check token info
         let token0 = {
@@ -339,7 +339,7 @@ impl CheatCodes {
     fn __check_uniswap_v3<S>(&mut self, state: &mut S, address: Address) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         // get token and fee info
         let token0 = {
@@ -402,7 +402,7 @@ impl CheatCodes {
     ) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let call = CurveRegistryABI::get_coinsCall { _pool: address };
         let calldata = call.abi_encode();
@@ -433,7 +433,7 @@ impl CheatCodes {
     ) -> Option<ContractType>
     where
         S::Error: Debug,
-        S: BcState + BcStateEditable,
+        S: BcState,
     {
         let call = CurveCryptoRegistryABI::get_coinsCall { _pool: address };
         let calldata = call.abi_encode();
@@ -463,7 +463,9 @@ impl CheatCodes {
 #[cfg(test)]
 mod tests_with_dep {
     use libsofl_core::{
-        blockchain::tx_position::TxPosition, conversion::ConvertTo, engine::types::Address,
+        blockchain::{provider::BcStateProvider, tx_position::TxPosition},
+        conversion::ConvertTo,
+        engine::types::Address,
     };
 
     use crate::{

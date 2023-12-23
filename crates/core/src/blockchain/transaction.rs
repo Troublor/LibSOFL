@@ -15,6 +15,9 @@ pub trait Tx {
     /// Returns the sender of the transaction.
     fn sender(&self) -> Address;
 
+    /// Returns the recipient of the transaction.
+    fn to(&self) -> Option<Address>;
+
     /// Returns the value of the transaction.
     fn value(&self) -> U256;
 

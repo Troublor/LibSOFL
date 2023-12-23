@@ -120,4 +120,9 @@ impl Tx for JsonRpcTx {
             )
         }
     }
+
+    #[doc = " Returns the recipient of the transaction."]
+    fn to(&self) -> Option<Address> {
+        self.tx.to
+    }
 }
