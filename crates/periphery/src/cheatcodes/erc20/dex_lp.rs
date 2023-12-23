@@ -228,7 +228,7 @@ impl CheatCodes {
 #[cfg(test)]
 mod tests_with_dep {
     use libsofl_core::{
-        blockchain::{tx_position::TxPosition, provider::BcStateProvider},
+        blockchain::{provider::BcStateProvider, tx_position::TxPosition},
         conversion::ConvertTo,
         engine::types::{Address, U256},
     };

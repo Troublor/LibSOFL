@@ -1,7 +1,7 @@
 use mockall::automock;
 
 use crate::{
-    engine::types::{Address, Bytes, TxHash, U256, Hash, TxEnv},
+    engine::types::{Address, Bytes, Hash, TxEnv, TxHash, U256},
     error::SoflError,
 };
 
@@ -46,7 +46,6 @@ pub trait Tx {
     /// Returns the gas used by the transaction.
     /// None if the transaction is not executed.
     fn logs(&self) -> Option<Vec<Log>>;
-
 }
 
 #[derive(Clone, Debug, serde::Deserialize, serde::Serialize)]

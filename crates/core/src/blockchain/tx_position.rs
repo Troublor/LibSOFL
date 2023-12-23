@@ -188,11 +188,7 @@ impl SubAssign<u64> for TxPosition {
 
 impl TxPosition {
     /// Shift the transaction position in history provided by TxProvider by `offset`
-    pub fn shift<T: Tx, P: BcProvider<T>>(
-        &mut self,
-        p: &P,
-        offset: i64,
-    ) -> Result<(), SoflError> {
+    pub fn shift<T: Tx, P: BcProvider<T>>(&mut self, p: &P, offset: i64) -> Result<(), SoflError> {
         let get_txs_count = |block: BlockHashOrNumber| -> Result<u64, SoflError> {
             p.txs_in_block(block).map(|txs| txs.len() as u64)
         };
@@ -231,9 +227,7 @@ pub(crate) mod tests_with_db {
     use mockall::predicate::eq;
 
     use crate::{
-        blockchain::{
-            provider::MockBcProvider, transaction::MockTx,
-        },
+        blockchain::{provider::MockBcProvider, transaction::MockTx},
         engine::types::BlockHashOrNumber,
     };
 

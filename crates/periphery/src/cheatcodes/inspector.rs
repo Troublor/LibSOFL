@@ -52,11 +52,7 @@ where
     #[doc = " # Example"]
     #[doc = ""]
     #[doc = " To get the current opcode, use `interp.current_opcode()`."]
-    fn step(
-        &mut self,
-        interpreter: &mut Interpreter,
-        _data: &mut EVMData<'_, DB>,
-    ) {
+    fn step(&mut self, interpreter: &mut Interpreter, _data: &mut EVMData<'_, DB>) {
         // Record writes and reads if `record` has been called
         if let Some(storage_accesses) = &mut self.accesses {
             match interpreter.contract.bytecode.bytecode()[interpreter.program_counter()] {

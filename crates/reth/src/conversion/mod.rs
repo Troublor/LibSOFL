@@ -4,7 +4,7 @@ pub trait ConvertTo<T> {
     fn cvt(self) -> T;
 }
 
-impl <T, C: ConvertTo<T> + Clone> ConvertTo<T> for &C {
+impl<T, C: ConvertTo<T> + Clone> ConvertTo<T> for &C {
     fn cvt(self) -> T {
         C::cvt(self.clone())
     }

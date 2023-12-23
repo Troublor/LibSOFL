@@ -18,10 +18,8 @@ use libsofl_core::{
     error::SoflError,
 };
 use reth_beacon_consensus::BeaconConsensus;
-use reth_blockchain_tree::{
-    BlockchainTree, ShareableBlockchainTree, TreeExternals,
-};
-use reth_db::{DatabaseEnv, open_db_read_only};
+use reth_blockchain_tree::{BlockchainTree, ShareableBlockchainTree, TreeExternals};
+use reth_db::{open_db_read_only, DatabaseEnv};
 use reth_primitives::revm::env::fill_tx_env;
 use reth_primitives::ChainSpecBuilder;
 use reth_provider::{
@@ -34,7 +32,10 @@ use crate::conversion::ConvertTo;
 
 use super::transaction::RethTx;
 
-pub type RethBlockchainProvider = BlockchainProvider<Arc<DatabaseEnv>, ShareableBlockchainTree<Arc<DatabaseEnv>, EvmProcessorFactory>>;
+pub type RethBlockchainProvider = BlockchainProvider<
+    Arc<DatabaseEnv>,
+    ShareableBlockchainTree<Arc<DatabaseEnv>, EvmProcessorFactory>,
+>;
 
 lazy_static! {
     /// Global caches of the reth db instance per datadir.
@@ -71,10 +72,12 @@ impl RethProvider {
             .map_err(|e| SoflError::Provider(format!("failed to create blockchain tree: {}", e)))?;
         let shareable_blockchain_tree = ShareableBlockchainTree::new(blockchain_tree);
         let database = ProviderFactory::new(db, chain_spec);
-        let bp: BlockchainProvider<Arc<DatabaseEnv>, ShareableBlockchainTree<Arc<DatabaseEnv>, EvmProcessorFactory>> =
-            BlockchainProvider::new(database, shareable_blockchain_tree).map_err(|e| {
-                SoflError::Provider(format!("failed to create blockchain provider: {}", e))
-            })?;
+        let bp: BlockchainProvider<
+            Arc<DatabaseEnv>,
+            ShareableBlockchainTree<Arc<DatabaseEnv>, EvmProcessorFactory>,
+        > = BlockchainProvider::new(database, shareable_blockchain_tree).map_err(|e| {
+            SoflError::Provider(format!("failed to create blockchain provider: {}", e))
+        })?;
         Ok(Self { bp })
     }
 
