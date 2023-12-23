@@ -97,8 +97,8 @@ impl Shr<u64> for TxPosition {
     /// If the block is a hash, this will panic.
     fn shr(self, rhs: u64) -> Self::Output {
         let BlockHashOrNumber::Number(n) = self.block else {
-                panic!("TxPosition::shr: block is a hash (not a number)")
-            };
+            panic!("TxPosition::shr: block is a hash (not a number)")
+        };
         Self {
             block: BlockHashOrNumber::from(n.add(rhs)),
             index: 0,
@@ -111,8 +111,8 @@ impl ShrAssign<u64> for TxPosition {
     /// If the block is a hash, this will panic.
     fn shr_assign(&mut self, rhs: u64) {
         let BlockHashOrNumber::Number(n) = self.block else {
-                panic!("TxPosition::shr_assign: block is a hash (not a number)")
-            };
+            panic!("TxPosition::shr_assign: block is a hash (not a number)")
+        };
         self.block = BlockHashOrNumber::from(n.add(rhs));
         self.index = 0;
     }
@@ -141,8 +141,8 @@ impl Shl<u64> for TxPosition {
     /// If the block is a hash, this will panic.
     fn shl(self, rhs: u64) -> Self::Output {
         let BlockHashOrNumber::Number(n) = self.block else {
-                panic!("TxPosition::shl: block is a hash (not a number)")
-            };
+            panic!("TxPosition::shl: block is a hash (not a number)")
+        };
         if n < rhs {
             panic!("TxPosition::shl: block number underflow");
         }
@@ -158,8 +158,8 @@ impl ShlAssign<u64> for TxPosition {
     /// If the block is a hash, this will panic.
     fn shl_assign(&mut self, rhs: u64) {
         let BlockHashOrNumber::Number(n) = self.block else {
-                panic!("TxPosition::shl_assign: block is a hash (not a number)")
-            };
+            panic!("TxPosition::shl_assign: block is a hash (not a number)")
+        };
         if n < rhs {
             panic!("TxPosition::shl_assign: block number underflow");
         }
@@ -188,12 +188,18 @@ impl SubAssign<u64> for TxPosition {
 
 impl TxPosition {
     /// Shift the transaction position in history provided by TxProvider by `offset`
-    pub fn shift<T: Tx, P: BcProvider<T>>(&mut self, p: &P, offset: i64) -> Result<(), SoflError> {
-        let get_txs_count = |block: BlockHashOrNumber| -> Result<u64, SoflError> {
-            p.txs_in_block(block).map(|txs| txs.len() as u64)
-        };
+    pub fn shift<T: Tx, P: BcProvider<T>>(
+        &mut self,
+        p: &P,
+        offset: i64,
+    ) -> Result<(), SoflError> {
+        let get_txs_count =
+            |block: BlockHashOrNumber| -> Result<u64, SoflError> {
+                p.txs_in_block(block).map(|txs| txs.len() as u64)
+            };
         if let BlockHashOrNumber::Hash(h) = self.block {
-            self.block = p.block_number_by_hash(h).map(BlockHashOrNumber::from)?;
+            self.block =
+                p.block_number_by_hash(h).map(BlockHashOrNumber::from)?;
         }
         match offset {
             0 => Ok(()),

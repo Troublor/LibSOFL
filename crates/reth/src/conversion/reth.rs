@@ -20,8 +20,12 @@ impl ConvertTo<reth_primitives::Address> for Address {
 impl ConvertTo<reth_primitives::BlockHashOrNumber> for BlockHashOrNumber {
     fn cvt(self) -> reth_primitives::BlockHashOrNumber {
         match self {
-            BlockHashOrNumber::Hash(hash) => reth_primitives::BlockHashOrNumber::Hash(hash),
-            BlockHashOrNumber::Number(number) => reth_primitives::BlockHashOrNumber::Number(number),
+            BlockHashOrNumber::Hash(hash) => {
+                reth_primitives::BlockHashOrNumber::Hash(hash)
+            }
+            BlockHashOrNumber::Number(number) => {
+                reth_primitives::BlockHashOrNumber::Number(number)
+            }
         }
     }
 }

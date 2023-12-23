@@ -2,7 +2,9 @@ use std::str::FromStr;
 
 use crate::{
     blockchain::tx_position::TxPosition,
-    engine::types::{Address, BlockHashOrNumber, Bytes, Hash, Signed, TxHashOrPosition, Uint},
+    engine::types::{
+        Address, BlockHashOrNumber, Bytes, Hash, Signed, TxHashOrPosition, Uint,
+    },
 };
 
 use super::ConvertTo;
@@ -23,12 +25,16 @@ impl ConvertTo<String> for Bytes {
         hex::encode(self)
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<String> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<String>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> String {
         self.to_string() // decimal string
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<String> for Signed<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<String>
+    for Signed<BITS, LIMBS>
+{
     fn cvt(&self) -> String {
         self.to_dec_string() // decimal string
     }
@@ -56,61 +62,83 @@ impl ConvertTo<String> for TxPosition {
 }
 
 ///*** Convert to Uint */
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for String {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for String
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         // treat the string as a hex string if it starts with 0x, otherwise treat it as a decimal string
-        Uint::<BITS, LIMBS>::from_str(self.as_str()).expect("failed to convert string to Uint")
+        Uint::<BITS, LIMBS>::from_str(self.as_str())
+            .expect("failed to convert string to Uint")
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for &str {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for &str
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         // treat the string as a hex string if it starts with 0x, otherwise treat it as a decimal string
-        Uint::<BITS, LIMBS>::from_str(self).expect("failed to convert string to Uint")
+        Uint::<BITS, LIMBS>::from_str(self)
+            .expect("failed to convert string to Uint")
     }
 }
-impl<const B1: usize, const L1: usize, const B2: usize, const L2: usize> ConvertTo<Uint<B1, L1>>
-    for Uint<B2, L2>
+impl<const B1: usize, const L1: usize, const B2: usize, const L2: usize>
+    ConvertTo<Uint<B1, L1>> for Uint<B2, L2>
 {
     fn cvt(&self) -> Uint<B1, L1> {
         Uint::<B1, L1>::from_be_slice(self.to_be_bytes_trimmed_vec().as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for Hash {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for Hash
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for Address {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for Address
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for usize {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for usize
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.to_be_bytes().as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for u8 {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for u8
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.to_be_bytes().as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for u16 {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for u16
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.to_be_bytes().as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for u32 {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for u32
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.to_be_bytes().as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for u64 {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for u64
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.to_be_bytes().as_slice())
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for u128 {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
+    for u128
+{
     fn cvt(&self) -> Uint<BITS, LIMBS> {
         Uint::<BITS, LIMBS>::from_be_slice(self.to_be_bytes().as_slice())
     }
@@ -120,23 +148,29 @@ impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>> for u12
 impl ConvertTo<Bytes> for String {
     fn cvt(&self) -> Bytes {
         let mut bytes = Vec::new();
-        hex::decode_to_slice(self.as_str(), &mut bytes).expect("failed to convert string to Bytes");
+        hex::decode_to_slice(self.as_str(), &mut bytes)
+            .expect("failed to convert string to Bytes");
         bytes.into()
     }
 }
 impl ConvertTo<Bytes> for &str {
     fn cvt(&self) -> Bytes {
         let mut bytes = Vec::new();
-        hex::decode_to_slice(self, &mut bytes).expect("failed to convert string to Bytes");
+        hex::decode_to_slice(self, &mut bytes)
+            .expect("failed to convert string to Bytes");
         bytes.into()
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Bytes> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Bytes>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> Bytes {
         self.to_be_bytes_vec().into()
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<Bytes> for Signed<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<Bytes>
+    for Signed<BITS, LIMBS>
+{
     fn cvt(&self) -> Bytes {
         self.into_raw().to_be_bytes_vec().into()
     }
@@ -168,37 +202,49 @@ impl ConvertTo<Bytes> for Vec<u8> {
 }
 
 ///*** Convert to usize */
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<usize> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<usize>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> usize {
         let s: String = self.cvt(); // decimal string
         usize::from_str_radix(&s, 10).expect("failed to convert Uint to usize")
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<u8> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<u8>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> u8 {
         let s: String = self.cvt(); // decimal string
         u8::from_str_radix(&s, 10).expect("failed to convert Uint to u8")
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<u16> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<u16>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> u16 {
         let s: String = self.cvt(); // decimal string
         u16::from_str_radix(&s, 10).expect("failed to convert Uint to u16")
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<u32> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<u32>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> u32 {
         let s: String = self.cvt(); // decimal string
         u32::from_str_radix(&s, 10).expect("failed to convert Uint to u32")
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<u64> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<u64>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> u64 {
         let s: String = self.cvt(); // decimal string
         u64::from_str_radix(&s, 10).expect("failed to convert Uint to u64")
     }
 }
-impl<const BITS: usize, const LIMBS: usize> ConvertTo<u128> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> ConvertTo<u128>
+    for Uint<BITS, LIMBS>
+{
     fn cvt(&self) -> u128 {
         let s: String = self.cvt(); // decimal string
         u128::from_str_radix(&s, 10).expect("failed to convert Uint to u128")

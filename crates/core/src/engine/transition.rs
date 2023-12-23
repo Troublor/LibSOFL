@@ -1,7 +1,9 @@
 use revm_primitives::{BlockEnv, CfgEnv, TxEnv};
 
 use crate::{
-    blockchain::{provider::BcProvider, transaction::Tx, tx_position::TxPosition},
+    blockchain::{
+        provider::BcProvider, transaction::Tx, tx_position::TxPosition,
+    },
     error::SoflError,
 };
 
@@ -29,7 +31,10 @@ impl TransitionSpec {
         Ok(this)
     }
 
-    pub fn from_tx_hash<T: Tx, P: BcProvider<T>>(p: &P, hash: TxHash) -> Result<Self, SoflError> {
+    pub fn from_tx_hash<T: Tx, P: BcProvider<T>>(
+        p: &P,
+        hash: TxHash,
+    ) -> Result<Self, SoflError> {
         let mut this = TransitionSpec::default();
 
         let tx = p.tx(hash.into())?;
@@ -103,7 +108,11 @@ impl TransitionSpecBuilder {
         self.append_tx_env(tx_env)
     }
 
-    pub fn at_block<T: Tx, P: BcProvider<T>>(mut self, p: P, block: BlockHashOrNumber) -> Self {
+    pub fn at_block<T: Tx, P: BcProvider<T>>(
+        mut self,
+        p: P,
+        block: BlockHashOrNumber,
+    ) -> Self {
         p.fill_cfg_env(&mut self.cfg, block)
             .expect("assumption: chain cfg must exist");
         p.fill_block_env(&mut self.block, block)

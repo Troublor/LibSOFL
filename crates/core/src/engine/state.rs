@@ -9,7 +9,8 @@ use super::{
     inspector::EvmInspector,
     transition::TransitionSpec,
     types::{
-        Account, AccountInfo, AccountStatus, Address, ExecutionResult, StateChange, Storage, U256,
+        Account, AccountInfo, AccountStatus, Address, ExecutionResult,
+        StateChange, Storage, U256,
     },
 };
 
@@ -53,9 +54,15 @@ pub trait BcState: revm::Database + revm::DatabaseCommit {
 
             // execute transaction
             let result = evm.inspect_commit(insp).map_err(|e| match e {
-                revm::primitives::EVMError::Transaction(ee) => SoflError::InvalidTransaction(ee),
-                revm::primitives::EVMError::Header(ee) => SoflError::InvalidHeader(ee),
-                revm::primitives::EVMError::Database(ee) => SoflError::BcState(format!("{:?}", ee)),
+                revm::primitives::EVMError::Transaction(ee) => {
+                    SoflError::InvalidTransaction(ee)
+                }
+                revm::primitives::EVMError::Header(ee) => {
+                    SoflError::InvalidHeader(ee)
+                }
+                revm::primitives::EVMError::Database(ee) => {
+                    SoflError::BcState(format!("{:?}", ee))
+                }
             })?;
 
             // inspector post-transaction hook
@@ -89,9 +96,15 @@ pub trait BcState: revm::Database + revm::DatabaseCommit {
         for tx in txs.into_iter() {
             evm.env.tx = tx;
             let result = evm.transact_commit().map_err(|e| match e {
-                revm::primitives::EVMError::Transaction(ee) => SoflError::InvalidTransaction(ee),
-                revm::primitives::EVMError::Header(ee) => SoflError::InvalidHeader(ee),
-                revm::primitives::EVMError::Database(ee) => SoflError::BcState(format!("{:?}", ee)),
+                revm::primitives::EVMError::Transaction(ee) => {
+                    SoflError::InvalidTransaction(ee)
+                }
+                revm::primitives::EVMError::Header(ee) => {
+                    SoflError::InvalidHeader(ee)
+                }
+                revm::primitives::EVMError::Database(ee) => {
+                    SoflError::BcState(format!("{:?}", ee))
+                }
             })?;
             // inspector post-transaction hook
             results.push(result);
@@ -144,7 +157,9 @@ pub trait BcState: revm::Database + revm::DatabaseCommit {
                     revm::primitives::EVMError::Transaction(ee) => {
                         SoflError::InvalidTransaction(ee)
                     }
-                    revm::primitives::EVMError::Header(ee) => SoflError::InvalidHeader(ee),
+                    revm::primitives::EVMError::Header(ee) => {
+                        SoflError::InvalidHeader(ee)
+                    }
                     revm::primitives::EVMError::Database(ee) => {
                         SoflError::BcState(format!("{:?}", ee))
                     }
@@ -181,7 +196,12 @@ pub trait BcState: revm::Database + revm::DatabaseCommit {
     {
         let account = self
             .basic(address)
-            .map_err(|e| SoflError::BcState(format!("failed to get account basic: {:?}", e)))?
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
             .unwrap_or_default();
         let mut changes = StateChange::default();
         let mut storage_change = Storage::default();

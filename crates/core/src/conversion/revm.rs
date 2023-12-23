@@ -3,8 +3,8 @@ use std::str::FromStr;
 use crate::{
     blockchain::tx_position::TxPosition,
     engine::types::{
-        Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytecode, Bytes, Hash, TxHash,
-        TxHashOrPosition, U256,
+        Address, BlockHash, BlockHashOrNumber, BlockNumber, Bytecode, Bytes,
+        Hash, TxHash, TxHashOrPosition, U256,
     },
 };
 

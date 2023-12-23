@@ -4,8 +4,10 @@ use crate::blockchain::tx_position::TxPosition;
 /// Most of types are re-exported from revm.
 
 // Low level types
-pub type Uint<const BITS: usize, const LIMBS: usize> = revm::primitives::ruint::Uint<BITS, LIMBS>;
-pub type Signed<const BITS: usize, const LIMBS: usize> = alloy_primitives::Signed<BITS, LIMBS>;
+pub type Uint<const BITS: usize, const LIMBS: usize> =
+    revm::primitives::ruint::Uint<BITS, LIMBS>;
+pub type Signed<const BITS: usize, const LIMBS: usize> =
+    alloy_primitives::Signed<BITS, LIMBS>;
 pub type U64 = revm::primitives::ruint::Uint<64, 1>;
 pub type U128 = revm::primitives::ruint::Uint<128, 2>;
 pub type U256 = revm::primitives::U256;
@@ -24,7 +26,16 @@ pub struct Hex(String);
 
 pub type BlockNumber = alloy_primitives::BlockNumber;
 pub type BlockHash = alloy_primitives::BlockHash;
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, derive_more::From, derive_more::Display)]
+#[derive(
+    Clone,
+    Debug,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::From,
+    derive_more::Display,
+)]
 pub enum BlockHashOrNumber {
     #[display(fmt = "number({})", _0)]
     Hash(BlockHash),
@@ -34,7 +45,16 @@ pub enum BlockHashOrNumber {
 
 pub type TxHash = alloy_primitives::TxHash;
 pub type TxIndex = alloy_primitives::TxIndex;
-#[derive(Clone, Debug, Copy, PartialEq, Eq, Hash, derive_more::From, derive_more::Display)]
+#[derive(
+    Clone,
+    Debug,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    derive_more::From,
+    derive_more::Display,
+)]
 pub enum TxHashOrPosition {
     #[display(fmt = "hash({})", _0)]
     Hash(TxHash),
@@ -50,7 +70,8 @@ pub type Account = revm::primitives::Account;
 pub type AccountStatus = revm::primitives::AccountStatus;
 pub type StorageKey = alloy_primitives::StorageKey;
 pub type StorageValue = alloy_primitives::StorageValue;
-pub type Storage = revm::primitives::HashMap<U256, revm::primitives::StorageSlot>;
+pub type Storage =
+    revm::primitives::HashMap<U256, revm::primitives::StorageSlot>;
 pub type StorageSlot = revm::primitives::StorageSlot;
 
 pub use revm::interpreter::opcode;

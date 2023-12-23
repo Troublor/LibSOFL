@@ -29,7 +29,9 @@ impl CheatCodes {
         let mut price = U256::ZERO;
         let mut liquidity = U256::ZERO;
 
-        if let Ok((price_v2, liquidity_v2)) = self.query_uniswap_v2(state, token) {
+        if let Ok((price_v2, liquidity_v2)) =
+            self.query_uniswap_v2(state, token)
+        {
             trace!("price_v2: {}, liquidity_v2: {}", price_v2, liquidity_v2);
             if liquidity_v2 > liquidity {
                 price = price_v2;
@@ -37,7 +39,9 @@ impl CheatCodes {
             }
         }
 
-        if let Ok((price_v3, liquidity_v3)) = self.query_uniswap_v3(state, token) {
+        if let Ok((price_v3, liquidity_v3)) =
+            self.query_uniswap_v3(state, token)
+        {
             trace!("price_v3: {}, liquidity_v3: {}", price_v3, liquidity_v3);
             if liquidity_v3 > liquidity {
                 price = price_v3;
@@ -85,9 +89,11 @@ impl CheatCodes {
         let (best_pool, best_bs_token, best_liquidity) =
             self.__get_best_pool_uniswap_v2(state, token)?;
 
-        let token_balance = self.__get_token_balance_uniswap_v2(state, token, best_pool)?;
+        let token_balance =
+            self.__get_token_balance_uniswap_v2(state, token, best_pool)?;
 
-        let bs_token_balance_in_pool1 = self.get_erc20_balance(state, best_bs_token, best_pool)?;
+        let bs_token_balance_in_pool1 =
+            self.get_erc20_balance(state, best_bs_token, best_pool)?;
 
         // we need to update the decimals of the token to 18
         let mut price = HPMultipler::from(U256::from(10).pow(U256::from(18)));
@@ -97,14 +103,16 @@ impl CheatCodes {
         price /= token_balance;
 
         if best_bs_token != weth {
-            let bc_pool = self.__get_pair_address_uniswap_v2(state, best_bs_token, weth)?;
+            let bc_pool =
+                self.__get_pair_address_uniswap_v2(state, best_bs_token, weth)?;
 
             let bs_token_balance_in_pool2 =
                 self.get_erc20_balance(state, best_bs_token, bc_pool)?;
 
             let weth_balance = self.get_erc20_balance(state, weth, bc_pool)?;
 
-            let bs_price = HPMultipler::from(weth_balance) / bs_token_balance_in_pool2;
+            let bs_price =
+                HPMultipler::from(weth_balance) / bs_token_balance_in_pool2;
 
             price /= bs_price;
         }
@@ -140,13 +148,16 @@ impl CheatCodes {
             liquidity = self.get_erc20_balance(state, token, pool)?;
         } else {
             for ms_token in mainstream_tokens.iter() {
-                let cur_pool = self.__get_pair_address_uniswap_v2(state, token, *ms_token)?;
+                let cur_pool = self
+                    .__get_pair_address_uniswap_v2(state, token, *ms_token)?;
 
                 if cur_pool == Address::ZERO {
                     continue;
                 }
 
-                if let Ok(token_liquidity) = self.get_erc20_balance(state, token, cur_pool) {
+                if let Ok(token_liquidity) =
+                    self.get_erc20_balance(state, token, cur_pool)
+                {
                     if token_liquidity > liquidity {
                         liquidity = token_liquidity;
                         pool = cur_pool;
@@ -224,8 +235,9 @@ impl CheatCodes {
                 .must_on_chain(Chain::Mainnet),
             call.abi_encode().cvt(),
         )?;
-        let ret = UniswapV2FactoryABI::getPairCall::abi_decode_returns(&ret, true)
-            .expect("bug: cannot decode getPairCall returns");
+        let ret =
+            UniswapV2FactoryABI::getPairCall::abi_decode_returns(&ret, true)
+                .expect("bug: cannot decode getPairCall returns");
         Ok(ret._0)
     }
 }
@@ -261,18 +273,30 @@ impl CheatCodes {
             return Ok((U256::from(10).pow(U256::from(18)), U256::MAX));
         }
 
-        let (best_pool, best_bs_token, best_liquidity) =
-            self.__get_best_pool_uniswap_v3(state, token, &[weth, usdt, usdc, dai])?;
+        let (best_pool, best_bs_token, best_liquidity) = self
+            .__get_best_pool_uniswap_v3(
+                state,
+                token,
+                &[weth, usdt, usdc, dai],
+            )?;
 
-        let mut price =
-            self.__get_token_price_uniswap_v3(state, token, best_bs_token, best_pool)?;
+        let mut price = self.__get_token_price_uniswap_v3(
+            state,
+            token,
+            best_bs_token,
+            best_pool,
+        )?;
 
         if best_bs_token != weth {
             let (best_bs_pool, _, _) =
                 self.__get_best_pool_uniswap_v3(state, best_bs_token, &[weth])?;
 
-            let bs_price =
-                self.__get_token_price_uniswap_v3(state, best_bs_token, weth, best_bs_pool)?;
+            let bs_price = self.__get_token_price_uniswap_v3(
+                state,
+                best_bs_token,
+                weth,
+                best_bs_pool,
+            )?;
 
             price *= bs_price;
         }
@@ -295,9 +319,10 @@ impl CheatCodes {
         let call = UniswapV3PoolABI::slot0Call {};
         // price is Q64.96
         let ret = self.cheat_read(state, pool, call.abi_encode().cvt())?;
-        let sqrt_price_x96 = UniswapV3PoolABI::slot0Call::abi_decode_returns(&ret, true)
-            .expect("bug: cannot decode slot0Call returns")
-            .sqrtPriceX96;
+        let sqrt_price_x96 =
+            UniswapV3PoolABI::slot0Call::abi_decode_returns(&ret, true)
+                .expect("bug: cannot decode slot0Call returns")
+                .sqrtPriceX96;
 
         let mut result = HPMultipler::from(sqrt_price_x96);
 
@@ -316,9 +341,13 @@ impl CheatCodes {
         let token_decimals = self.get_erc20_decimals(state, token)?;
         let bs_token_decimals = self.get_erc20_decimals(state, bs_token)?;
         result = match token_decimals.cmp(&bs_token_decimals) {
-            Ordering::Less => result / U256::from(10).pow(bs_token_decimals - token_decimals),
+            Ordering::Less => {
+                result / U256::from(10).pow(bs_token_decimals - token_decimals)
+            }
             Ordering::Equal => result,
-            Ordering::Greater => result * U256::from(10).pow(token_decimals - bs_token_decimals),
+            Ordering::Greater => {
+                result * U256::from(10).pow(token_decimals - bs_token_decimals)
+            }
         };
 
         Ok(result)
@@ -345,20 +374,24 @@ impl CheatCodes {
         // a shortcut for mainstream tokens
         if baseline_tokens.contains(&token) {
             // this cannot be WETH
-            pool = self.__get_pool_address_uniswap_v3(state, token, weth, 500)?;
+            pool =
+                self.__get_pool_address_uniswap_v3(state, token, weth, 500)?;
             bs_token = weth;
             liquidity = self.get_erc20_balance(state, token, pool)?;
         } else {
             for ms_token in baseline_tokens.iter() {
                 for fee in fees.iter() {
-                    let cur_pool =
-                        self.__get_pool_address_uniswap_v3(state, token, *ms_token, *fee)?;
+                    let cur_pool = self.__get_pool_address_uniswap_v3(
+                        state, token, *ms_token, *fee,
+                    )?;
 
                     if cur_pool == Address::ZERO {
                         continue;
                     }
 
-                    if let Ok(token_liquidity) = self.get_erc20_balance(state, token, cur_pool) {
+                    if let Ok(token_liquidity) =
+                        self.get_erc20_balance(state, token, cur_pool)
+                    {
                         if token_liquidity > liquidity {
                             liquidity = token_liquidity;
                             pool = cur_pool;
@@ -403,8 +436,9 @@ impl CheatCodes {
                 .must_on_chain(Chain::Mainnet),
             call.abi_encode().cvt(),
         )?;
-        let ret = UniswapV3FactoryABI::getPoolCall::abi_decode_returns(&ret, true)
-            .expect("bug: cannot decode getPoolCall returns");
+        let ret =
+            UniswapV3FactoryABI::getPoolCall::abi_decode_returns(&ret, true)
+                .expect("bug: cannot decode getPoolCall returns");
         Ok(ret._0)
     }
 }

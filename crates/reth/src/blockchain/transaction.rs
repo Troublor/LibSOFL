@@ -45,18 +45,26 @@ impl From<TransactionSigned> for RethTx {
 }
 
 impl RethTx {
-    pub fn from_hash(bp: &RethBlockchainProvider, hash: TxHash) -> Result<Self, SoflError> {
+    pub fn from_hash(
+        bp: &RethBlockchainProvider,
+        hash: TxHash,
+    ) -> Result<Self, SoflError> {
         let (tx, meta) = bp
             .transaction_by_hash_with_meta(hash)
-            .map_err(|e| SoflError::Provider(format!("failed to get transaction by hash: {}", e)))?
+            .map_err(|e| {
+                SoflError::Provider(format!(
+                    "failed to get transaction by hash: {}",
+                    e
+                ))
+            })?
             .ok_or(SoflError::NotFound(format!("transaction {}", hash)))?;
         let mut tx: RethTx = tx.into();
         tx.meta = Some(meta);
 
         // fill receipt if available
-        let receipt = bp
-            .receipt_by_hash(hash)
-            .map_err(|e| SoflError::Provider(format!("failed to get receipt by hash: {}", e)))?;
+        let receipt = bp.receipt_by_hash(hash).map_err(|e| {
+            SoflError::Provider(format!("failed to get receipt by hash: {}", e))
+        })?;
         if let Some(receipt) = receipt {
             let success = receipt.success;
             let logs = receipt.logs.into_iter().map(|log| log.cvt()).collect();

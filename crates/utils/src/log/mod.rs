@@ -1,7 +1,9 @@
 pub mod config;
 
 pub use tracing::{debug, error, event, info, trace, warn, Level};
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer};
+use tracing_subscriber::{
+    layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
+};
 
 use self::config::must_load_cfg;
 

@@ -7,8 +7,8 @@ use libsofl_core::{
         state::BcState,
         transition::TransitionSpecBuilder,
         types::{
-            Address, BlockEnv, BlockHashOrNumber, Bytes, CfgEnv, CreateScheme, ExecutionResult,
-            Output, StateChange, TransactTo, TxEnv, U256,
+            Address, BlockEnv, BlockHashOrNumber, Bytes, CfgEnv, CreateScheme,
+            ExecutionResult, Output, StateChange, TransactTo, TxEnv, U256,
         },
     },
     error::SoflError,

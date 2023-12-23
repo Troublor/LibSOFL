@@ -3,7 +3,9 @@ use revm::db::CacheDB;
 use super::types::{AccountInfo, Address, Bytecode, Hash, StateChange, U256};
 
 /// In-memory BcState implementation, using revm's CacheDB.
-#[derive(Debug, Clone, derive_more::AsRef, derive_more::Deref, derive_more::DerefMut)]
+#[derive(
+    Debug, Clone, derive_more::AsRef, derive_more::Deref, derive_more::DerefMut,
+)]
 pub struct MemoryBcState<S: revm::DatabaseRef>(
     #[as_ref]
     #[deref]
@@ -15,17 +17,27 @@ impl<S: revm::DatabaseRef> revm::Database for MemoryBcState<S> {
     type Error = S::Error;
 
     #[doc = " Get basic account information."]
-    fn basic(&mut self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
+    fn basic(
+        &mut self,
+        address: Address,
+    ) -> Result<Option<AccountInfo>, Self::Error> {
         self.0.basic(address)
     }
 
     #[doc = " Get account code by its hash."]
-    fn code_by_hash(&mut self, code_hash: Hash) -> Result<Bytecode, Self::Error> {
+    fn code_by_hash(
+        &mut self,
+        code_hash: Hash,
+    ) -> Result<Bytecode, Self::Error> {
         self.0.code_by_hash(code_hash)
     }
 
     #[doc = " Get storage value of address at index."]
-    fn storage(&mut self, address: Address, index: U256) -> Result<U256, Self::Error> {
+    fn storage(
+        &mut self,
+        address: Address,
+        index: U256,
+    ) -> Result<U256, Self::Error> {
         self.0.storage(address, index)
     }
 
@@ -75,8 +87,8 @@ mod tests {
             state::BcState,
             transition::TransitionSpecBuilder,
             types::{
-                AccountInfo, Address, BlockEnv, Bytecode, CfgEnv, ExecutionResult, TransactTo,
-                TxEnv, U256,
+                AccountInfo, Address, BlockEnv, Bytecode, CfgEnv,
+                ExecutionResult, TransactTo, TxEnv, U256,
             },
         },
     };

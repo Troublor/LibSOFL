@@ -68,7 +68,10 @@ impl CheatCodes {
         }
     }
 
-    pub fn set_caller(mut self, f: &dyn Fn(HighLevelCaller) -> HighLevelCaller) -> Self {
+    pub fn set_caller(
+        mut self,
+        f: &dyn Fn(HighLevelCaller) -> HighLevelCaller,
+    ) -> Self {
         self.caller = f(self.caller);
         self
     }
@@ -79,8 +82,9 @@ impl CheatCodes {
 
     pub fn parse_abi(&mut self, s: &str) -> Result<&Function, SoflError> {
         if !self.abi_cache.contains_key(&s.to_string()) {
-            let abi = Function::parse(s)
-                .map_err(|e| SoflError::Abi(format!("failed to parse abi: {:?}", e)))?;
+            let abi = Function::parse(s).map_err(|e| {
+                SoflError::Abi(format!("failed to parse abi: {:?}", e))
+            })?;
             self.abi_cache.insert(s.to_string(), abi);
         }
 
@@ -88,7 +92,12 @@ impl CheatCodes {
     }
 
     /// Find the storage slot that is read by executing the given calldata.
-    fn find_slot<S>(&mut self, state: &mut S, to: Address, calldata: Bytes) -> Option<U256>
+    fn find_slot<S>(
+        &mut self,
+        state: &mut S,
+        to: Address,
+        calldata: Bytes,
+    ) -> Option<U256>
     where
         S: BcState,
         S::Error: Debug,
@@ -142,7 +151,12 @@ impl CheatCodes {
                     self.inspector.disable_access_recording();
                     let ret = self
                         .caller
-                        .static_call(state, to, calldata.clone(), &mut self.inspector)
+                        .static_call(
+                            state,
+                            to,
+                            calldata.clone(),
+                            &mut self.inspector,
+                        )
                         .ok()?;
                     let cdata = SolUint256::abi_decode(&ret, false);
                     if cdata.is_err() {
@@ -193,29 +207,41 @@ impl CheatCodes {
                 Some(SlotQueryResult::Found(slot)) => {
                     // return self.decode_from_storage(state, to, *slot, rtypes);
                     let v: U256 = state.storage(to, *slot).map_err(|e| {
-                        SoflError::BcState(format!("failed to read storage value: {:?}", e))
+                        SoflError::BcState(format!(
+                            "failed to read storage value: {:?}",
+                            e
+                        ))
                     })?;
                     return Ok(v.cvt());
                 }
                 Some(SlotQueryResult::NotFound) => {}
                 None => {
                     // we have not tried to find the slot, so we first try to find the slot
-                    if let Some(slot) = self.find_slot(state, to, calldata.clone()) {
+                    if let Some(slot) =
+                        self.find_slot(state, to, calldata.clone())
+                    {
                         // cache the slot
-                        self.slots
-                            .insert((code_hash, calldata), SlotQueryResult::Found(slot));
+                        self.slots.insert(
+                            (code_hash, calldata),
+                            SlotQueryResult::Found(slot),
+                        );
 
                         // return self
                         // .decode_from_storage(state, to, slot, rtypes);
                         let v: U256 = state.storage(to, slot).map_err(|e| {
-                            SoflError::BcState(format!("failed to read storage value: {:?}", e))
+                            SoflError::BcState(format!(
+                                "failed to read storage value: {:?}",
+                                e
+                            ))
                         })?;
                         return Ok(v.cvt());
                     } else {
                         // we cannnot find the slot, so we cache the result (to avoid trying to
                         // find the slot again)
-                        self.slots
-                            .insert((code_hash, calldata.clone()), SlotQueryResult::NotFound);
+                        self.slots.insert(
+                            (code_hash, calldata.clone()),
+                            SlotQueryResult::NotFound,
+                        );
                     }
                 }
             }
@@ -262,7 +288,12 @@ impl CheatCodes {
     {
         let account_info = state
             .basic(to)
-            .map_err(|e| SoflError::BcState(format!("failed to get account basic: {:?}", e)))?
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
             .ok_or(SoflError::BcState(format!(
                 "{}: account does not have code",
                 type_name::<Self>()
@@ -271,24 +302,30 @@ impl CheatCodes {
         // let calldata = pack_calldata(func.short_signature(), args);
         let code_hash = account_info.code_hash;
         match self.slots.get(&(code_hash, calldata.clone())) {
-            Some(SlotQueryResult::Found(slot)) => self.write_or_err(state, to, *slot, data),
-            Some(SlotQueryResult::NotFound) => Err(SoflError::BcState(format!(
-                "{}: cannot find the target slot",
-                type_name::<Self>(),
-            ))),
+            Some(SlotQueryResult::Found(slot)) => {
+                self.write_or_err(state, to, *slot, data)
+            }
+            Some(SlotQueryResult::NotFound) => Err(SoflError::BcState(
+                format!("{}: cannot find the target slot", type_name::<Self>(),),
+            )),
             None => {
                 // we need to find the slot
-                if let Some(slot) = self.find_slot(state, to, calldata.clone()) {
+                if let Some(slot) = self.find_slot(state, to, calldata.clone())
+                {
                     // cache the slot
-                    self.slots
-                        .insert((code_hash, calldata), SlotQueryResult::Found(slot));
+                    self.slots.insert(
+                        (code_hash, calldata),
+                        SlotQueryResult::Found(slot),
+                    );
 
                     self.write_or_err(state, to, slot, data)
                 } else {
                     // we cannnot find the slot, so we cache the result (to avoid trying to
                     // find the slot again)
-                    self.slots
-                        .insert((code_hash, calldata), SlotQueryResult::NotFound);
+                    self.slots.insert(
+                        (code_hash, calldata),
+                        SlotQueryResult::NotFound,
+                    );
                     Err(SoflError::BcState(format!(
                         "{}: cannot find the target slot",
                         type_name::<Self>()
@@ -309,13 +346,16 @@ impl CheatCodes {
         S::Error: Debug,
         S: BcState,
     {
-        let rdata = state
-            .storage(to, slot)
-            .map_err(|e| SoflError::BcState(format!("failed to get storage value: {:?}", e)))?;
+        let rdata = state.storage(to, slot).map_err(|e| {
+            SoflError::BcState(format!("failed to get storage value: {:?}", e))
+        })?;
 
         if rdata != data {
             state.insert_account_storage(to, slot, data).map_err(|e| {
-                SoflError::BcState(format!("failed to insert account storage: {:?}", e))
+                SoflError::BcState(format!(
+                    "failed to insert account storage: {:?}",
+                    e
+                ))
             })?;
             Ok(Some(rdata))
         } else {
@@ -336,7 +376,12 @@ impl CheatCodes {
     {
         state
             .basic(account)
-            .map_err(|e| SoflError::BcState(format!("failed to get account basic: {:?}", e)))?
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
             .map_or(Ok(U256::from(0)), |info| Ok(info.balance))
     }
 
@@ -350,7 +395,12 @@ impl CheatCodes {
     {
         state
             .basic(account)
-            .map_err(|e| SoflError::BcState(format!("failed to get account basic: {:?}", e)))?
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
             .map_or(Ok(B256::ZERO), |info| Ok(info.code_hash))
     }
 
@@ -364,15 +414,23 @@ impl CheatCodes {
     {
         if let Some(code) = state
             .basic(account)
-            .map_err(|e| SoflError::BcState(format!("failed to get account basic: {:?}", e)))?
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
             .and_then(|info| info.code)
         {
             Ok(code)
         } else {
             let code_hash = self.get_code_hash(state, account)?;
-            state
-                .code_by_hash(code_hash)
-                .map_err(|e| SoflError::BcState(format!("failed to get code by hash: {:?}", e)))
+            state.code_by_hash(code_hash).map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get code by hash: {:?}",
+                    e
+                ))
+            })
         }
     }
 
@@ -387,7 +445,12 @@ impl CheatCodes {
     {
         let mut account_info = state
             .basic(address)
-            .map_err(|e| SoflError::BcState(format!("failed to get account basic: {:?}", e)))?
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
             .unwrap_or_default();
         let old_balance = account_info.balance;
 
@@ -423,7 +486,8 @@ mod tests_with_dep {
         let mut cheatcodes = CheatCodes::new();
 
         let token: Address = "0xdAC17F958D2ee523a2206206994597C13D831ec7".cvt();
-        let account: Address = "0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a".cvt();
+        let account: Address =
+            "0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a".cvt();
 
         let balance1 = cheatcodes
             .get_erc20_balance(&mut state, token, account)

@@ -13,7 +13,9 @@ use libsofl_core::{
 };
 
 use crate::{
-    addressbook::{AaveLendingPoolV2ABI, CurveYVaultABI, ADDRESS_BOOK, ERC20ABI},
+    addressbook::{
+        AaveLendingPoolV2ABI, CurveYVaultABI, ADDRESS_BOOK, ERC20ABI,
+    },
     cheatcodes::{contract_type::ContractType, CheatCodes},
     math::HPMultipler,
     types::Chain,
@@ -39,20 +41,22 @@ impl CheatCodes {
         }
         if balance_before < balance {
             match token_ty {
-                ContractType::CurveYVault(base_token) => self.__increase_curve_yvault_balance(
-                    state,
-                    token,
-                    base_token,
-                    account,
-                    balance - balance_before,
-                )?,
-                ContractType::AaveAToken(base_token) => self.__increase_aave_atoken_v2_balance(
-                    state,
-                    token,
-                    base_token,
-                    account,
-                    balance - balance_before,
-                )?,
+                ContractType::CurveYVault(base_token) => self
+                    .__increase_curve_yvault_balance(
+                        state,
+                        token,
+                        base_token,
+                        account,
+                        balance - balance_before,
+                    )?,
+                ContractType::AaveAToken(base_token) => self
+                    .__increase_aave_atoken_v2_balance(
+                        state,
+                        token,
+                        base_token,
+                        account,
+                        balance - balance_before,
+                    )?,
                 _ => {}
             }
         }
@@ -93,7 +97,9 @@ impl CheatCodes {
         let mut caller = self.caller.clone();
         caller.address = account;
 
-        let amount_in = (HPMultipler::from(amount) * U256::from(100) / U256::from(95)).into();
+        let amount_in = (HPMultipler::from(amount) * U256::from(100)
+            / U256::from(95))
+        .into();
 
         self.increase_erc20_balance_by(state, base_token, account, amount_in)?;
         self.set_erc20_allowance(
@@ -144,31 +150,39 @@ impl CheatCodes {
         let call = CurveYVaultABI::pricePerShareCall {};
         let calldata = call.abi_encode();
         let ret = self.cheat_read(state, token, calldata.cvt())?;
-        let ret = CurveYVaultABI::pricePerShareCall::abi_decode_returns(&ret, true)
-            .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
+        let ret =
+            CurveYVaultABI::pricePerShareCall::abi_decode_returns(&ret, true)
+                .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
         let price = ret._0;
 
         let decimals = self.get_erc20_decimals(state, token)?;
 
         // we need to convert more amount to the base token
         // amount_in = amount * price / 10^decimals * 100 / 95
-        let amount_in: U256 = (HPMultipler::from(amount) * price / U256::from(10).pow(decimals)
+        let amount_in: U256 = (HPMultipler::from(amount) * price
+            / U256::from(10).pow(decimals)
             * U256::from(100)
             / U256::from(95))
         .into();
 
         // check depositLimit
         let deposit_limit_func = CurveYVaultABI::depositLimitCall {};
-        let ret = self.cheat_read(state, token, deposit_limit_func.abi_encode().cvt())?;
-        let ret = CurveYVaultABI::depositLimitCall::abi_decode_returns(&ret, true)
-            .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
+        let ret = self.cheat_read(
+            state,
+            token,
+            deposit_limit_func.abi_encode().cvt(),
+        )?;
+        let ret =
+            CurveYVaultABI::depositLimitCall::abi_decode_returns(&ret, true)
+                .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
         let deposit_limit = ret._0;
 
         // check totalasset
         let call = CurveYVaultABI::totalAssetsCall {};
         let ret = self.cheat_read(state, token, call.abi_encode().cvt())?;
-        let ret = CurveYVaultABI::totalAssetsCall::abi_decode_returns(&ret, true)
-            .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
+        let ret =
+            CurveYVaultABI::totalAssetsCall::abi_decode_returns(&ret, true)
+                .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
         let total_assets = ret._0;
 
         if total_assets + amount_in > deposit_limit {
@@ -202,7 +216,9 @@ mod tests_with_dep {
         engine::types::U256,
     };
 
-    use crate::{cheatcodes::CheatCodes, math::approx_eq, test::get_test_bc_provider};
+    use crate::{
+        cheatcodes::CheatCodes, math::approx_eq, test::get_test_bc_provider,
+    };
 
     #[test]
     fn test_set_depegged_token() {
@@ -211,8 +227,8 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(14972419, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes =
-            CheatCodes::new().set_caller(&|caller| caller.at_block(&bp, fork_at.block));
+        let mut cheatcodes = CheatCodes::new()
+            .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
         let token = "0xE537B5cc158EB71037D4125BDD7538421981E6AA".cvt();
         let account = "0x166ed9f7A56053c7c4E77CB0C91a9E46bbC5e8b0".cvt();

@@ -9,19 +9,36 @@ pub static CONFIG_ENV_PREFIX: &str = "SOFL";
 pub static CONFIG_ENV_SEPARATOR: &str = "_";
 
 impl ConfigLoader {
-    pub fn load_cfg_or_default<T: Config>(section: &str, default: T) -> Result<T, SoflError> {
-        let config_file =
-            std::env::var(CONFIG_FILE_ENV_VAR).unwrap_or_else(|_| "config.toml".to_string());
-        let default_source = config::Config::try_from(&default)
-            .map_err(|e| SoflError::Config(format!("failed to load default config: {}", e)))?;
+    pub fn load_cfg_or_default<T: Config>(
+        section: &str,
+        default: T,
+    ) -> Result<T, SoflError> {
+        let config_file = std::env::var(CONFIG_FILE_ENV_VAR)
+            .unwrap_or_else(|_| "config.toml".to_string());
+        let default_source =
+            config::Config::try_from(&default).map_err(|e| {
+                SoflError::Config(format!(
+                    "failed to load default config: {}",
+                    e
+                ))
+            })?;
         let cfg = config::Config::builder()
             .add_source(
-                config::Environment::with_prefix(CONFIG_ENV_PREFIX).separator(CONFIG_ENV_SEPARATOR),
+                config::Environment::with_prefix(CONFIG_ENV_PREFIX)
+                    .separator(CONFIG_ENV_SEPARATOR),
             )
-            .add_source(config::File::new(&config_file, config::FileFormat::Toml).required(false))
+            .add_source(
+                config::File::new(&config_file, config::FileFormat::Toml)
+                    .required(false),
+            )
             .add_source(default_source)
             .build()
-            .map_err(|e| SoflError::Config(format!("failed to build config builder: {}", e)))?;
+            .map_err(|e| {
+                SoflError::Config(format!(
+                    "failed to build config builder: {}",
+                    e
+                ))
+            })?;
         let c: T = cfg.get(section).or_else(|e| match e {
             config::ConfigError::NotFound(_) => Ok(default),
             _ => Err(SoflError::Config(format!("{}", e))),
@@ -30,15 +47,24 @@ impl ConfigLoader {
     }
 
     pub fn load_cfg<T: Config>(section: &str) -> Result<T, SoflError> {
-        let config_file =
-            std::env::var(CONFIG_FILE_ENV_VAR).unwrap_or_else(|_| "config.toml".to_string());
+        let config_file = std::env::var(CONFIG_FILE_ENV_VAR)
+            .unwrap_or_else(|_| "config.toml".to_string());
         let cfg = config::Config::builder()
             .add_source(
-                config::Environment::with_prefix(CONFIG_ENV_PREFIX).separator(CONFIG_ENV_SEPARATOR),
+                config::Environment::with_prefix(CONFIG_ENV_PREFIX)
+                    .separator(CONFIG_ENV_SEPARATOR),
             )
-            .add_source(config::File::new(&config_file, config::FileFormat::Toml).required(false))
+            .add_source(
+                config::File::new(&config_file, config::FileFormat::Toml)
+                    .required(false),
+            )
             .build()
-            .map_err(|e| SoflError::Config(format!("failed to build config builder: {}", e)))?;
+            .map_err(|e| {
+                SoflError::Config(format!(
+                    "failed to build config builder: {}",
+                    e
+                ))
+            })?;
         let c: T = cfg
             .get(section)
             .map_err(|e| SoflError::Config(format!("{}", e)))?;
@@ -54,7 +80,15 @@ mod tests {
     use std::io::Write;
     use tempfile::NamedTempFile;
 
-    #[derive(Debug, Clone, Eq, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+    #[derive(
+        Debug,
+        Clone,
+        Eq,
+        PartialEq,
+        Default,
+        serde::Deserialize,
+        serde::Serialize,
+    )]
     struct TestConfig {
         test: String,
     }
@@ -70,7 +104,9 @@ mod tests {
         "#;
         file.write_all(config_txt.as_bytes()).unwrap();
         std::env::set_var(CONFIG_FILE_ENV_VAR, file.path().as_os_str());
-        let cfg: TestConfig = ConfigLoader::load_cfg_or_default("abc", Default::default()).unwrap();
+        let cfg: TestConfig =
+            ConfigLoader::load_cfg_or_default("abc", Default::default())
+                .unwrap();
         assert_eq!(cfg.test, "abc");
         std::env::remove_var(CONFIG_FILE_ENV_VAR);
     }
@@ -86,7 +122,9 @@ mod tests {
                 + "test",
             "def",
         );
-        let cfg = ConfigLoader::load_cfg_or_default("abc", TestConfig::default()).unwrap();
+        let cfg =
+            ConfigLoader::load_cfg_or_default("abc", TestConfig::default())
+                .unwrap();
         assert_eq!(cfg.test, "def")
     }
 

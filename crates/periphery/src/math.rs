@@ -81,7 +81,9 @@ impl MulAssign<HPMultipler> for HPMultipler {
     }
 }
 
-impl<const BITS: usize, const LIMBS: usize> From<HPMultipler> for Uint<BITS, LIMBS> {
+impl<const BITS: usize, const LIMBS: usize> From<HPMultipler>
+    for Uint<BITS, LIMBS>
+{
     fn from(mut value: HPMultipler) -> Self {
         for numerator in value.numerator.iter_mut() {
             for denominator in value.denominator.iter_mut() {

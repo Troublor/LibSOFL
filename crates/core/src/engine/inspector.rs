@@ -4,7 +4,11 @@ use super::state::BcState;
 pub trait EvmInspector<BS: BcState>: revm::Inspector<BS> {
     /// Called before the transaction is executed.
     /// Return false to skip the transaction.
-    fn transaction(&mut self, _tx: &revm::primitives::TxEnv, _state: &BS) -> bool {
+    fn transaction(
+        &mut self,
+        _tx: &revm::primitives::TxEnv,
+        _state: &BS,
+    ) -> bool {
         true
     }
 

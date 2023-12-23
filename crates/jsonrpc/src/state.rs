@@ -15,8 +15,8 @@ use libsofl_core::{
         memory::MemoryBcState,
         state::DatabaseRef,
         types::{
-            keccak256, AccountInfo, Address, BlockHashOrNumber, Bytecode, Hash, B256, KECCAK_EMPTY,
-            U256,
+            keccak256, AccountInfo, Address, BlockHashOrNumber, Bytecode, Hash,
+            B256, KECCAK_EMPTY, U256,
         },
     },
     error::SoflError,
@@ -31,7 +31,10 @@ pub struct JsonrRpcBcStateRef {
 
 impl BcStateProvider<JsonrRpcBcStateRef> for JsonRpcProvider {
     /// Create a BcState from the the state before the transaction at the position is executed.
-    fn bc_state_at(&self, pos: TxPosition) -> Result<MemoryBcState<JsonrRpcBcStateRef>, SoflError> {
+    fn bc_state_at(
+        &self,
+        pos: TxPosition,
+    ) -> Result<MemoryBcState<JsonrRpcBcStateRef>, SoflError> {
         Ok(MemoryBcState::new(JsonrRpcBcStateRef {
             provider: self.clone(),
             pos,
@@ -42,7 +45,9 @@ impl BcStateProvider<JsonrRpcBcStateRef> for JsonRpcProvider {
 impl JsonrRpcBcStateRef {
     fn bn(&self) -> Result<u64, SoflError> {
         match self.pos.block {
-            BlockHashOrNumber::Hash(hash) => self.provider.block_number_by_hash(hash),
+            BlockHashOrNumber::Hash(hash) => {
+                self.provider.block_number_by_hash(hash)
+            }
             BlockHashOrNumber::Number(number) => Ok(number),
         }
     }
@@ -53,7 +58,10 @@ impl DatabaseRef for JsonrRpcBcStateRef {
     type Error = SoflError;
 
     #[doc = " Get basic account information."]
-    fn basic_ref(&self, address: Address) -> Result<Option<AccountInfo>, Self::Error> {
+    fn basic_ref(
+        &self,
+        address: Address,
+    ) -> Result<Option<AccountInfo>, Self::Error> {
         let task = async {
             let bn = (self.bn()? - 1).into();
             let balance = self
@@ -61,21 +69,31 @@ impl DatabaseRef for JsonrRpcBcStateRef {
                 .p
                 .get_balance(address, Some(bn))
                 .await
-                .map_err(|e| SoflError::Provider(format!("failed to get balance: {}", e)))?;
+                .map_err(|e| {
+                    SoflError::Provider(format!("failed to get balance: {}", e))
+                })?;
             let nonce = self
                 .provider
                 .p
                 .get_transaction_count(address, Some(bn))
                 .await
                 .map_err(|e| {
-                    SoflError::Provider(format!("failed to get transaction count: {}", e))
+                    SoflError::Provider(format!(
+                        "failed to get transaction count: {}",
+                        e
+                    ))
                 })?;
             let code: Bytecode = self
                 .provider
                 .p
                 .get_code_at(address, bn)
                 .await
-                .map_err(|e| SoflError::Provider(format!("failed to get code hash: {}", e)))?
+                .map_err(|e| {
+                    SoflError::Provider(format!(
+                        "failed to get code hash: {}",
+                        e
+                    ))
+                })?
                 .cvt();
             let code_hash = if code.is_empty() {
                 KECCAK_EMPTY
@@ -98,7 +116,10 @@ impl DatabaseRef for JsonrRpcBcStateRef {
     }
 
     #[doc = " Get account code by its hash."]
-    fn code_by_hash_ref(&self, code_hash: B256) -> Result<Bytecode, Self::Error> {
+    fn code_by_hash_ref(
+        &self,
+        code_hash: B256,
+    ) -> Result<Bytecode, Self::Error> {
         get_code_hash_map()
             .lock()
             .unwrap()
@@ -108,7 +129,11 @@ impl DatabaseRef for JsonrRpcBcStateRef {
     }
 
     #[doc = " Get storage value of address at index."]
-    fn storage_ref(&self, address: Address, index: U256) -> Result<U256, Self::Error> {
+    fn storage_ref(
+        &self,
+        address: Address,
+        index: U256,
+    ) -> Result<U256, Self::Error> {
         let task = async {
             let bn = (self.bn()? - 1).into();
             let value = self
@@ -116,7 +141,9 @@ impl DatabaseRef for JsonrRpcBcStateRef {
                 .p
                 .get_storage_at(address, index.cvt(), Some(bn))
                 .await
-                .map_err(|e| SoflError::Provider(format!("failed to get storage: {}", e)))?;
+                .map_err(|e| {
+                    SoflError::Provider(format!("failed to get storage: {}", e))
+                })?;
             Ok(value)
         };
         self.provider.rt.block_on(task)
@@ -128,10 +155,21 @@ impl DatabaseRef for JsonrRpcBcStateRef {
             let blk = self
                 .provider
                 .p
-                .get_block_by_number(BlockNumberOrTag::Number(number.cvt()), false)
+                .get_block_by_number(
+                    BlockNumberOrTag::Number(number.cvt()),
+                    false,
+                )
                 .await
-                .map_err(|e| SoflError::Provider(format!("failed to get block hash: {}", e)))?
-                .ok_or(SoflError::NotFound(format!("block number {}", number)))?;
+                .map_err(|e| {
+                    SoflError::Provider(format!(
+                        "failed to get block hash: {}",
+                        e
+                    ))
+                })?
+                .ok_or(SoflError::NotFound(format!(
+                    "block number {}",
+                    number
+                )))?;
             blk.header
                 .hash
                 .ok_or(SoflError::NotFound(format!("block number {}", number)))

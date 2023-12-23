@@ -6,7 +6,8 @@ use libsofl_core::{
     },
     conversion::ConvertTo,
     engine::types::{
-        Address, BlockHashOrNumber, Bytes, CreateScheme, TransactTo, TxEnv, TxHash, U256,
+        Address, BlockHashOrNumber, Bytes, CreateScheme, TransactTo, TxEnv,
+        TxHash, U256,
     },
     error::SoflError,
 };
@@ -60,15 +61,20 @@ impl Tx for JsonRpcTx {
                     .map(|a| {
                         (
                             a.address,
-                            a.storage_keys.into_iter().map(|k| k.cvt()).collect(),
+                            a.storage_keys
+                                .into_iter()
+                                .map(|k| k.cvt())
+                                .collect(),
                         )
                     })
                     .collect()
             })
             .unwrap_or_default();
-        env.gas_priority_fee = self.tx.max_priority_fee_per_gas.map(|p| p.cvt());
+        env.gas_priority_fee =
+            self.tx.max_priority_fee_per_gas.map(|p| p.cvt());
         env.blob_hashes = self.tx.blob_versioned_hashes.clone();
-        env.max_fee_per_blob_gas = self.tx.max_fee_per_blob_gas.map(|p| p.cvt());
+        env.max_fee_per_blob_gas =
+            self.tx.max_fee_per_blob_gas.map(|p| p.cvt());
         Ok(())
     }
 
@@ -76,13 +82,12 @@ impl Tx for JsonRpcTx {
     #[doc = " Returns the position of the transaction in the blockchain."]
     #[doc = " None if the transaction is not in the blockchain."]
     fn position(&self) -> Option<TxPosition> {
-        self.tx
-            .block_number
-            .zip(self.tx.transaction_index)
-            .map(|(block_number, index)| TxPosition {
+        self.tx.block_number.zip(self.tx.transaction_index).map(
+            |(block_number, index)| TxPosition {
                 block: BlockHashOrNumber::Number(block_number.cvt()),
                 index: index.cvt(),
-            })
+            },
+        )
     }
 
     #[doc = " Returns the output data of the transaction."]

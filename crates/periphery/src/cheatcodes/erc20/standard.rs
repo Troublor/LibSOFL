@@ -35,7 +35,12 @@ impl CheatCodes {
         println!("ret: {:?}", ret);
         ERC20ABI::balanceOfCall::abi_decode_returns(&ret, true)
             .map(|r| r.balance)
-            .map_err(|e| SoflError::Abi(format!("failed to decode balanceOf return: {}", e)))
+            .map_err(|e| {
+                SoflError::Abi(format!(
+                    "failed to decode balanceOf return: {}",
+                    e
+                ))
+            })
     }
 
     pub fn get_erc20_total_supply<S>(
@@ -53,7 +58,12 @@ impl CheatCodes {
         let ret = self.cheat_read(state, token, calldata.cvt())?;
         ERC20ABI::totalSupplyCall::abi_decode_returns(&ret, true)
             .map(|r| r._0)
-            .map_err(|e| SoflError::Abi(format!("failed to decode totalSupply return: {}", e)))
+            .map_err(|e| {
+                SoflError::Abi(format!(
+                    "failed to decode totalSupply return: {}",
+                    e
+                ))
+            })
     }
 
     pub fn get_erc20_decimals<S>(
@@ -71,7 +81,12 @@ impl CheatCodes {
         let ret = self.cheat_read(state, token, calldata.cvt())?;
         ERC20ABI::decimalsCall::abi_decode_returns(&ret, true)
             .map(|r| r._0.cvt())
-            .map_err(|e| SoflError::Abi(format!("failed to decode decimals return: {}", e)))
+            .map_err(|e| {
+                SoflError::Abi(format!(
+                    "failed to decode decimals return: {}",
+                    e
+                ))
+            })
     }
 
     pub fn get_erc20_allowance<S>(
@@ -94,7 +109,12 @@ impl CheatCodes {
         let ret = self.cheat_read(state, token, calldata.cvt())?;
         ERC20ABI::allowanceCall::abi_decode_returns(&ret, true)
             .map(|r| r._0)
-            .map_err(|e| SoflError::Abi(format!("failed to decode allowance return: {}", e)))
+            .map_err(|e| {
+                SoflError::Abi(format!(
+                    "failed to decode allowance return: {}",
+                    e
+                ))
+            })
     }
 
     // return the old allowance if updated
@@ -186,9 +206,13 @@ impl CheatCodes {
         // first check whether the token is a LP token for a DEX pool
         let token_ty = self.get_contract_type(state, token)?;
         if token_ty.is_lp_token() {
-            return self.set_lp_token_balance(state, token_ty, token, account, balance);
+            return self.set_lp_token_balance(
+                state, token_ty, token, account, balance,
+            );
         } else if token_ty.is_pegged_token() {
-            return self.set_pegged_token_balance(state, token_ty, token, account, balance);
+            return self.set_pegged_token_balance(
+                state, token_ty, token, account, balance,
+            );
         }
 
         // signature: balanceOf(address) -> 0x70a08231
@@ -201,7 +225,11 @@ impl CheatCodes {
 
             let weth = ADDRESS_BOOK.weth.must_on_chain(Chain::Mainnet);
             if token == weth {
-                self.set_balance(state, weth, total_supply + balance - old_balance)?;
+                self.set_balance(
+                    state,
+                    weth,
+                    total_supply + balance - old_balance,
+                )?;
             } else {
                 // signature: totalSupply() -> 0x18160ddd
                 let call = ERC20ABI::totalSupplyCall {};
@@ -256,7 +284,10 @@ mod tests_with_dep {
             .get_erc20_total_supply(&mut state, token)
             .unwrap();
 
-        assert!(cheatcodes.get_erc20_decimals(&mut state, token).unwrap() == decimals);
+        assert!(
+            cheatcodes.get_erc20_decimals(&mut state, token).unwrap()
+                == decimals
+        );
 
         cheatcodes
             .set_erc20_balance(&mut state, token, account, U256::from(1234567))
@@ -270,11 +301,20 @@ mod tests_with_dep {
             .unwrap();
 
         assert!(balance_after == U256::from(1234567));
-        assert!(total_supply_after == total_supply_before - balance_before + balance_after);
+        assert!(
+            total_supply_after
+                == total_supply_before - balance_before + balance_after
+        );
 
         let spender = "0x1497bF2C336EBE4B8745DF52E190Bd0c8129666a".cvt();
         cheatcodes
-            .set_erc20_allowance(&mut state, token, account, spender, U256::from(7654321))
+            .set_erc20_allowance(
+                &mut state,
+                token,
+                account,
+                spender,
+                U256::from(7654321),
+            )
             .unwrap();
 
         let allowance_after = cheatcodes
@@ -321,7 +361,12 @@ mod tests_with_dep {
         assert_eq!(balance1, U256::from(0));
 
         cheatcodes
-            .set_erc20_balance(&mut state, usdt, account1, U256::from(10u64.pow(12)))
+            .set_erc20_balance(
+                &mut state,
+                usdt,
+                account1,
+                U256::from(10u64.pow(12)),
+            )
             .unwrap();
         let balance2 = cheatcodes
             .get_erc20_balance(&mut state, usdt, account1)
@@ -329,7 +374,13 @@ mod tests_with_dep {
         assert_eq!(balance2, U256::from(10u64.pow(12)));
 
         cheatcodes
-            .set_erc20_allowance(&mut state, usdt, account1, account2, U256::MAX)
+            .set_erc20_allowance(
+                &mut state,
+                usdt,
+                account1,
+                account2,
+                U256::MAX,
+            )
             .unwrap();
 
         let call = ERC20ABI::transferFromCall {
@@ -371,8 +422,10 @@ mod tests_with_dep {
         let mut cheatcodes = CheatCodes::new();
 
         let deposit_amount = 300479464706193878654u128.cvt();
-        let yv_curve_3crypto_token = "0xE537B5cc158EB71037D4125BDD7538421981E6AA".cvt();
-        let yv_curve_3crypto_richer = "0xA67EC8737021A7e91e883A3277384E6018BB5776".cvt();
+        let yv_curve_3crypto_token =
+            "0xE537B5cc158EB71037D4125BDD7538421981E6AA".cvt();
+        let yv_curve_3crypto_richer =
+            "0xA67EC8737021A7e91e883A3277384E6018BB5776".cvt();
         cheatcodes
             .steal_erc20(
                 &mut state,

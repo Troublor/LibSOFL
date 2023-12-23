@@ -3,7 +3,9 @@ use libsofl_utils::config::{Config, ConfigLoader};
 
 use crate::provider::JsonRpcProvider;
 
-#[derive(Debug, Clone, Eq, PartialEq, Default, serde::Deserialize, serde::Serialize)]
+#[derive(
+    Debug, Clone, Eq, PartialEq, Default, serde::Deserialize, serde::Serialize,
+)]
 pub struct JsonRpcConfig {
     pub url: String,
 }

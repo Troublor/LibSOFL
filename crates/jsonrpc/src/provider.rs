@@ -4,11 +4,14 @@ use alloy_providers::provider::{Provider, TempProvider};
 use alloy_rpc_types::{Block, BlockNumberOrTag};
 use alloy_transport_http::Http;
 use libsofl_core::{
-    blockchain::{provider::BcProvider, transaction::Tx, tx_position::TxPosition},
+    blockchain::{
+        provider::BcProvider, transaction::Tx, tx_position::TxPosition,
+    },
     conversion::ConvertTo,
     engine::types::{
-        AnalysisKind, BlobExcessGasAndPrice, BlockEnv, BlockHash, BlockHashOrNumber, BlockNumber,
-        CfgEnv, SpecId, TxEnv, TxHashOrPosition,
+        AnalysisKind, BlobExcessGasAndPrice, BlockEnv, BlockHash,
+        BlockHashOrNumber, BlockNumber, CfgEnv, SpecId, TxEnv,
+        TxHashOrPosition,
     },
     error::SoflError,
 };
@@ -25,21 +28,23 @@ pub struct JsonRpcProvider {
     // caches
     pub(crate) chain_id: u64,
     pub(crate) txs: RefCell<HashMap<TxHashOrPosition, JsonRpcTx>>,
-    pub(crate) txs_in_block: RefCell<HashMap<BlockHashOrNumber, Vec<JsonRpcTx>>>,
+    pub(crate) txs_in_block:
+        RefCell<HashMap<BlockHashOrNumber, Vec<JsonRpcTx>>>,
     pub(crate) block_by_hash: RefCell<HashMap<BlockHash, Block>>,
     pub(crate) block_by_number: RefCell<HashMap<BlockNumber, Block>>,
 }
 
 impl JsonRpcProvider {
     pub fn new(url: String) -> Result<JsonRpcProvider, SoflError> {
-        let p = Provider::try_from(url.clone()).expect("failed to create jsonrpc provider");
+        let p = Provider::try_from(url.clone())
+            .expect("failed to create jsonrpc provider");
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
             .expect("failed to create tokio runtime");
-        let chain_id = rt
-            .block_on(p.get_chain_id())
-            .map_err(|e| SoflError::Provider(format!("failed to get chain id: {:?}", e)))?;
+        let chain_id = rt.block_on(p.get_chain_id()).map_err(|e| {
+            SoflError::Provider(format!("failed to get chain id: {:?}", e))
+        })?;
         Ok(JsonRpcProvider {
             url,
             p,
@@ -55,7 +60,8 @@ impl JsonRpcProvider {
 
 impl Clone for JsonRpcProvider {
     fn clone(&self) -> Self {
-        let p = Provider::try_from(self.url.clone()).expect("failed to create jsonrpc provider");
+        let p = Provider::try_from(self.url.clone())
+            .expect("failed to create jsonrpc provider");
         let rt = tokio::runtime::Builder::new_current_thread()
             .enable_all()
             .build()
@@ -83,14 +89,19 @@ impl JsonRpcProvider {
                     .map(|b| Result::<Block, SoflError>::Ok(b.clone()))
                     .unwrap_or_else(|| {
                         let task = self.p.get_block_by_hash(hash, false);
-                        let blk = self
-                            .rt
-                            .block_on(task)
-                            .map_err(|e| SoflError::Provider(format!("{:?}", e)))?;
-                        let blk = blk.ok_or(SoflError::NotFound(format!("block {}", hash)))?;
+                        let blk = self.rt.block_on(task).map_err(|e| {
+                            SoflError::Provider(format!("{:?}", e))
+                        })?;
+                        let blk = blk.ok_or(SoflError::NotFound(format!(
+                            "block {}",
+                            hash
+                        )))?;
                         block_by_hash.insert(hash, blk.clone());
-                        let bn: u64 = blk.header.number.expect("block number").cvt();
-                        self.block_by_number.borrow_mut().insert(bn, blk.clone());
+                        let bn: u64 =
+                            blk.header.number.expect("block number").cvt();
+                        self.block_by_number
+                            .borrow_mut()
+                            .insert(bn, blk.clone());
                         Ok(blk)
                     })
             }
@@ -100,17 +111,22 @@ impl JsonRpcProvider {
                     .get(&number)
                     .map(|b| Result::<Block, SoflError>::Ok(b.clone()))
                     .unwrap_or_else(|| {
-                        let task = self
-                            .p
-                            .get_block_by_number(BlockNumberOrTag::Number(number), false);
-                        let blk = self
-                            .rt
-                            .block_on(task)
-                            .map_err(|e| SoflError::Provider(format!("{:?}", e)))?;
-                        let blk = blk.ok_or(SoflError::NotFound(format!("block {}", number)))?;
+                        let task = self.p.get_block_by_number(
+                            BlockNumberOrTag::Number(number),
+                            false,
+                        );
+                        let blk = self.rt.block_on(task).map_err(|e| {
+                            SoflError::Provider(format!("{:?}", e))
+                        })?;
+                        let blk = blk.ok_or(SoflError::NotFound(format!(
+                            "block {}",
+                            number
+                        )))?;
                         block_by_number.insert(number, blk.clone());
                         let hash = blk.header.hash.expect("block hash");
-                        self.block_by_hash.borrow_mut().insert(hash, blk.clone());
+                        self.block_by_hash
+                            .borrow_mut()
+                            .insert(hash, blk.clone());
                         Ok(blk)
                     })
             }
@@ -129,10 +145,16 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
             .map(|t| Result::<JsonRpcTx, SoflError>::Ok(t.clone()))
             .unwrap_or_else(move || {
                 let task = match &tx {
-                    TxHashOrPosition::Hash(hash) => self.p.get_transaction_by_hash(*hash),
+                    TxHashOrPosition::Hash(hash) => {
+                        self.p.get_transaction_by_hash(*hash)
+                    }
                     TxHashOrPosition::Position(TxPosition { block, index }) => {
                         let blk = self.block(*block)?;
-                        let hash = blk.transactions.hashes().skip(*index as usize).next();
+                        let hash = blk
+                            .transactions
+                            .hashes()
+                            .skip(*index as usize)
+                            .next();
                         let hash = hash.ok_or(SoflError::NotFound(format!(
                             "transaction {} in block {}",
                             index, block
@@ -141,7 +163,10 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
                     }
                 };
                 let transaction = self.rt.block_on(task).map_err(|e| {
-                    SoflError::Provider(format!("failed to get transaction {}: {:?}", tx, e))
+                    SoflError::Provider(format!(
+                        "failed to get transaction {}: {:?}",
+                        tx, e
+                    ))
                 })?;
                 let task = self.p.get_transaction_receipt(transaction.hash);
                 let receipt = self.rt.block_on(task).map_err(|e| {
@@ -159,7 +184,10 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
             })
     }
 
-    fn txs_in_block(&self, block: BlockHashOrNumber) -> Result<Vec<JsonRpcTx>, SoflError> {
+    fn txs_in_block(
+        &self,
+        block: BlockHashOrNumber,
+    ) -> Result<Vec<JsonRpcTx>, SoflError> {
         let mut txs_in_block = self.txs_in_block.borrow_mut();
         txs_in_block
             .get(&block)
@@ -177,7 +205,10 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
             })
     }
 
-    fn block_number_by_hash(&self, hash: BlockHash) -> Result<BlockNumber, SoflError> {
+    fn block_number_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> Result<BlockNumber, SoflError> {
         self.block(BlockHashOrNumber::Hash(hash))?
             .header
             .number
@@ -188,7 +219,10 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
             )))
     }
 
-    fn block_hash_by_number(&self, number: BlockNumber) -> Result<BlockHash, SoflError> {
+    fn block_hash_by_number(
+        &self,
+        number: BlockNumber,
+    ) -> Result<BlockHash, SoflError> {
         self.block(BlockHashOrNumber::Number(number))?
             .header
             .hash
@@ -197,7 +231,11 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
                 number
             )))
     }
-    fn fill_cfg_env(&self, env: &mut CfgEnv, block: BlockHashOrNumber) -> Result<(), SoflError> {
+    fn fill_cfg_env(
+        &self,
+        env: &mut CfgEnv,
+        block: BlockHashOrNumber,
+    ) -> Result<(), SoflError> {
         let number = match block {
             BlockHashOrNumber::Hash(hash) => self.block_number_by_hash(hash)?,
             BlockHashOrNumber::Number(number) => number,
@@ -248,7 +286,11 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
         Ok(())
     }
 
-    fn fill_tx_env(&self, env: &mut TxEnv, tx: TxHashOrPosition) -> Result<(), SoflError> {
+    fn fill_tx_env(
+        &self,
+        env: &mut TxEnv,
+        tx: TxHashOrPosition,
+    ) -> Result<(), SoflError> {
         let tx = self.tx(tx)?;
         tx.fill_tx_env(env)
     }

@@ -30,7 +30,9 @@ impl MultiChainAddress {
     pub fn on_chain(&self, chain: impl Into<Chain>) -> Option<Address> {
         match self {
             MultiChainAddress::Fixed(addr) => Some(*addr),
-            MultiChainAddress::Varying(addrs) => addrs.get(&chain.into()).copied(),
+            MultiChainAddress::Varying(addrs) => {
+                addrs.get(&chain.into()).copied()
+            }
         }
     }
 
@@ -180,10 +182,12 @@ mod tests {
     #[test]
     fn test_address_book() {
         let addr: Address = ADDRESS_BOOK.eth.must_on_chain(Chain::Mainnet);
-        let expected: Address = "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".cvt();
+        let expected: Address =
+            "0xEeeeeEeeeEeEeeEeEeEeeEEEeeeeEeeeeeeeEEeE".cvt();
         assert_eq!(addr, expected);
         let addr: Address = ADDRESS_BOOK.weth.must_on_chain(Chain::Mainnet);
-        let expected: Address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".cvt();
+        let expected: Address =
+            "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".cvt();
         assert_eq!(addr, expected);
     }
 }

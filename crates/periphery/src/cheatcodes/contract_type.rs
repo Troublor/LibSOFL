@@ -13,8 +13,9 @@ use libsofl_core::{
 
 use crate::{
     addressbook::{
-        AaveLendingPoolV2ABI, CurveCryptoRegistryABI, CurveRegistryABI, UniswapV2FactoryABI,
-        UniswapV2PairABI, UniswapV3FactoryABI, UniswapV3PoolABI, ADDRESS_BOOK,
+        AaveLendingPoolV2ABI, CurveCryptoRegistryABI, CurveRegistryABI,
+        UniswapV2FactoryABI, UniswapV2PairABI, UniswapV3FactoryABI,
+        UniswapV3PoolABI, ADDRESS_BOOK,
     },
     types::{Chain, SolAddress},
 };
@@ -75,7 +76,9 @@ impl ContractType {
         match self {
             ContractType::UniswapV2Pair(_, _) => Some((token, self)),
             ContractType::CurveStableSwapToken(pool, pool_ty)
-            | ContractType::CurveCryptoSwapToken(pool, pool_ty) => Some((pool, *pool_ty)),
+            | ContractType::CurveCryptoSwapToken(pool, pool_ty) => {
+                Some((pool, *pool_ty))
+            }
             _ => None,
         }
     }
@@ -89,7 +92,8 @@ impl ContractType {
 
     pub fn get_pegged_token(self, _: Address) -> Option<Address> {
         match self {
-            ContractType::CurveYVault(token) | ContractType::AaveAToken(token) => Some(token),
+            ContractType::CurveYVault(token)
+            | ContractType::AaveAToken(token) => Some(token),
             _ => None,
         }
     }
@@ -169,7 +173,8 @@ impl CheatCodes {
         let token_ty = self.get_contract_type(state, token).ok()?;
         if matches!(
             token_ty,
-            ContractType::CurveCryptoSwapToken(_, _) | ContractType::CurveStableSwapToken(_, _)
+            ContractType::CurveCryptoSwapToken(_, _)
+                | ContractType::CurveStableSwapToken(_, _)
         ) {
             Some(ContractType::CurveYVault(token))
         } else {
@@ -190,19 +195,22 @@ impl CheatCodes {
             .parse_abi("underlyingAssetAddress() returns (address)")
             .expect("bug: invalid abi");
         let calldata = func.abi_encode_input(&[]).expect("bug: invalid abi");
-        let base_token: Address =
-            if let Ok(unerlying_token) = self.cheat_read(state, token, calldata.cvt()) {
-                SolAddress::abi_decode(&unerlying_token, true).ok()?
-            } else {
-                let func = self
-                    .parse_abi("UNDERLYING_ASSET_ADDRESS() returns (address)")
-                    .expect("bug: invalid abi");
-                let calldata = func.abi_encode_input(&[]).expect("bug: invalid abi");
-                let ret = self.cheat_read(state, token, calldata.cvt()).ok()?;
-                SolAddress::abi_decode(&ret, true).ok()?
-            };
+        let base_token: Address = if let Ok(unerlying_token) =
+            self.cheat_read(state, token, calldata.cvt())
+        {
+            SolAddress::abi_decode(&unerlying_token, true).ok()?
+        } else {
+            let func = self
+                .parse_abi("UNDERLYING_ASSET_ADDRESS() returns (address)")
+                .expect("bug: invalid abi");
+            let calldata =
+                func.abi_encode_input(&[]).expect("bug: invalid abi");
+            let ret = self.cheat_read(state, token, calldata.cvt()).ok()?;
+            SolAddress::abi_decode(&ret, true).ok()?
+        };
 
-        let call = AaveLendingPoolV2ABI::getReserveDataCall { asset: base_token };
+        let call =
+            AaveLendingPoolV2ABI::getReserveDataCall { asset: base_token };
         let calldata = call.abi_encode();
         let ret = self
             .cheat_read(
@@ -214,9 +222,11 @@ impl CheatCodes {
             )
             .ok()?;
         let rets: AaveLendingPoolV2ABI::ReserveData =
-            AaveLendingPoolV2ABI::getReserveDataCall::abi_decode_returns(&ret, true)
-                .ok()?
-                ._0;
+            AaveLendingPoolV2ABI::getReserveDataCall::abi_decode_returns(
+                &ret, true,
+            )
+            .ok()?
+            ._0;
         if rets.aTokenAddress == token {
             Some(ContractType::AaveAToken(base_token))
         } else {
@@ -237,7 +247,8 @@ impl CheatCodes {
     {
         // check CurveStableSwap
         {
-            let call = CurveRegistryABI::get_pool_from_lp_tokenCall { arg0: token };
+            let call =
+                CurveRegistryABI::get_pool_from_lp_tokenCall { arg0: token };
             let calldata = call.abi_encode();
             let ret = self
                 .cheat_read(
@@ -260,7 +271,9 @@ impl CheatCodes {
 
         // check CurveCryptoSwap
         {
-            let call = CurveCryptoRegistryABI::get_pool_from_lp_tokenCall { arg0: token };
+            let call = CurveCryptoRegistryABI::get_pool_from_lp_tokenCall {
+                arg0: token,
+            };
             let calldata = call.abi_encode();
             let ret = self
                 .cheat_read(
@@ -289,7 +302,11 @@ impl CheatCodes {
 }
 
 impl CheatCodes {
-    fn __check_uniswap_v2<S>(&mut self, state: &mut S, address: Address) -> Option<ContractType>
+    fn __check_uniswap_v2<S>(
+        &mut self,
+        state: &mut S,
+        address: Address,
+    ) -> Option<ContractType>
     where
         S::Error: Debug,
         S: BcState,
@@ -328,7 +345,9 @@ impl CheatCodes {
                 calldata.cvt(),
             )
             .ok()?;
-        let ret = UniswapV2FactoryABI::getPairCall::abi_decode_returns(&ret, true).ok()?;
+        let ret =
+            UniswapV2FactoryABI::getPairCall::abi_decode_returns(&ret, true)
+                .ok()?;
         if ret._0 == address {
             Some(ContractType::UniswapV2Pair(token0, token1))
         } else {
@@ -336,7 +355,11 @@ impl CheatCodes {
         }
     }
 
-    fn __check_uniswap_v3<S>(&mut self, state: &mut S, address: Address) -> Option<ContractType>
+    fn __check_uniswap_v3<S>(
+        &mut self,
+        state: &mut S,
+        address: Address,
+    ) -> Option<ContractType>
     where
         S::Error: Debug,
         S: BcState,
@@ -385,9 +408,10 @@ impl CheatCodes {
                 calldata.cvt(),
             )
             .ok()?;
-        let pool = UniswapV3FactoryABI::getPoolCall::abi_decode_returns(&ret, true)
-            .ok()?
-            ._0;
+        let pool =
+            UniswapV3FactoryABI::getPoolCall::abi_decode_returns(&ret, true)
+                .ok()?
+                ._0;
         if pool == address {
             Some(ContractType::UniswapV3Pool(token0, token1, fee.cvt()))
         } else {
@@ -413,9 +437,10 @@ impl CheatCodes {
                 calldata.cvt(),
             )
             .ok()?;
-        let coins = CurveRegistryABI::get_coinsCall::abi_decode_returns(&ret, true)
-            .ok()?
-            ._0;
+        let coins =
+            CurveRegistryABI::get_coinsCall::abi_decode_returns(&ret, true)
+                .ok()?
+                ._0;
 
         if !coins.is_empty() && coins[0] != Address::ZERO {
             return Some(ContractType::CurveStableSwap(
@@ -446,9 +471,11 @@ impl CheatCodes {
                 calldata.cvt(),
             )
             .ok()?;
-        let coins = CurveCryptoRegistryABI::get_coinsCall::abi_decode_returns(&ret, true)
-            .ok()?
-            ._0;
+        let coins = CurveCryptoRegistryABI::get_coinsCall::abi_decode_returns(
+            &ret, true,
+        )
+        .ok()?
+        ._0;
 
         if !coins.is_empty() && coins[0] != Address::ZERO {
             return Some(ContractType::CurveCryptoSwap(
@@ -480,10 +507,11 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes =
-            CheatCodes::new().set_caller(&|caller| caller.at_block(&bp, fork_at.block));
+        let mut cheatcodes = CheatCodes::new()
+            .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
-        let curve_yvault: Address = "0xE537B5cc158EB71037D4125BDD7538421981E6AA".cvt();
+        let curve_yvault: Address =
+            "0xE537B5cc158EB71037D4125BDD7538421981E6AA".cvt();
         let token_ty = cheatcodes
             .get_contract_type(&mut state, curve_yvault)
             .unwrap();
@@ -503,11 +531,16 @@ mod tests_with_dep {
 
         let mut cheatcodes = CheatCodes::new();
 
-        let uniswap_v2: Address = "0x004375Dff511095CC5A197A54140a24eFEF3A416".cvt();
-        let uniswap_v3: Address = "0x7668B2Ea8490955F68F5c33E77FE150066c94fb9".cvt();
-        let curve_stable_swap: Address = "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7".cvt();
-        let curve_crypto_swap: Address = "0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC".cvt();
-        let random: Address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".cvt();
+        let uniswap_v2: Address =
+            "0x004375Dff511095CC5A197A54140a24eFEF3A416".cvt();
+        let uniswap_v3: Address =
+            "0x7668B2Ea8490955F68F5c33E77FE150066c94fb9".cvt();
+        let curve_stable_swap: Address =
+            "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7".cvt();
+        let curve_crypto_swap: Address =
+            "0x752eBeb79963cf0732E9c0fec72a49FD1DEfAEAC".cvt();
+        let random: Address =
+            "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2".cvt();
 
         assert!(matches!(
             cheatcodes
@@ -550,8 +583,8 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes =
-            CheatCodes::default().set_caller(&|caller| caller.at_block(&bp, fork_at.block));
+        let mut cheatcodes = CheatCodes::default()
+            .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
         let token = "0x3Ba78eC6Fdd9E1AD64c1a28F5Db6D63156565fF9".cvt();
         let (pool, pool_ty) = cheatcodes
@@ -559,14 +592,16 @@ mod tests_with_dep {
             .unwrap()
             .get_pool(token)
             .unwrap();
-        let expected: Address = "0x3Ba78eC6Fdd9E1AD64c1a28F5Db6D63156565fF9".cvt();
+        let expected: Address =
+            "0x3Ba78eC6Fdd9E1AD64c1a28F5Db6D63156565fF9".cvt();
         assert_eq!(pool, expected);
         assert!(matches!(pool_ty, ContractType::UniswapV2Pair(_, _)));
 
         let token = "0x6c3F90f043a72FA612cbac8115EE7e52BDe6E490".cvt();
         let token_ty = cheatcodes.get_contract_type(&mut state, token).unwrap();
         let (pool, pool_ty) = token_ty.get_pool(token).unwrap();
-        let expected: Address = "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7".cvt();
+        let expected: Address =
+            "0xbEbc44782C7dB0a1A60Cb6fe97d0b483032FF1C7".cvt();
         assert_eq!(pool, expected);
         assert!(matches!(pool_ty, ContractType::CurveStableSwap(_)));
 
@@ -576,7 +611,8 @@ mod tests_with_dep {
             .unwrap()
             .get_pool(token)
             .unwrap();
-        let expected: Address = "0xD51a44d3FaE010294C616388b506AcdA1bfAAE46".cvt();
+        let expected: Address =
+            "0xD51a44d3FaE010294C616388b506AcdA1bfAAE46".cvt();
         assert_eq!(pool, expected);
         assert!(matches!(pool_ty, ContractType::CurveCryptoSwap(_)));
     }
