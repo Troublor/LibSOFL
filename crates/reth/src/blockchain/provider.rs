@@ -5,26 +5,34 @@ use std::{
 };
 
 use libsofl_core::{
-    blockchain::{provider::BcProvider, transaction::Tx, tx_position::TxPosition},
+    blockchain::{
+        provider::{BcProvider, BcStateProvider},
+        transaction::Tx,
+        tx_position::TxPosition,
+    },
     engine::{
         inspector::no_inspector,
         memory::MemoryBcState,
         state::BcState,
         transition::TransitionSpecBuilder,
         types::{
-            BlockEnv, BlockHash, BlockHashOrNumber, BlockNumber, CfgEnv, TxEnv, TxHashOrPosition,
+            BlockEnv, BlockHash, BlockHashOrNumber, BlockNumber, CfgEnv, TxEnv,
+            TxHashOrPosition,
         },
     },
     error::SoflError,
 };
 use reth_beacon_consensus::BeaconConsensus;
-use reth_blockchain_tree::{BlockchainTree, ShareableBlockchainTree, TreeExternals};
+use reth_blockchain_tree::{
+    BlockchainTree, ShareableBlockchainTree, TreeExternals,
+};
 use reth_db::{open_db_read_only, DatabaseEnv};
 use reth_primitives::revm::env::fill_tx_env;
 use reth_primitives::ChainSpecBuilder;
 use reth_provider::{
-    providers::BlockchainProvider, BlockHashReader, BlockNumReader, ChainSpecProvider,
-    EvmEnvProvider, ProviderFactory, StateProviderBox, StateProviderFactory, TransactionsProvider,
+    providers::BlockchainProvider, BlockHashReader, BlockNumReader,
+    ChainSpecProvider, EvmEnvProvider, ProviderFactory, StateProviderBox,
+    StateProviderFactory, TransactionsProvider,
 };
 use reth_revm::{database::StateProviderDatabase, EvmProcessorFactory};
 
@@ -57,45 +65,73 @@ impl RethProvider {
         let maybe_db = db_cache.get(&datadir_str);
         let db;
         if maybe_db.is_none() {
-            let db_inner = open_db_read_only(datadir.join("db").as_path(), None)
-                .map_err(|e| SoflError::Provider(format!("failed to open db: {}", e)))?;
+            let db_inner =
+                open_db_read_only(datadir.join("db").as_path(), None).map_err(
+                    |e| {
+                        SoflError::Provider(format!("failed to open db: {}", e))
+                    },
+                )?;
             db = Arc::new(db_inner);
             db_cache.insert(datadir_str, db.clone());
         } else {
             db = maybe_db.unwrap().clone();
         }
 
-        let provider_factory = ProviderFactory::new(db.clone(), chain_spec.clone());
+        let provider_factory =
+            ProviderFactory::new(db.clone(), chain_spec.clone());
         let executor_factory = EvmProcessorFactory::new(chain_spec.clone());
-        let tree_externals = TreeExternals::new(provider_factory, consensus, executor_factory);
-        let blockchain_tree = BlockchainTree::new(tree_externals, Default::default(), None)
-            .map_err(|e| SoflError::Provider(format!("failed to create blockchain tree: {}", e)))?;
-        let shareable_blockchain_tree = ShareableBlockchainTree::new(blockchain_tree);
+        let tree_externals =
+            TreeExternals::new(provider_factory, consensus, executor_factory);
+        let blockchain_tree =
+            BlockchainTree::new(tree_externals, Default::default(), None)
+                .map_err(|e| {
+                    SoflError::Provider(format!(
+                        "failed to create blockchain tree: {}",
+                        e
+                    ))
+                })?;
+        let shareable_blockchain_tree =
+            ShareableBlockchainTree::new(blockchain_tree);
         let database = ProviderFactory::new(db, chain_spec);
         let bp: BlockchainProvider<
             Arc<DatabaseEnv>,
             ShareableBlockchainTree<Arc<DatabaseEnv>, EvmProcessorFactory>,
-        > = BlockchainProvider::new(database, shareable_blockchain_tree).map_err(|e| {
-            SoflError::Provider(format!("failed to create blockchain provider: {}", e))
-        })?;
+        > = BlockchainProvider::new(database, shareable_blockchain_tree)
+            .map_err(|e| {
+                SoflError::Provider(format!(
+                    "failed to create blockchain provider: {}",
+                    e
+                ))
+            })?;
         Ok(Self { bp })
     }
+}
 
+impl BcStateProvider<StateProviderDatabase<StateProviderBox>> for RethProvider {
     /// Create a BcState from the the state before the transaction at the position is executed.
-    pub fn bc_state_at(
+    fn bc_state_at(
         &self,
         pos: TxPosition,
-    ) -> Result<MemoryBcState<StateProviderDatabase<StateProviderBox>>, SoflError> {
+    ) -> Result<MemoryBcState<StateProviderDatabase<StateProviderBox>>, SoflError>
+    {
         let bn = match pos.block {
             BlockHashOrNumber::Hash(hash) => self
                 .bp
                 .block_number(hash)
-                .map_err(|e| SoflError::Provider(format!("failed to get block number: {}", e)))?
+                .map_err(|e| {
+                    SoflError::Provider(format!(
+                        "failed to get block number: {}",
+                        e
+                    ))
+                })?
                 .ok_or(SoflError::NotFound(format!("block {}", hash)))?,
             BlockHashOrNumber::Number(n) => n,
         };
         let sp = self.bp.state_by_block_id((bn - 1).into()).map_err(|e| {
-            SoflError::Provider(format!("failed to create reth state provider: {}", e))
+            SoflError::Provider(format!(
+                "failed to create reth state provider: {}",
+                e
+            ))
         })?;
         let wrapped = StateProviderDatabase::new(sp);
         let mut state = MemoryBcState::new(wrapped);
@@ -106,7 +142,10 @@ impl RethProvider {
                 .bp
                 .transactions_by_block(pos.block.cvt())
                 .map_err(|e| {
-                    SoflError::Provider(format!("failed to get transactions by block: {}", e))
+                    SoflError::Provider(format!(
+                        "failed to get transactions by block: {}",
+                        e
+                    ))
                 })?
                 .ok_or(SoflError::NotFound(format!("position {}", pos)))?;
             let txs: Vec<RethTx> = txs
@@ -115,7 +154,8 @@ impl RethProvider {
                 .map(move |t| t.into())
                 .collect();
             // prepare
-            let mut spec_builder = TransitionSpecBuilder::new().at_block(self.clone(), pos.block);
+            let mut spec_builder =
+                TransitionSpecBuilder::new().at_block(self.clone(), pos.block);
             for tx in txs.into_iter() {
                 spec_builder = spec_builder.append_tx(tx);
             }
@@ -136,7 +176,10 @@ impl BcProvider<RethTx> for RethProvider {
                     .bp
                     .transactions_by_block(pos.block.cvt())
                     .map_err(|e| {
-                        SoflError::Provider(format!("failed to get transactions by block: {}", e))
+                        SoflError::Provider(format!(
+                            "failed to get transactions by block: {}",
+                            e
+                        ))
                     })?;
                 txs.map(|mut s| s.remove(pos.index as usize))
                     .ok_or(SoflError::NotFound(format!("transaction {}", pos)))?
@@ -146,25 +189,36 @@ impl BcProvider<RethTx> for RethProvider {
         RethTx::from_hash(&self.bp, hash)
     }
 
-    fn txs_in_block(&self, block: BlockHashOrNumber) -> Result<Vec<RethTx>, SoflError> {
+    fn txs_in_block(
+        &self,
+        block: BlockHashOrNumber,
+    ) -> Result<Vec<RethTx>, SoflError> {
         let txs = self
             .bp
             .transactions_by_block(block.cvt())
             .map_err(|e| {
-                SoflError::Provider(format!("failed to get transactions by block: {}", e))
+                SoflError::Provider(format!(
+                    "failed to get transactions by block: {}",
+                    e
+                ))
             })?
             .ok_or(SoflError::NotFound(format!("block {}", block)))?;
         let txs: Result<Vec<RethTx>, _> =
             txs.into_iter().map(|t| self.tx(t.hash().into())).collect();
-        let txs =
-            txs.map_err(|e| SoflError::Provider(format!("failed to get transaction: {}", e)))?;
+        let txs = txs.map_err(|e| {
+            SoflError::Provider(format!("failed to get transaction: {}", e))
+        })?;
         Ok(txs)
     }
 
-    fn fill_cfg_env(&self, env: &mut CfgEnv, block: BlockHashOrNumber) -> Result<(), SoflError> {
-        self.bp
-            .fill_cfg_env_at(env, block.cvt())
-            .map_err(|e| SoflError::Provider(format!("failed to fill cfg env: {}", e)))
+    fn fill_cfg_env(
+        &self,
+        env: &mut CfgEnv,
+        block: BlockHashOrNumber,
+    ) -> Result<(), SoflError> {
+        self.bp.fill_cfg_env_at(env, block.cvt()).map_err(|e| {
+            SoflError::Provider(format!("failed to fill cfg env: {}", e))
+        })
     }
 
     fn fill_block_env(
@@ -172,29 +226,46 @@ impl BcProvider<RethTx> for RethProvider {
         env: &mut BlockEnv,
         block: BlockHashOrNumber,
     ) -> Result<(), SoflError> {
-        self.bp
-            .fill_block_env_at(env, block.cvt())
-            .map_err(|e| SoflError::Provider(format!("failed to fill block env: {}", e)))
+        self.bp.fill_block_env_at(env, block.cvt()).map_err(|e| {
+            SoflError::Provider(format!("failed to fill block env: {}", e))
+        })
     }
 
-    fn fill_tx_env(&self, env: &mut TxEnv, tx: TxHashOrPosition) -> Result<(), SoflError> {
+    fn fill_tx_env(
+        &self,
+        env: &mut TxEnv,
+        tx: TxHashOrPosition,
+    ) -> Result<(), SoflError> {
         let tx = self.tx(tx)?;
         let sender = tx.sender();
         fill_tx_env(env, Box::new(tx.tx), sender.cvt());
         Ok(())
     }
 
-    fn block_number_by_hash(&self, hash: BlockHash) -> Result<BlockNumber, SoflError> {
+    fn block_number_by_hash(
+        &self,
+        hash: BlockHash,
+    ) -> Result<BlockNumber, SoflError> {
         self.bp
             .block_number(hash)
-            .map_err(|e| SoflError::Provider(format!("failed to get block number: {}", e)))?
+            .map_err(|e| {
+                SoflError::Provider(format!(
+                    "failed to get block number: {}",
+                    e
+                ))
+            })?
             .ok_or(SoflError::NotFound(format!("block {}", hash)))
     }
 
-    fn block_hash_by_number(&self, number: BlockNumber) -> Result<BlockHash, SoflError> {
+    fn block_hash_by_number(
+        &self,
+        number: BlockNumber,
+    ) -> Result<BlockHash, SoflError> {
         self.bp
             .block_hash(number)
-            .map_err(|e| SoflError::Provider(format!("failed to get block hash: {}", e)))?
+            .map_err(|e| {
+                SoflError::Provider(format!("failed to get block hash: {}", e))
+            })?
             .ok_or(SoflError::NotFound(format!("block {}", number)))
     }
 
@@ -211,10 +282,14 @@ mod tests_with_db {
     use std::{path::Path, sync::Arc};
 
     use libsofl_core::{
-        blockchain::{provider::BcProvider, tx_position::TxPosition},
+        blockchain::{
+            provider::{BcProvider, BcStateProvider},
+            tx_position::TxPosition,
+        },
         conversion::ConvertTo,
         engine::{
-            inspector::no_inspector, state::BcState, transition::TransitionSpec, types::TxHash,
+            inspector::no_inspector, state::BcState,
+            transition::TransitionSpec, types::TxHash,
         },
     };
     use reth_provider::ReceiptProvider;
