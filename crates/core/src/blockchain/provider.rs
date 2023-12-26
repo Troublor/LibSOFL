@@ -56,6 +56,8 @@ pub trait BcProvider<T: Tx> {
     ) -> Result<(), SoflError>;
 }
 
+#[auto_impl(&, Box)]
+#[automock]
 pub trait BcStateProvider<S: DatabaseRef> {
     fn bc_state_at(
         &self,
