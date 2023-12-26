@@ -1,0 +1,37 @@
+[package]
+name = "libsofl-knowledge"
+version = "0.1.0"
+edition = "2021"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "migration"
+path = "bin/migration/main.rs"
+
+[[bin]]
+name = "collect"
+path = "bin/collect/main.rs"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+
+libsofl-core = { path = "../core" }
+libsofl-reth = { path = "../reth" }
+libsofl-jsonrpc = { path = "../jsonrpc" }
+libsofl-utils = { path = "../utils" }
+
+tokio = { version = "1", features = ["full"] }
+sea-orm = { version = "^0", features = [
+    "sqlx-postgres",
+    "sqlx-sqlite",
+    "runtime-tokio-rustls",
+    "macros",
+    "mock",
+    "debug-print",
+] }
+sea-orm-migration = { version = "^0" }
+serde = { version = "1.0.164", features = ["derive"] }
+serde_json = "1.0.108"

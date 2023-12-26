@@ -5,13 +5,15 @@ use tracing_subscriber::{
     layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };
 
-use self::config::must_load_cfg;
+use crate::config::Config;
+
+use self::config::LogConfig;
 
 static INIT_ONCE: std::sync::Once = std::sync::Once::new();
 
 pub fn init() {
     INIT_ONCE.call_once(|| {
-        let cfg = must_load_cfg();
+        let cfg = LogConfig::must_load();
 
         // Console log
         let console_filter = EnvFilter::try_from_default_env()

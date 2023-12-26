@@ -1,10 +1,7 @@
 use std::path::Path;
 
 use libsofl_core::error::SoflError;
-use libsofl_utils::{
-    config::{Config, ConfigLoader},
-    log::info,
-};
+use libsofl_utils::{config::Config, log::info};
 
 use crate::blockchain::provider::RethProvider;
 
@@ -19,16 +16,10 @@ impl RethConfig {
         let datadir = Path::new(&self.datadir);
         RethProvider::from_db(datadir)
     }
-
-    pub fn must_load() -> RethConfig {
-        ConfigLoader::load_cfg(CONFIG_SECTION).expect("failed to load config")
-    }
-
-    pub fn load() -> Result<RethConfig, SoflError> {
-        ConfigLoader::load_cfg(CONFIG_SECTION)
-    }
 }
 
-pub static CONFIG_SECTION: &str = "reth";
-
-impl Config for RethConfig {}
+impl Config for RethConfig {
+    fn section_name() -> &'static str {
+        "reth"
+    }
+}

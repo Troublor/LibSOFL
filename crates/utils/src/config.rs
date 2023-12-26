@@ -1,18 +1,15 @@
 use libsofl_core::error::SoflError;
 pub use serde::{Deserialize, Serialize};
-pub trait Config: Deserialize<'static> + Serialize {}
-
-pub struct ConfigLoader {}
 
 pub static CONFIG_FILE_ENV_VAR: &str = "SOFL_CONFIG";
 pub static CONFIG_ENV_PREFIX: &str = "SOFL";
 pub static CONFIG_ENV_SEPARATOR: &str = "_";
 
-impl ConfigLoader {
-    pub fn load_cfg_or_default<T: Config>(
-        section: &str,
-        default: T,
-    ) -> Result<T, SoflError> {
+pub trait Config: Deserialize<'static> + Serialize {
+    fn section_name() -> &'static str;
+
+    fn load_or_default(default: Self) -> Result<Self, SoflError> {
+        let section = Self::section_name();
         let config_file = std::env::var(CONFIG_FILE_ENV_VAR)
             .unwrap_or_else(|_| "config.toml".to_string());
         let default_source =
@@ -39,14 +36,15 @@ impl ConfigLoader {
                     e
                 ))
             })?;
-        let c: T = cfg.get(section).or_else(|e| match e {
+        let c: Self = cfg.get(section).or_else(|e| match e {
             config::ConfigError::NotFound(_) => Ok(default),
             _ => Err(SoflError::Config(format!("{}", e))),
         })?;
         Ok(c)
     }
 
-    pub fn load_cfg<T: Config>(section: &str) -> Result<T, SoflError> {
+    fn load() -> Result<Self, SoflError> {
+        let section = Self::section_name();
         let config_file = std::env::var(CONFIG_FILE_ENV_VAR)
             .unwrap_or_else(|_| "config.toml".to_string());
         let cfg = config::Config::builder()
@@ -65,17 +63,21 @@ impl ConfigLoader {
                     e
                 ))
             })?;
-        let c: T = cfg
+        let c: Self = cfg
             .get(section)
             .map_err(|e| SoflError::Config(format!("{}", e)))?;
         Ok(c)
+    }
+
+    fn must_load() -> Self {
+        Self::load().expect("failed to load config")
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::{Config, CONFIG_ENV_PREFIX, CONFIG_ENV_SEPARATOR};
-    use crate::config::{ConfigLoader, CONFIG_FILE_ENV_VAR};
+    use crate::config::CONFIG_FILE_ENV_VAR;
     use libsofl_core::error::SoflError;
     use std::io::Write;
     use tempfile::NamedTempFile;
@@ -92,7 +94,11 @@ mod tests {
     struct TestConfig {
         test: String,
     }
-    impl Config for TestConfig {}
+    impl Config for TestConfig {
+        fn section_name() -> &'static str {
+            "abc"
+        }
+    }
 
     #[test]
     #[ignore = "Run this test together with others will fail. But run it alone will pass."]
@@ -105,8 +111,7 @@ mod tests {
         file.write_all(config_txt.as_bytes()).unwrap();
         std::env::set_var(CONFIG_FILE_ENV_VAR, file.path().as_os_str());
         let cfg: TestConfig =
-            ConfigLoader::load_cfg_or_default("abc", Default::default())
-                .unwrap();
+            TestConfig::load_or_default(Default::default()).unwrap();
         assert_eq!(cfg.test, "abc");
         std::env::remove_var(CONFIG_FILE_ENV_VAR);
     }
@@ -122,9 +127,7 @@ mod tests {
                 + "test",
             "def",
         );
-        let cfg =
-            ConfigLoader::load_cfg_or_default("abc", TestConfig::default())
-                .unwrap();
+        let cfg = TestConfig::load_or_default(TestConfig::default()).unwrap();
         assert_eq!(cfg.test, "def")
     }
 
@@ -132,7 +135,7 @@ mod tests {
     #[ignore = "Run this test together with others will fail. But run it alone will pass."]
     fn test_no_default() {
         std::env::set_var(CONFIG_FILE_ENV_VAR, "/dev/non_exist");
-        let cfg: Result<TestConfig, SoflError> = ConfigLoader::load_cfg("abc");
+        let cfg: Result<TestConfig, SoflError> = TestConfig::load();
         assert!(cfg.is_err());
         std::env::remove_var(CONFIG_FILE_ENV_VAR);
     }

@@ -1,4 +1,4 @@
-use crate::config::{Config, ConfigLoader};
+use crate::config::Config;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub struct LogConfig {
@@ -17,11 +17,8 @@ impl Default for LogConfig {
     }
 }
 
-pub static CONFIG_SECTION: &str = "log";
-
-impl Config for LogConfig {}
-
-pub fn must_load_cfg() -> LogConfig {
-    ConfigLoader::load_cfg_or_default(CONFIG_SECTION, Default::default())
-        .expect("failed to load log config")
+impl Config for LogConfig {
+    fn section_name() -> &'static str {
+        "log"
+    }
 }

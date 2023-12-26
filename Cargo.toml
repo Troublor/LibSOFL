@@ -1,3 +1,10 @@
 [workspace]
 
-members = ["crates/core", "crates/reth", "crates/utils", "crates/periphery", "crates/jsonrpc"]
+members = [
+    "crates/core",
+    "crates/reth",
+    "crates/utils",
+    "crates/periphery",
+    "crates/jsonrpc",
+    "crates/knowledge",
+]

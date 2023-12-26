@@ -292,6 +292,7 @@ mod tests_with_db {
             transition::TransitionSpec, types::TxHash,
         },
     };
+    use libsofl_utils::config::Config;
     use reth_provider::ReceiptProvider;
 
     use crate::config::RethConfig;

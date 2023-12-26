@@ -75,6 +75,9 @@ pub type Storage =
 pub type StorageSlot = revm::primitives::StorageSlot;
 
 pub use revm::interpreter::opcode;
+pub use revm::Database;
+pub use revm::DatabaseCommit;
+pub use revm::DatabaseRef;
 pub use revm::Inspector;
 pub type InstructionResult = revm::interpreter::InstructionResult;
 pub type Interpreter<'a> = revm::interpreter::Interpreter<'a>;
@@ -88,6 +91,9 @@ pub type BlockEnv = revm::primitives::BlockEnv;
 pub type CfgEnv = revm::primitives::CfgEnv;
 pub type StateChange = revm::primitives::State;
 pub type ExecutionResult = revm::primitives::ExecutionResult;
+pub type Gas = revm::interpreter::Gas;
+pub type CreateInputs = revm::interpreter::CreateInputs;
+pub type CallInputs = revm::interpreter::CallInputs;
 pub type Output = revm::primitives::Output;
 pub type CreateScheme = revm::primitives::CreateScheme;
 

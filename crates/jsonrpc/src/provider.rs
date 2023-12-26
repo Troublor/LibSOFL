@@ -302,6 +302,7 @@ mod tests {
         blockchain::{provider::BcProvider, transaction::Tx},
         conversion::ConvertTo,
     };
+    use libsofl_utils::config::Config;
 
     use crate::config::JsonRpcConfig;
 

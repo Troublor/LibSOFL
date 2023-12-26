@@ -128,6 +128,42 @@ impl ConvertTo<TxHashOrPosition> for TxHash {
     }
 }
 
+///*** Convert To TxPosition */
+impl ConvertTo<TxPosition> for BlockHashOrNumber {
+    fn cvt(&self) -> TxPosition {
+        TxPosition {
+            block: *self,
+            index: 0,
+        }
+    }
+}
+impl ConvertTo<TxPosition> for BlockNumber {
+    fn cvt(&self) -> TxPosition {
+        TxPosition {
+            block: self.cvt(),
+            index: 0,
+        }
+    }
+}
+impl ConvertTo<TxPosition> for BlockHash {
+    fn cvt(&self) -> TxPosition {
+        TxPosition {
+            block: self.cvt(),
+            index: 0,
+        }
+    }
+}
+impl<B: ConvertTo<BlockHashOrNumber>, I: ConvertTo<u64>> ConvertTo<TxPosition>
+    for (B, I)
+{
+    fn cvt(&self) -> TxPosition {
+        TxPosition {
+            block: self.0.cvt(),
+            index: self.1.cvt(),
+        }
+    }
+}
+
 ///*** Convert to Bytecode */
 impl<T: ConvertTo<Bytes>> ConvertTo<Bytecode> for T {
     fn cvt(&self) -> Bytecode {

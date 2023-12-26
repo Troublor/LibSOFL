@@ -57,7 +57,7 @@ impl ConvertTo<String> for TxHashOrPosition {
 }
 impl ConvertTo<String> for TxPosition {
     fn cvt(&self) -> String {
-        format!("{}:{}", self.block.cvt(), self.index)
+        format!("{}:{}", ConvertTo::<String>::cvt(&self.block), self.index)
     }
 }
 
