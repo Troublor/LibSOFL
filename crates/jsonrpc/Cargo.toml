@@ -11,7 +11,6 @@ libsofl-core = { path = "../core" }
 libsofl-utils = { path = "../utils" }
 
 serde = { version = "1.0.164", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
 reqwest = "0.11.23"
 
 alloy-providers = { git = "https://github.com/alloy-rs/alloy" }

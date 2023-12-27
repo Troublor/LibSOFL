@@ -1,4 +1,4 @@
-use std::{cell::RefCell, collections::HashMap};
+use std::{cell::RefCell, collections::HashMap, sync::Arc};
 
 use alloy_providers::provider::{Provider, TempProvider};
 use alloy_rpc_types::{Block, BlockNumberOrTag};
@@ -15,15 +15,16 @@ use libsofl_core::{
     },
     error::SoflError,
 };
+use libsofl_utils::sync::runtime::AsyncRuntime;
 use reqwest::Client;
 
 use crate::blockchain::JsonRpcTx;
 
 pub struct JsonRpcProvider {
     pub(crate) url: String,
-    pub(crate) p: Provider<Http<Client>>,
+    pub(crate) p: Arc<Provider<Http<Client>>>,
 
-    pub(crate) rt: tokio::runtime::Runtime,
+    pub(crate) rt: AsyncRuntime,
 
     // caches
     pub(crate) chain_id: u64,
@@ -38,10 +39,9 @@ impl JsonRpcProvider {
     pub fn new(url: String) -> Result<JsonRpcProvider, SoflError> {
         let p = Provider::try_from(url.clone())
             .expect("failed to create jsonrpc provider");
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to create tokio runtime");
+        let p = Arc::new(p);
+
+        let rt = AsyncRuntime::new();
         let chain_id = rt.block_on(p.get_chain_id()).map_err(|e| {
             SoflError::Provider(format!("failed to get chain id: {:?}", e))
         })?;
@@ -60,16 +60,10 @@ impl JsonRpcProvider {
 
 impl Clone for JsonRpcProvider {
     fn clone(&self) -> Self {
-        let p = Provider::try_from(self.url.clone())
-            .expect("failed to create jsonrpc provider");
-        let rt = tokio::runtime::Builder::new_current_thread()
-            .enable_all()
-            .build()
-            .expect("failed to create tokio runtime");
         Self {
             url: self.url.clone(),
-            p,
-            rt,
+            p: self.p.clone(),
+            rt: self.rt.clone(),
             chain_id: self.chain_id,
             txs: self.txs.clone(),
             txs_in_block: self.txs_in_block.clone(),
