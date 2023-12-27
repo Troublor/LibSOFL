@@ -16,7 +16,11 @@ use super::{
 
 /// BcState is a wrapper of revm's Database trait.
 /// It provides a set of basic methods to read the state of the blockchain.
-pub trait BcState: revm::Database + revm::DatabaseCommit {
+pub trait BcState:
+    revm::Database<Error = Self::DatabaseErr> + revm::DatabaseCommit
+{
+    type DatabaseErr: std::fmt::Debug;
+
     fn transit<'a, I>(
         &'a mut self,
         spec: TransitionSpec,
@@ -232,7 +236,12 @@ pub trait BcState: revm::Database + revm::DatabaseCommit {
 }
 
 /// Any type that implements revm::Database auto-implements BcState.
-impl<T: revm::Database + revm::DatabaseCommit> BcState for T {}
+impl<T: revm::Database + revm::DatabaseCommit> BcState for T
+where
+    T::Error: std::fmt::Debug,
+{
+    type DatabaseErr = T::Error;
+}
 
 // /// BcState wraps revm's DatabaseCommit trait.
 // /// It provides a set of basic methods to edit the state of the blockchain.
