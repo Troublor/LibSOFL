@@ -1,5 +1,13 @@
-[workspace]
+[workspace.package]
+version = "0.1.0"
+authors = ["William Aaron Cheung, Zhuo Zhang"]
+description = "Smart contract Ops Fuzzy Library"
+homepage = "https://github.com/Troublor/LibSOFL"
+rust-version = "1.74"
+license = "MIT"
+edition = "2021"
 
+[workspace]
 members = [
     "crates/core",
     "crates/reth",
