@@ -14,8 +14,6 @@ use libsofl_core::{
     error::SoflError,
 };
 
-use super::addressbook::ADDRESS_BOOK;
-
 /// HighLevelCaller provider a high level interface for calling contract.
 /// HighLevelCaller is readonly caller, which means it can not change the state.
 /// All calls are simulations.
@@ -30,7 +28,7 @@ pub struct HighLevelCaller {
 impl Default for HighLevelCaller {
     fn default() -> Self {
         Self {
-            address: ADDRESS_BOOK.default_caller.fixed(),
+            address: "0x4354bB7C9dad5b0299199c0084E6ae386afD636C".cvt(),
             nonce: 0,
             gas_limit: 0,
             spec_builder: TransitionSpecBuilder::default(),
@@ -50,6 +48,11 @@ impl HighLevelCaller {
             address,
             ..Default::default()
         }
+    }
+
+    pub fn set_address(mut self, address: Address) -> Self {
+        self.address = address;
+        self
     }
 
     pub fn set_nonce(mut self, nonce: u64) -> Self {

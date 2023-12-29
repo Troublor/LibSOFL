@@ -233,6 +233,32 @@ pub trait BcState:
         );
         self.commit(changes);
     }
+
+    fn add_ether_balance(
+        &mut self,
+        address: Address,
+        amount: U256,
+    ) -> Result<(), SoflError> {
+        let mut account_info = self
+            .basic(address)
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
+            .unwrap_or_default();
+        account_info.balance += amount;
+        let account = Account {
+            info: account_info,
+            storage: Default::default(),
+            status: AccountStatus::Touched,
+        };
+        let mut changes = StateChange::new();
+        changes.insert(address, account);
+        self.commit(changes);
+        Ok(())
+    }
 }
 
 /// Any type that implements revm::Database auto-implements BcState.

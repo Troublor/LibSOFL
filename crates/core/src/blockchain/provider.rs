@@ -15,7 +15,7 @@ use crate::error::SoflError;
 use super::transaction::Tx;
 use super::tx_position::TxPosition;
 
-#[auto_impl(&, Box)]
+#[auto_impl(&, Box, Arc, Rc)]
 #[automock]
 pub trait BcProvider<T: Tx> {
     // chain info
@@ -56,7 +56,7 @@ pub trait BcProvider<T: Tx> {
     ) -> Result<(), SoflError>;
 }
 
-#[auto_impl(&, Box)]
+#[auto_impl(&, Box, Arc, Rc)]
 #[automock]
 pub trait BcStateProvider<S: DatabaseRef> {
     fn bc_state_at(

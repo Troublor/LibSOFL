@@ -1,7 +1,7 @@
 #[macro_use]
 extern crate lazy_static;
 pub mod addressbook;
-pub mod caller;
+pub use libsofl_utils::solidity::caller;
 pub mod cheatcodes;
 pub mod conversion;
 pub mod math;

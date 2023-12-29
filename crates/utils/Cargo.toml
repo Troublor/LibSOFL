@@ -9,9 +9,11 @@ edition = "2021"
 
 libsofl-core = { path = "../core" }
 
+foundry-compilers = { version = "0.1.1", features = ["svm-solc"] }
 futures = "0.3"
 tokio = { version = "1", features = ["full"] }
 serde = { version = "1.0.164", features = ["derive"] }
+serde_json = "1.0.102"
 config = "0.13.1"
 tempfile = "3.8.1"
 tracing = "0.1.40"
@@ -21,3 +23,9 @@ tracing-subscriber = { version = "0.3.18", features = [
     "json",
     "env-filter",
 ] }
+
+handlebars = "4.5.0"
+
+alloy-sol-types = "0.5.3"
+alloy-dyn-abi = "0.5.3"
+alloy-json-abi = "0.5.3"

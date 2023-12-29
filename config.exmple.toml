@@ -1,5 +1,5 @@
 [reth]
-db = "/path/to/blockchain"
+datadir = "/path/to/blockchain"
 
 [jsonrpc]
 url = "http://localhost:8545"

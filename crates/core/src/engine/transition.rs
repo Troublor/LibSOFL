@@ -56,7 +56,7 @@ pub struct TransitionSpecBuilder {
     cfg: CfgEnv,
     block: BlockEnv,
     txs: Vec<TxEnv>,
-    disable_nonce_check: bool,
+    bypass_check: bool,
 }
 
 impl TransitionSpecBuilder {
@@ -66,7 +66,16 @@ impl TransitionSpecBuilder {
 }
 
 impl TransitionSpecBuilder {
-    pub fn build(self) -> TransitionSpec {
+    pub fn build(mut self) -> TransitionSpec {
+        if self.bypass_check {
+            self.cfg.disable_balance_check = true;
+            self.cfg.disable_base_fee = true;
+            self.cfg.disable_block_gas_limit = true;
+            self.cfg.disable_eip3607 = true;
+            self.txs.iter_mut().for_each(|tx| {
+                tx.nonce = None;
+            });
+        }
         TransitionSpec {
             cfg: self.cfg,
             block: self.block,
@@ -74,20 +83,16 @@ impl TransitionSpecBuilder {
         }
     }
 
-    pub fn append_tx_env(mut self, mut tx_env: TxEnv) -> Self {
-        if self.disable_nonce_check {
-            tx_env.nonce = None;
-        }
+    pub fn append_tx_env(mut self, tx_env: TxEnv) -> Self {
+        // if self.disable_nonce_check {
+        //     tx_env.nonce = None;
+        // }
         self.txs.push(tx_env);
         self
     }
 
     pub fn bypass_check(mut self) -> Self {
-        self.cfg.disable_balance_check = true;
-        self.cfg.disable_base_fee = true;
-        self.cfg.disable_block_gas_limit = true;
-        self.cfg.disable_eip3607 = true;
-        self.disable_nonce_check = true;
+        self.bypass_check = true;
         self
     }
 
