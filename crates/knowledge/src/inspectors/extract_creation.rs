@@ -48,3 +48,44 @@ impl<BS: BcState> Inspector<BS> for ExtractCreationInspector {
 }
 
 impl<BS: BcState> EvmInspector<BS> for ExtractCreationInspector {}
+
+#[cfg(test)]
+mod tests {
+    use libsofl_core::engine::memory::MemoryBcState;
+    use libsofl_utils::solidity::{
+        caller::HighLevelCaller, scripting::compile_contract,
+    };
+
+    #[test]
+    fn test_extract_creation() {
+        let mut state = MemoryBcState::fresh();
+        let mut inspector = super::ExtractCreationInspector::default();
+
+        let code = format!(
+            r#"
+            contract A {{
+                constructor() {{}}
+            }}
+            contract B {{
+                A a;
+                constructor() {{
+                    a = new A{{salt: bytes32(uint(0))}}();
+                }}
+            }}
+            "#,
+        );
+        let (_, bytecode) = compile_contract("0.8.12", code)
+            .unwrap()
+            .into_iter()
+            .filter(|(n, _)| n == "B")
+            .next()
+            .unwrap();
+        HighLevelCaller::default()
+            .bypass_check()
+            .create(&mut state, None, &bytecode, None, &mut inspector)
+            .unwrap();
+
+        let creations = inspector.created;
+        assert_eq!(creations.len(), 2);
+    }
+}

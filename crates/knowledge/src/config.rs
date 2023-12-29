@@ -19,4 +19,10 @@ impl Config for KnowledgeConfig {
     }
 }
 
-impl KnowledgeConfig {}
+impl KnowledgeConfig {
+    pub async fn get_database_connection(
+        &self,
+    ) -> Result<sea_orm::DatabaseConnection, sea_orm::DbErr> {
+        sea_orm::Database::connect(&self.database).await
+    }
+}

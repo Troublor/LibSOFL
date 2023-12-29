@@ -7,7 +7,7 @@ pub struct Model {
     pub contract: String,
     #[sea_orm(primary_key, auto_increment = false)]
     pub tx: String, // tx hash of the transaction that creates or destroys the contract
-    pub index: i32, // the index of the contract creation in the history
+    pub block: u64, // the block number of the transaction
     pub destruct: bool, // whether the contract is created or destroyed in this transaction
 }
 

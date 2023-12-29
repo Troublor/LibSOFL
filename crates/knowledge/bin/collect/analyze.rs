@@ -1,4 +1,4 @@
-use std::ops::Range;
+use std::{collections::HashSet, sync::Arc};
 
 use libsofl_core::{
     blockchain::{
@@ -18,18 +18,31 @@ use libsofl_knowledge::inspectors::{
     extract_creation::ExtractCreationInspector,
     extract_invocation::ExtractInvocationInspector,
 };
-use libsofl_utils::log::{error, info};
+use libsofl_utils::log::info;
 
-pub(crate) struct Analyzer<
+pub struct Analyzer<
     T: Tx,
     S: DatabaseRef,
     P: BcProvider<T> + BcStateProvider<S>,
-> {
-    provider: P,
-    creation_result_feed: tokio::sync::mpsc::Sender<(String, String, bool)>, // (tx, contract, destruct)
-    invocation_result_feed: tokio::sync::mpsc::Sender<(u64, String)>, // (block number, contract)
-    failed_block_feed: tokio::sync::mpsc::Sender<u64>,
+> where
+    S::Error: std::fmt::Debug,
+{
+    provider: Arc<P>,
+
     _phantom: std::marker::PhantomData<(T, S)>,
+}
+
+impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>> Clone
+    for Analyzer<T, S, P>
+where
+    S::Error: std::fmt::Debug,
+{
+    fn clone(&self) -> Self {
+        Self {
+            provider: self.provider.clone(),
+            _phantom: std::marker::PhantomData,
+        }
+    }
 }
 
 impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
@@ -37,31 +50,23 @@ impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
 where
     S::Error: std::fmt::Debug,
 {
-    pub async fn analyze_blocks(
-        &mut self,
-        blocks: Range<u64>,
-    ) -> Result<(), SoflError> {
-        for block in blocks {
-            let r = self.analyze_one_block(block).await;
-            match r {
-                Ok(_) => {}
-                Err(e) => {
-                    error!(
-                        block = block,
-                        error = format!("{:?}", e),
-                        "failed to analyze block"
-                    );
-                    self.failed_block_feed
-                        .send(block)
-                        .await
-                        .map_err(|e| SoflError::Custom(format!("{:?}", e)))?;
-                }
-            }
+    pub fn new(provider: Arc<P>) -> Self {
+        Self {
+            provider,
+            _phantom: std::marker::PhantomData,
         }
-        Ok(())
     }
+}
 
-    async fn analyze_one_block(&mut self, block: u64) -> Result<(), SoflError> {
+impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
+    Analyzer<T, S, P>
+where
+    S::Error: std::fmt::Debug,
+{
+    pub async fn analyze_one_block(
+        &mut self,
+        block: u64,
+    ) -> Result<(Vec<(String, String, bool)>, HashSet<String>), SoflError> {
         let txs = self.provider.txs_in_block(block.cvt())?;
         let mut cfg_env = CfgEnv::default();
         self.provider.fill_cfg_env(&mut cfg_env, block.cvt())?;
@@ -69,8 +74,8 @@ where
         self.provider.fill_block_env(&mut block_env, block.cvt())?;
         let mut state = self.provider.bc_state_at(block.cvt())?;
 
-        let mut n_creations = 0;
-        let mut n_invocations = 0;
+        let mut total_creations = Vec::new();
+        let mut total_invocations = HashSet::new();
 
         for tx in txs {
             let mut tx_env = TxEnv::default();
@@ -101,33 +106,40 @@ where
                     (tx_hash.clone(), ConvertTo::<String>::cvt(addr), *destruct)
                 })
                 .collect();
-            for c in creations {
-                self.creation_result_feed
-                    .send(c)
-                    .await
-                    .map_err(|e| SoflError::Custom(format!("{:?}", e)))?;
-                n_creations += 1;
-            }
+            total_creations.extend(creations);
 
-            let invocations: Vec<(u64, String)> = invocation_insp
+            let invocations: Vec<String> = invocation_insp
                 .invocations
                 .iter()
-                .map(|addr| (block, ConvertTo::<String>::cvt(addr)))
+                .map(|addr| ConvertTo::<String>::cvt(addr))
                 .collect();
-            for i in invocations {
-                self.invocation_result_feed
-                    .send(i)
-                    .await
-                    .map_err(|e| SoflError::Custom(format!("{:?}", e)))?;
-                n_invocations += 1;
-            }
+            total_invocations.extend(invocations);
         }
         info!(
             block = block,
-            creations = n_creations,
-            invocations = n_invocations,
+            creations = total_creations.len(),
+            invocations = total_invocations.len(),
             "block analyzed"
         );
-        Ok(())
+        Ok((total_creations, total_invocations))
+    }
+}
+
+#[cfg(test)]
+mod tests_with_dep {
+    use std::sync::Arc;
+
+    use libsofl_knowledge::testing::get_bc_provider;
+
+    #[tokio::test(flavor = "multi_thread")]
+    async fn test_analyze_block() {
+        let bp = get_bc_provider();
+
+        let mut analyzer = super::Analyzer::new(Arc::new(bp));
+        let (creations, invocations) =
+            analyzer.analyze_one_block(1000000).await.unwrap();
+
+        assert_eq!(creations.len(), 0);
+        assert_eq!(invocations.len(), 2);
     }
 }

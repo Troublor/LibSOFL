@@ -6,8 +6,8 @@ pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
     pub contract: String,
     #[sea_orm(primary_key, auto_increment = false)]
-    pub from_block: u32,
-    pub to_block: u32,
+    pub from_block: u64,
+    pub to_block: u64,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

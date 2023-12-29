@@ -151,7 +151,7 @@ pub fn compile_contract(
     // compile
     let compiler_output = compiler
         .compile_exact(&compiler_input)
-        .expect("failed to compile yul code");
+        .expect("failed to compile contract code");
     let errs: Vec<Error> = compiler_output
         .errors
         .iter()
