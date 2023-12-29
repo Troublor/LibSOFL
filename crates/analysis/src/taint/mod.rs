@@ -86,6 +86,4 @@ impl<'a, S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<'a, S, P> {
     }
 }
 
-impl<'a, S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<'a, S, P> {
-    
-}
+impl<'a, S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<'a, S, P> {}
