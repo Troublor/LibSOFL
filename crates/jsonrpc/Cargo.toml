@@ -1,6 +1,11 @@
 [package]
 name = "libsofl-jsonrpc"
 version.workspace = true
+authors.workspace = true
+description = "JsonRPC transport for libsofl"
+homepage.workspace = true
+rust-version.workspace = true
+license.workspace = true
 edition.workspace = true
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html

@@ -1,6 +1,11 @@
 [package]
 name = "libsofl-knowledge"
 version.workspace = true
+authors.workspace = true
+description = "Historical transaction mining"
+homepage.workspace = true
+rust-version.workspace = true
+license.workspace = true
 edition.workspace = true
 
 [lib]

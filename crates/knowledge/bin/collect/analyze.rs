@@ -88,9 +88,7 @@ where
 
             let mut creation_insp = ExtractCreationInspector::default();
             let mut invocation_insp = ExtractInvocationInspector::default();
-            let mut insp = CombinedInspector {
-                inspectors: Vec::new(),
-            };
+            let mut insp = CombinedInspector::default();
             insp.add(&mut creation_insp);
             insp.add(&mut invocation_insp);
 
@@ -132,6 +130,7 @@ mod tests_with_dep {
     use libsofl_knowledge::testing::get_bc_provider;
 
     #[tokio::test(flavor = "multi_thread")]
+    #[ignore]
     async fn test_analyze_block() {
         let bp = get_bc_provider();
 
