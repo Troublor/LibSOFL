@@ -204,7 +204,6 @@ mod tests {
             types::{Address, Database},
         },
     };
-    use serde_json::json;
 
     use crate::solidity::{
         caller::HighLevelCaller, scripting::SolScriptConfig,
@@ -239,22 +238,19 @@ mod tests {
     pub fn test_transfer_ether() {
         let mut state = MemoryBcState::fresh();
         let receiver: Address = 0x1234567890abcdef.cvt();
-        let reg = handlebars::Handlebars::new();
-        let code = reg
-            .render_template(
-                r#"
-                contract Script {
-                    constructor() payable {}
-                    function run() public {
-                        address to = {{ address }};
+        let code = format!(
+            r#"
+                contract Script {{
+                    constructor() payable {{ }}
+                    function run() public {{
+                        address to = {};
                         require(address(this).balance >= 1 ether, "insufficient balance");
                         payable(to).transfer(1 ether);
-                    }
-                }
+                    }}
+                }}
             "#,
-                &json!({"address": ConvertTo::<String>::cvt(&receiver)}),
-            )
-            .unwrap();
+            receiver,
+        );
         let _ = run_sol(
             &mut state,
             "0.8.12",

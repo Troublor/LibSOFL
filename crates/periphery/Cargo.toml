@@ -11,15 +11,15 @@ test-using-jsonrpc = []
 
 [dependencies]
 
-libsofl-core = { path = "../core" }
-libsofl-utils = { path = "../utils" }
-libsofl-reth = { path = "../reth" }
-libsofl-jsonrpc = { path = "../jsonrpc" }
+libsofl-core.workspace = true
+libsofl-utils.workspace = true
+libsofl-reth.workspace = true
+libsofl-jsonrpc.workspace = true
 
 paste = "1.0.14"
-lazy_static = "1.4.0"
+lazy_static.workspace = true
 ethers = "2.0.11"
-alloy-sol-types = "0.5.3"
-alloy-sol-macro = { version = "0.5.3", features = ["json"] }
-alloy-dyn-abi = "0.5.3"
-alloy-json-abi = "0.5.3"
+alloy-sol-types.workspace = true
+alloy-sol-macro.workspace = true
+alloy-dyn-abi.workspace = true
+alloy-json-abi.workspace = true

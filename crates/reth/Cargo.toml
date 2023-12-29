@@ -7,24 +7,17 @@ edition = "2021"
 
 [dependencies]
 
-libsofl-core = { path = "../core" }
-libsofl-utils = { path = "../utils" }
+libsofl-core.workspace = true
+libsofl-utils.workspace = true
 
-serde = { version = "1.0.164", features = ["derive"] }
-lazy_static = "1.4.0"
-tokio = { version = "1.28.2", features = ["macros", "rt-multi-thread"] }
+serde.workspace = true
+lazy_static.workspace = true
+tokio.workspace = true
 
 #reth
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13", features = [
-    "arbitrary",
-] }
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13", features = [
-    "mdbx",
-    "test-utils",
-] }
-reth-provider = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13", features = [
-    "test-utils",
-] }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13" }
-reth-beacon-consensus = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13" }
-reth-blockchain-tree = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.13" }
+reth-primitives.workspace = true
+reth-db.workspace = true
+reth-provider.workspace = true
+reth-revm.workspace = true
+reth-beacon-consensus.workspace = true
+reth-blockchain-tree.workspace = true
