@@ -1,39 +1,33 @@
 use libsofl_core::engine::{
     inspector::EvmInspector,
-    state::{self, BcState},
+    state::BcState,
     types::{
-        opcode, Bytes, CallInputs, EVMData, Gas, Inspector, InstructionResult,
-        Interpreter,
+        opcode, Address, Bytes, CallInputs, CreateInputs, EVMData, Gas,
+        Inspector, InstructionResult, Interpreter,
     },
 };
 
 use crate::taint::{
     call::TaintableCall, memory::TaintableMemory, stack::TaintableStack,
-    storage::TaintableStorage, TaintMarker, TaintTracker,
+    TaintTracker,
 };
 
 use super::{
     policy::PropagationPolicy, stack::OPCODE_STACK_DELTA, TaintAnalyzer,
 };
 
-impl<'a, S: BcState, P: PropagationPolicy<S>> Inspector<S>
-    for TaintAnalyzer<'a, S, P>
-{
+impl<S: BcState, P: PropagationPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
     fn step(
         &mut self,
         interp: &mut Interpreter<'_>,
         data: &mut EVMData<'_, S>,
     ) {
-        let mut trackers = self.trackers.borrow_mut();
-        let current_taint_tracker =
-            trackers.last_mut().expect("bug: call stack underflow");
-        self.stack_taint_effects =
-            self.policy.before_step(current_taint_tracker, interp, data);
-        // pop values from taintable stack
-        match interp.current_opcode() {
-            op if opcode::PUSH0 <= op && op <= opcode::PUSH32 => {}
-            op if opcode::DUP1 <= op && op <= opcode::DUP16 => {}
-            op if opcode::SWAP1 <= op && op <= opcode::SWAP16 => {}
+        let state_addr = interp.contract().address;
+        let taint_stack = self.stacks.last_mut().unwrap();
+        let taint_memory = self.memories.last_mut().unwrap();
+        let taint_storage = self.storages.entry(state_addr).or_default();
+        let taint_call = self.calls.last_mut().unwrap();
+        let taint_child_call = match interp.current_opcode() {
             opcode::CREATE
             | opcode::CALL
             | opcode::CALLCODE
@@ -42,8 +36,27 @@ impl<'a, S: BcState, P: PropagationPolicy<S>> Inspector<S>
             | opcode::STATICCALL => {
                 // construct child taintable call
                 let child_call = TaintableCall::default();
-                current_taint_tracker.child_call = Some(child_call);
+                self.child_calls.last_mut().unwrap().replace(child_call);
+                self.child_calls.last_mut().unwrap().as_mut()
             }
+            _ => None,
+        };
+        let mut current_taint_tracker = TaintTracker {
+            stack: taint_stack,
+            memory: taint_memory,
+            storage: taint_storage,
+            call: taint_call,
+            child_call: taint_child_call,
+        };
+
+        self.stack_taint_effects =
+            self.policy
+                .before_step(&mut current_taint_tracker, interp, data);
+        // pop values from taintable stack
+        match interp.current_opcode() {
+            op if opcode::PUSH0 <= op && op <= opcode::PUSH32 => {}
+            op if opcode::DUP1 <= op && op <= opcode::DUP16 => {}
+            op if opcode::SWAP1 <= op && op <= opcode::SWAP16 => {}
             _ => {
                 let (n_pop, _) =
                     OPCODE_STACK_DELTA[interp.current_opcode() as usize];
@@ -58,9 +71,20 @@ impl<'a, S: BcState, P: PropagationPolicy<S>> Inspector<S>
         interp: &mut Interpreter<'_>,
         data: &mut EVMData<'_, S>,
     ) {
-        let mut trackers = self.trackers.borrow_mut();
-        let current_taint_tracker =
-            trackers.last_mut().expect("bug: call stack underflow");
+        let state_addr = interp.contract().address;
+        let taint_stack = self.stacks.last_mut().unwrap();
+        let taint_memory = self.memories.last_mut().unwrap();
+        let taint_storage = self.storages.entry(state_addr).or_default();
+        let taint_call = self.calls.last_mut().unwrap();
+        let taint_child_call = self.child_calls.last_mut().unwrap().as_mut();
+        let mut current_taint_tracker = TaintTracker {
+            stack: taint_stack,
+            memory: taint_memory,
+            storage: taint_storage,
+            call: taint_call,
+            child_call: taint_child_call,
+        };
+
         // push values to taintable stack
         match interp.current_opcode() {
             op if opcode::PUSH0 <= op && op <= opcode::PUSH32 => {
@@ -107,53 +131,100 @@ impl<'a, S: BcState, P: PropagationPolicy<S>> Inspector<S>
             }
         }
 
-        self.policy.after_step(current_taint_tracker, interp, data);
+        self.policy
+            .after_step(&mut current_taint_tracker, interp, data);
     }
 
     fn call(
         &mut self,
-        data: &mut EVMData<'_, S>,
-        inputs: &mut CallInputs,
+        _data: &mut EVMData<'_, S>,
+        _inputs: &mut CallInputs,
     ) -> (InstructionResult, Gas, Bytes) {
-        let mut trackers = self.trackers.borrow_mut();
-        let current_taint_tracker =
-            trackers.last_mut().expect("bug: call stack underflow");
+        let taint_stack = TaintableStack::default();
+        self.stacks.push(taint_stack);
+        let taint_memory = TaintableMemory::default();
+        self.memories.push(taint_memory);
+        let child_call = self.child_calls.last_mut().unwrap().take().unwrap();
+        self.calls.push(child_call);
 
-        let state_addr = inputs.context.address;
-
-        let child_call = current_taint_tracker
-            .child_call
-            .as_mut()
-            .expect("bug: child call not constructed");
-        let mut storages = self.storages.borrow_mut();
-        let child_storage = storages.entry(state_addr).or_default();
-
-        let child_taint = TaintTracker {
-            stack: TaintableStack::default(),
-            memory: TaintableMemory::default(),
-            storage: child_storage,
-            call: child_call,
-            child_call: None,
-        };
-
-        // trackers.push(child_taint);
+        // sanity check
+        assert_eq!(self.calls.len(), self.stacks.len());
+        assert_eq!(self.calls.len(), self.memories.len());
+        assert_eq!(self.calls.len(), self.child_calls.len());
 
         (InstructionResult::Continue, Gas::new(0), Bytes::new())
     }
 
     fn call_end(
         &mut self,
-        data: &mut EVMData<'_, S>,
-        inputs: &CallInputs,
+        _data: &mut EVMData<'_, S>,
+        _inputs: &CallInputs,
         remaining_gas: Gas,
         ret: InstructionResult,
         out: Bytes,
     ) -> (InstructionResult, Gas, Bytes) {
+        self.stacks.pop();
+        self.memories.pop();
+        let child_call = self.calls.pop().unwrap();
+        self.child_calls.last_mut().unwrap().replace(child_call);
+
+        // sanity check
+        assert_eq!(self.calls.len(), self.stacks.len());
+        assert_eq!(self.calls.len(), self.memories.len());
+        assert_eq!(self.calls.len(), self.child_calls.len());
+
         (ret, remaining_gas, out)
+    }
+
+    fn create(
+        &mut self,
+        _data: &mut EVMData<'_, S>,
+        _inputs: &mut CreateInputs,
+    ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
+        let taint_stack = TaintableStack::default();
+        self.stacks.push(taint_stack);
+        let taint_memory = TaintableMemory::default();
+        self.memories.push(taint_memory);
+        let child_call = self.child_calls.last_mut().unwrap().take().unwrap();
+        self.calls.push(child_call);
+
+        // sanity check
+        assert_eq!(self.calls.len(), self.stacks.len());
+        assert_eq!(self.calls.len(), self.memories.len());
+        assert_eq!(self.calls.len(), self.child_calls.len());
+
+        (
+            InstructionResult::Continue,
+            None,
+            Gas::new(0),
+            Bytes::default(),
+        )
+    }
+
+    fn create_end(
+        &mut self,
+        _data: &mut EVMData<'_, S>,
+        _inputs: &CreateInputs,
+        ret: InstructionResult,
+        address: Option<Address>,
+        remaining_gas: Gas,
+        out: Bytes,
+    ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
+        self.stacks.pop();
+        self.memories.pop();
+        let child_call = self.calls.pop().unwrap();
+        self.child_calls.last_mut().unwrap().replace(child_call);
+
+        // sanity check
+        assert_eq!(self.calls.len(), self.stacks.len());
+        assert_eq!(self.calls.len(), self.memories.len());
+        assert_eq!(self.calls.len(), self.child_calls.len());
+
+        (ret, address, remaining_gas, out)
     }
 }
 
-impl<'a, S: BcState, P: PropagationPolicy<S>> EvmInspector<S>
-    for TaintAnalyzer<'a, S, P>
+impl<S: BcState, P: PropagationPolicy<S>> EvmInspector<S>
+    for TaintAnalyzer<S, P>
 {
 }

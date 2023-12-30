@@ -9,10 +9,7 @@ pub mod policy;
 pub mod call;
 pub mod storage;
 
-use std::{
-    cell::{Ref, RefCell},
-    collections::HashMap,
-};
+use std::collections::HashMap;
 
 use libsofl_core::{
     engine::{
@@ -29,10 +26,10 @@ use self::{
 
 pub struct TaintTracker<'a> {
     /// current stack
-    pub stack: TaintableStack,
+    pub stack: &'a mut TaintableStack,
 
     /// current memory
-    pub memory: TaintableMemory,
+    pub memory: &'a mut TaintableMemory,
 
     /// current storage
     pub storage: &'a mut TaintableStorage,
@@ -43,7 +40,7 @@ pub struct TaintTracker<'a> {
     /// the recent child call
     /// This field is the next about-to-happen call if the current opcode is CREATE-like or CALL-like.
     /// This field is the most recent call (if it exists) in other opcode.
-    pub child_call: Option<TaintableCall>,
+    pub child_call: Option<&'a mut TaintableCall>,
 }
 
 pub trait TaintMarker<S: BcState> {
@@ -64,26 +61,34 @@ pub trait TaintMarker<S: BcState> {
 
 pub trait TaintAnalysisSpec<S: BcState>: TaintMarker<S> {}
 
-pub struct TaintAnalyzer<'a, S: BcState, P: PropagationPolicy<S>> {
+pub struct TaintAnalyzer<S: BcState, P: PropagationPolicy<S>> {
     policy: P,
-    storages: RefCell<HashMap<Address, TaintableStorage>>,
-    trackers: RefCell<Vec<TaintTracker<'a>>>,
+    storages: HashMap<Address, TaintableStorage>,
+
+    // nested taintable objects (akin to call stack)
+    stacks: Vec<TaintableStack>,
+    memories: Vec<TaintableMemory>,
+    calls: Vec<TaintableCall>,
+    child_calls: Vec<Option<TaintableCall>>,
 
     /// stack taint effects of the current instruction
     stack_taint_effects: Vec<Option<bool>>,
     _phantom: std::marker::PhantomData<S>,
 }
 
-impl<'a, S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<'a, S, P> {
+impl<S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<S, P> {
     fn new(policy: P, memory_word_size: usize) -> Self {
         Self {
             policy,
-            storages: RefCell::new(HashMap::new()),
-            trackers: RefCell::new(Vec::new()),
+            storages: HashMap::new(),
+            stacks: Vec::new(),
+            memories: Vec::new(),
+            calls: Vec::new(),
+            child_calls: Vec::new(),
             stack_taint_effects: Vec::new(),
             _phantom: std::marker::PhantomData,
         }
     }
 }
 
-impl<'a, S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<'a, S, P> {}
+impl<S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<S, P> {}
