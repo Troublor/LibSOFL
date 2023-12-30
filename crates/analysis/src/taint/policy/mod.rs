@@ -1,7 +1,8 @@
-pub mod arithmetic;
-pub mod bitwise;
-pub mod host;
-pub mod system;
+pub mod call;
+pub mod env;
+pub mod execution;
+pub mod math;
+pub mod nested_call;
 
 use libsofl_core::engine::{
     state::BcState,
@@ -130,15 +131,11 @@ mod tests {
         transition::TransitionSpecBuilder,
     };
 
-    use super::{
-        arithmetic::ArithmeticPolicy, bitwise::BitwisePolicy,
-        system::SystemPolicy,
-    };
+    use super::{env::EnvPolicy, math::MathPolicy};
 
     #[test]
     fn test_compose_multiple_policy() {
-        let policy =
-            policies![ArithmeticPolicy {}, BitwisePolicy {}, SystemPolicy {}];
+        let policy = policies![MathPolicy {}, EnvPolicy {}];
         let mut analyzer = super::super::TaintAnalyzer::new(policy, 32);
         let mut state = MemoryBcState::fresh();
         let spec = TransitionSpecBuilder::default().bypass_check().build();

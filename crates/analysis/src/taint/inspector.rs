@@ -35,7 +35,7 @@ impl<S: BcState, P: PropagationPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
             | opcode::CREATE2
             | opcode::STATICCALL => {
                 // construct child taintable call
-                let child_call = TaintableCall::default();
+                let child_call = TaintableCall::new(self.memory_word_size);
                 self.child_calls.last_mut().unwrap().replace(child_call);
                 self.child_calls.last_mut().unwrap().as_mut()
             }
@@ -142,7 +142,7 @@ impl<S: BcState, P: PropagationPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
     ) -> (InstructionResult, Gas, Bytes) {
         let taint_stack = TaintableStack::default();
         self.stacks.push(taint_stack);
-        let taint_memory = TaintableMemory::default();
+        let taint_memory = TaintableMemory::new(self.memory_word_size);
         self.memories.push(taint_memory);
         let child_call = self.child_calls.last_mut().unwrap().take().unwrap();
         self.calls.push(child_call);
@@ -183,7 +183,7 @@ impl<S: BcState, P: PropagationPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
     ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
         let taint_stack = TaintableStack::default();
         self.stacks.push(taint_stack);
-        let taint_memory = TaintableMemory::default();
+        let taint_memory = TaintableMemory::new(self.memory_word_size);
         self.memories.push(taint_memory);
         let child_call = self.child_calls.last_mut().unwrap().take().unwrap();
         self.calls.push(child_call);

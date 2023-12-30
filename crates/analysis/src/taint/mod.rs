@@ -62,6 +62,7 @@ pub trait TaintMarker<S: BcState> {
 pub trait TaintAnalysisSpec<S: BcState>: TaintMarker<S> {}
 
 pub struct TaintAnalyzer<S: BcState, P: PropagationPolicy<S>> {
+    memory_word_size: usize,
     policy: P,
     storages: HashMap<Address, TaintableStorage>,
 
@@ -77,8 +78,10 @@ pub struct TaintAnalyzer<S: BcState, P: PropagationPolicy<S>> {
 }
 
 impl<S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<S, P> {
+    #[allow(unused)]
     fn new(policy: P, memory_word_size: usize) -> Self {
         Self {
+            memory_word_size,
             policy,
             storages: HashMap::new(),
             stacks: Vec::new(),

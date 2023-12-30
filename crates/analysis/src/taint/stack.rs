@@ -12,6 +12,10 @@ impl TaintableStack {
 }
 
 impl TaintableStack {
+    pub(crate) fn raw(&self) -> &[bool] {
+        &self.stack
+    }
+
     /// Push a number of (un)tainted values to the stack.
     #[deprecated]
     pub(crate) fn push(&mut self, n: usize, tainted: bool) {
@@ -53,62 +57,131 @@ impl TaintableStack {
 }
 
 #[allow(unused_macros)]
-macro_rules! taint_stack_pop {
+macro_rules! taint_stack_borrow {
     ($stack:expr, $x1:ident) => {
-        let $x1 = $stack.pop(1).remove(0);
+        let $x1 = $stack.raw().iter().rev().next().expect("stack underflow");
     };
     ($stack:expr, $x1:ident, $x2:ident) => {
         let ($x1, $x2) = {
-            let mut rs = $stack.pop(2);
-            (rs.remove(0), rs.remove(0))
+            let mut iter = $stack.raw().iter().rev();
+            (
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+            )
         };
     };
     ($stack:expr, $x1:ident, $x2:ident, $x3:ident) => {
         let ($x1, $x2, $x3) = {
-            let mut rs = $stack.pop(3);
-            (rs.remove(0), rs.remove(0), rs.remove(0))
+            let mut iter = $stack.raw().iter().rev();
+            (
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+            )
+        };
+    };
+    ($stack:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident) => {
+        let ($x1, $x2, $x3, $x4) = {
+            let mut iter = $stack.raw().iter().rev();
+            (
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+            )
+        };
+    };
+    ($stack:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident, $x5:ident) => {
+        let ($x1, $x2, $x3, $x4, $x5) = {
+            let mut iter = $stack.raw().iter().rev();
+            (
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+            )
+        };
+    };
+    ($stack:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident, $x5:ident, $x6:ident) => {
+        let ($x1, $x2, $x3, $x4, $x5, $x6) = {
+            let mut iter = $stack.raw().iter().rev();
+            (
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+            )
+        };
+    };
+    ($stack:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident, $x5:ident, $x6:ident, $x7:ident) => {
+        let ($x1, $x2, $x3, $x4, $x5, $x6, $x7) = {
+            let mut iter = $stack.raw().iter().rev();
+            (
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+                iter.next().expect("stack underflow"),
+            )
         };
     };
 }
 
 #[allow(unused_macros)]
-macro_rules! stack_pop {
+macro_rules! stack_borrow {
     ($interp:expr, $x1:ident) => {
-        if $interp.stack.len() < 1 {
-            $interp.instruction_result =
-                libsofl_core::engine::types::InstructionResult::StackUnderflow;
-            panic!("stack underflow");
-        }
-        // Safety: Length is checked above.
-        let $x1 = unsafe { $interp.stack.pop_unsafe() };
+        let mut iter = $interp.stack.data().iter().rev();
+        let $x1 = iter.next().expect("stack underflow");
     };
     ($interp:expr, $x1:ident, $x2:ident) => {
-        if $interp.stack.len() < 2 {
-            $interp.instruction_result =
-                libsofl_core::engine::types::InstructionResult::StackUnderflow;
-            panic!("stack underflow");
-        }
-        // Safety: Length is checked above.
-        let ($x1, $x2) = unsafe { $interp.stack.pop2_unsafe() };
+        let mut iter = $interp.stack.data().iter().rev();
+        let $x1 = iter.next().expect("stack underflow");
+        let $x2 = iter.next().expect("stack underflow");
     };
     ($interp:expr, $x1:ident, $x2:ident, $x3:ident) => {
-        if $interp.stack.len() < 3 {
-            $interp.instruction_result =
-                libsofl_core::engine::types::InstructionResult::StackUnderflow;
-            panic!("stack underflow");
-        }
-        // Safety: Length is checked above.
-        let ($x1, $x2, $x3) = unsafe { $interp.stack.pop3_unsafe() };
+        let mut iter = $interp.stack.data().iter().rev();
+        let $x1 = iter.next().expect("stack underflow");
+        let $x2 = iter.next().expect("stack underflow");
+        let $x3 = iter.next().expect("stack underflow");
     };
-
     ($interp:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident) => {
-        if $interp.stack.len() < 4 {
-            $interp.instruction_result =
-                libsofl_core::engine::types::InstructionResult::StackUnderflow;
-            panic!("stack underflow");
-        }
-        // Safety: Length is checked above.
-        let ($x1, $x2, $x3, $x4) = unsafe { $interp.stack.pop4_unsafe() };
+        let mut iter = $interp.stack.data().iter().rev();
+        let $x1 = iter.next().expect("stack underflow");
+        let $x2 = iter.next().expect("stack underflow");
+        let $x3 = iter.next().expect("stack underflow");
+        let $x4 = iter.next().expect("stack underflow");
+    };
+    ($interp:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident, $x5:ident) => {
+        let mut iter = $interp.stack.data().iter().rev();
+        let $x1 = iter.next().expect("stack underflow");
+        let $x2 = iter.next().expect("stack underflow");
+        let $x3 = iter.next().expect("stack underflow");
+        let $x4 = iter.next().expect("stack underflow");
+        let $x5 = iter.next().expect("stack underflow");
+    };
+    ($interp:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident, $x5:ident, $x6:ident) => {
+        let mut iter = $interp.stack.data().iter().rev();
+        let $x1 = iter.next().expect("stack underflow");
+        let $x2 = iter.next().expect("stack underflow");
+        let $x3 = iter.next().expect("stack underflow");
+        let $x4 = iter.next().expect("stack underflow");
+        let $x5 = iter.next().expect("stack underflow");
+        let $x6 = iter.next().expect("stack underflow");
+    };
+    ($interp:expr, $x1:ident, $x2:ident, $x3:ident, $x4:ident, $x5:ident, $x6:ident, $x7:ident) => {
+        let mut iter = $interp.stack.data().iter().rev();
+        let $x1 = iter.next().expect("stack underflow");
+        let $x2 = iter.next().expect("stack underflow");
+        let $x3 = iter.next().expect("stack underflow");
+        let $x4 = iter.next().expect("stack underflow");
+        let $x5 = iter.next().expect("stack underflow");
+        let $x6 = iter.next().expect("stack underflow");
+        let $x7 = iter.next().expect("stack underflow");
     };
 }
 

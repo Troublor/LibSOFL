@@ -1,5 +1,5 @@
 /// TaintableMemory tracks tainted values in EVM memory.
-#[derive(Clone, Debug, Default)]
+#[derive(Clone, Debug)]
 pub struct TaintableMemory {
     memory: Vec<bool>,
     word_size: usize,
@@ -26,6 +26,19 @@ impl TaintableMemory {
         }
         for i in start..end {
             self.memory[i] = true;
+        }
+    }
+
+    pub fn slice(&self, offset: usize, size: usize) -> TaintableMemory {
+        let start = offset / self.word_size;
+        let end = (offset + size) / self.word_size;
+        let mut rs = Vec::new();
+        for i in start..end {
+            rs.push(self.memory[i]);
+        }
+        TaintableMemory {
+            memory: rs,
+            word_size: self.word_size,
         }
     }
 
