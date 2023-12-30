@@ -21,8 +21,8 @@ use reqwest::Client;
 use crate::blockchain::JsonRpcTx;
 
 pub struct JsonRpcProvider {
-    pub(crate) url: String,
-    pub(crate) p: Arc<Provider<Http<Client>>>,
+    pub url: String,
+    pub p: Arc<Provider<Http<Client>>>,
 
     pub(crate) rt: AsyncRuntime,
 

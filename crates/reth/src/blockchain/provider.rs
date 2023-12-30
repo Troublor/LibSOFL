@@ -52,7 +52,7 @@ lazy_static! {
 
 #[derive(Clone)]
 pub struct RethProvider {
-    pub(crate) bp: RethBlockchainProvider,
+    pub bp: RethBlockchainProvider,
 }
 
 impl RethProvider {
