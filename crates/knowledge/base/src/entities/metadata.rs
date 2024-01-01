@@ -4,8 +4,8 @@ use sea_orm::{entity::prelude::*, ActiveValue};
 #[sea_orm(table_name = "metadata")]
 pub struct Model {
     #[sea_orm(primary_key, auto_increment = false)]
-    key: String,
-    value: String,
+    pub key: String,
+    pub value: String,
 }
 
 #[derive(Copy, Clone, Debug, EnumIter, DeriveRelation)]

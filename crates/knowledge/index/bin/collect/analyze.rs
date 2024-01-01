@@ -14,7 +14,7 @@ use libsofl_core::{
     },
     error::SoflError,
 };
-use libsofl_knowledge::inspectors::{
+use libsofl_knowledge_index::inspectors::{
     extract_creation::ExtractCreationInspector,
     extract_invocation::ExtractInvocationInspector,
 };
@@ -63,7 +63,7 @@ impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
 where
     S::Error: std::fmt::Debug,
 {
-    pub async fn analyze_one_block(
+    pub fn analyze_one_block(
         &mut self,
         block: u64,
     ) -> Result<(Vec<(String, String, bool)>, HashSet<String>), SoflError> {
@@ -127,16 +127,15 @@ where
 mod tests_with_dep {
     use std::sync::Arc;
 
-    use libsofl_knowledge::testing::get_bc_provider;
+    use libsofl_knowledge_index::testing::get_bc_provider;
 
     #[tokio::test(flavor = "multi_thread")]
-    #[ignore]
     async fn test_analyze_block() {
         let bp = get_bc_provider();
 
         let mut analyzer = super::Analyzer::new(Arc::new(bp));
         let (creations, invocations) =
-            analyzer.analyze_one_block(1000000).await.unwrap();
+            analyzer.analyze_one_block(1000000).unwrap();
 
         assert_eq!(creations.len(), 0);
         assert_eq!(invocations.len(), 2);

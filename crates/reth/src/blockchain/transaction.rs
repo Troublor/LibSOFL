@@ -7,7 +7,7 @@ use libsofl_core::{
     error::SoflError,
 };
 use reth_primitives::revm::env::fill_tx_env;
-use reth_primitives::{Transaction, TransactionMeta, TransactionSigned};
+use reth_primitives::{TransactionMeta, TransactionSigned};
 use reth_provider::{ReceiptProvider, TransactionsProvider};
 
 use crate::conversion::ConvertTo;
@@ -16,7 +16,7 @@ use super::provider::RethBlockchainProvider;
 
 /// A wrapper of reth transaction.
 pub struct RethTx {
-    pub(crate) tx: Transaction,
+    pub tx: TransactionSigned,
     pub(crate) hash: TxHash,
     pub(crate) sender: Address,
 
@@ -30,12 +30,14 @@ pub struct RethTx {
 impl From<TransactionSigned> for RethTx {
     fn from(tx: TransactionSigned) -> Self {
         let hash = tx.hash();
-        let sender = tx.recover_signer().expect("invalid signature").cvt();
-        let tx = tx.transaction;
+        let sender = tx
+            .recover_signer_unchecked()
+            .expect(format!("invalid signature for tx {}", hash).as_str())
+            .cvt();
         Self {
             tx,
-            hash,
             sender,
+            hash,
             meta: None,
             success: None,
             output: None,
@@ -103,7 +105,7 @@ impl Tx for RethTx {
 
     #[doc = " Fill the revm transaction environment."]
     fn fill_tx_env(&self, env: &mut TxEnv) -> Result<(), SoflError> {
-        fill_tx_env(env, Box::new(self.tx.clone()), self.sender());
+        fill_tx_env(env, Box::new(self.tx.transaction.clone()), self.sender());
         Ok(())
     }
 

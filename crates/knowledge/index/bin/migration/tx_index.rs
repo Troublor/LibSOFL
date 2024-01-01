@@ -10,12 +10,12 @@ impl MigrationTrait for Migration {
         let schema = Schema::new(manager.get_database_backend());
         manager
             .create_table(schema.create_table_from_entity(
-                libsofl_knowledge::entities::creation::Entity,
+                libsofl_knowledge_index::entities::creation::Entity,
             ))
             .await?;
         manager
             .create_table(schema.create_table_from_entity(
-                libsofl_knowledge::entities::invocation::Entity,
+                libsofl_knowledge_index::entities::invocation::Entity,
             ))
             .await
     }
@@ -24,14 +24,16 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(
                 Table::drop()
-                    .table(libsofl_knowledge::entities::invocation::Entity)
+                    .table(
+                        libsofl_knowledge_index::entities::invocation::Entity,
+                    )
                     .to_owned(),
             )
             .await?;
         manager
             .drop_table(
                 Table::drop()
-                    .table(libsofl_knowledge::entities::creation::Entity)
+                    .table(libsofl_knowledge_index::entities::creation::Entity)
                     .to_owned(),
             )
             .await

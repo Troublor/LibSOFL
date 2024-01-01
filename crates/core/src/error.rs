@@ -29,6 +29,9 @@ pub enum SoflError {
     #[display(fmt = "Err invalid abi encoding/decoding: {}", _0)]
     Abi(String),
 
+    #[display(fmt = "Execution interrupted")]
+    Interrupted,
+
     #[display(fmt = "Err: {}", _0)]
     Custom(String),
 }

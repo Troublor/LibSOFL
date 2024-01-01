@@ -1,8 +1,9 @@
 use sea_orm::{
-    entity, ConnectionTrait, Database, DatabaseConnection, DbBackend, Schema,
+    ConnectionTrait, Database, DatabaseConnection, DbBackend, Schema,
 };
 
 use crate::entities;
+use libsofl_knowledge_base::entities as base_entities;
 
 pub async fn setup_test_db() -> DatabaseConnection {
     // Connecting SQLite
@@ -10,7 +11,7 @@ pub async fn setup_test_db() -> DatabaseConnection {
     // Setup Schema helper
     let schema = Schema::new(DbBackend::Sqlite);
     // Create the database
-    let sql = schema.create_table_from_entity(entities::metadata::Entity);
+    let sql = schema.create_table_from_entity(base_entities::metadata::Entity);
     db.execute(db.get_database_backend().build(&sql))
         .await
         .unwrap();

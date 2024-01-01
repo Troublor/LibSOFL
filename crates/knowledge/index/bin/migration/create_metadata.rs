@@ -10,7 +10,7 @@ impl MigrationTrait for Migration {
         let schema = Schema::new(manager.get_database_backend());
         manager
             .create_table(schema.create_table_from_entity(
-                libsofl_knowledge::entities::metadata::Entity,
+                libsofl_knowledge_base::entities::metadata::Entity,
             ))
             .await
     }
@@ -19,7 +19,7 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(
                 Table::drop()
-                    .table(libsofl_knowledge::entities::metadata::Entity)
+                    .table(libsofl_knowledge_base::entities::metadata::Entity)
                     .to_owned(),
             )
             .await

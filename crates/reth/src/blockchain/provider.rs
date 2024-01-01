@@ -238,7 +238,7 @@ impl BcProvider<RethTx> for RethProvider {
     ) -> Result<(), SoflError> {
         let tx = self.tx(tx)?;
         let sender = tx.sender();
-        fill_tx_env(env, Box::new(tx.tx), sender.cvt());
+        fill_tx_env(env, Box::new(tx.tx.transaction), sender.cvt());
         Ok(())
     }
 
