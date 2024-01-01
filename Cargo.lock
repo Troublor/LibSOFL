@@ -3832,6 +3832,7 @@ dependencies = [
  "tokio",
  "tokio-util",
  "tracing-indicatif",
+ "tracing-subscriber",
 ]
 
 [[package]]

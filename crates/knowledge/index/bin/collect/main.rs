@@ -3,17 +3,22 @@ use std::sync::Arc;
 use clap::Parser;
 use data::DataStore;
 use futures::stream::StreamExt;
+use indicatif::ProgressStyle;
 use libsofl_core::error::SoflError;
 use libsofl_knowledge_index::config::KnowledgeConfig;
 use libsofl_reth::config::RethConfig;
 use libsofl_utils::{
     config::Config,
-    log::{config::LogConfig, error, info, warn},
+    log::{error, info, info_span, span::Span, warn},
 };
 use sea_orm::DbErr;
 use signal_hook::consts::signal::*;
 use signal_hook_tokio::Signals;
 use tokio_util::{sync::CancellationToken, task::TaskTracker};
+use tracing_indicatif::{span_ext::IndicatifSpanExt, IndicatifLayer};
+use tracing_subscriber::{
+    layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
+};
 
 pub mod analyze;
 pub mod data;
@@ -23,9 +28,6 @@ pub mod data;
 struct Arg {
     #[arg(short, long, default_value = "info")]
     level: String,
-
-    #[arg(short, long, default_value = None)]
-    file: Option<String>, // log file path
 
     #[arg(short, long, default_value = "8")]
     jobs: usize,
@@ -40,12 +42,22 @@ struct Arg {
 #[tokio::main(worker_threads = 32)]
 async fn main() {
     let args = Arg::parse();
-    let log_cfg = LogConfig {
-        console_level: args.level.clone(),
-        file_level: args.level.clone(),
-        file: args.file.clone(),
-    };
-    log_cfg.init();
+
+    // prepare logger
+    let indicatif_layer = IndicatifLayer::new();
+    let log_filter = EnvFilter::try_from_default_env()
+        .or_else(|_| EnvFilter::try_new(args.level))
+        .expect("failed to create console logger filter");
+    tracing_subscriber::registry()
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_writer(indicatif_layer.get_stderr_writer())
+                .with_target(false)
+                .with_filter(log_filter),
+        )
+        .with(indicatif_layer)
+        .init();
+
     info!(
         until = args.until_block,
         "start indexing transaction hisotry"
@@ -104,9 +116,15 @@ async fn collect_blocks(
     let analyzer = analyze::Analyzer::new(provider);
     let mut store = DataStore::new(&db, db_flush_threshold).await.unwrap();
 
-    for block in
-        ((store.get_last_finished_block() + 1)..until_block).step_by(step)
-    {
+    let range = (store.get_last_finished_block() + 1)..until_block;
+
+    let progress_span = info_span!("tx-index");
+    progress_span.pb_set_style(&ProgressStyle::default_bar());
+    progress_span.pb_set_length(range.end - 1);
+    let header_span_enter = progress_span.enter();
+    progress_span.pb_set_position(range.start - 1);
+
+    for block in range.step_by(step) {
         let mut tasks = Vec::new();
         for bn in block..(block + step as u64).min(until_block) {
             let mut analyzer_cloned = analyzer.clone();
@@ -126,9 +144,16 @@ async fn collect_blocks(
                 break;
             }
             let task = tasks.remove(0);
-            match task.await.unwrap() {
+            let _ = match task.await.unwrap() {
                 Ok((creations, invocations)) => {
-                    let r = store.add_creations(bn, creations).await;
+                    let r =
+                        store.add_creations(bn, creations).await.or_else(|e| {
+                            if e == DbErr::RecordNotInserted {
+                                Ok(())
+                            } else {
+                                Err(e)
+                            }
+                        });
                     if let Err(e) = r {
                         if e != DbErr::RecordNotInserted {
                             error!(
@@ -137,7 +162,7 @@ async fn collect_blocks(
                                 "failed to add creations"
                             );
                             store.add_failed_block(bn);
-                            continue;
+                            ()
                         }
                     }
                     let r = store.add_invocations(bn, invocations).await;
@@ -149,7 +174,7 @@ async fn collect_blocks(
                                 "failed to add invocations"
                             );
                             store.add_failed_block(bn);
-                            continue;
+                            ()
                         }
                     }
                 }
@@ -165,9 +190,13 @@ async fn collect_blocks(
                     );
                     store.add_failed_block(bn);
                 }
-            }
+            };
             store.update_last_finished_block(bn);
+            Span::current().pb_inc(1);
         }
     }
     store.save_progress().await.unwrap();
+
+    drop(header_span_enter);
+    drop(progress_span);
 }

@@ -1,6 +1,9 @@
 pub mod config;
 
-pub use tracing::{debug, error, event, info, trace, warn, Level};
+pub use tracing::{
+    debug, debug_span, error, error_span, event, info, info_span, span, trace,
+    trace_span, warn, warn_span, Level, Subscriber,
+};
 use tracing_subscriber::{
     layer::SubscriberExt, util::SubscriberInitExt, EnvFilter, Layer,
 };

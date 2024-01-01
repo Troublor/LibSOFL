@@ -18,7 +18,7 @@ use libsofl_knowledge_index::inspectors::{
     extract_creation::ExtractCreationInspector,
     extract_invocation::ExtractInvocationInspector,
 };
-use libsofl_utils::log::info;
+use libsofl_utils::log::debug;
 
 pub struct Analyzer<
     T: Tx,
@@ -113,7 +113,7 @@ where
                 .collect();
             total_invocations.extend(invocations);
         }
-        info!(
+        debug!(
             block = block,
             creations = total_creations.len(),
             invocations = total_invocations.len(),
