@@ -5,6 +5,7 @@ pub use revm::Database;
 pub use revm::DatabaseCommit;
 pub use revm::DatabaseRef;
 
+use super::types::Bytecode;
 use super::{
     inspector::EvmInspector,
     transition::TransitionSpec,
@@ -188,6 +189,22 @@ pub trait BcState:
         changes.into_iter().for_each(|c| self.commit(c));
     }
 
+    fn get_account_code(
+        &mut self,
+        address: Address,
+    ) -> Result<Bytecode, SoflError> {
+        let account = self
+            .basic(address)
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
+            .unwrap_or_default();
+        Ok(account.code.unwrap_or_default())
+    }
+
     /// Set a new value to a storage slot of an account.
     fn insert_account_storage(
         &mut self,
@@ -258,6 +275,36 @@ pub trait BcState:
         changes.insert(address, account);
         self.commit(changes);
         Ok(())
+    }
+
+    /// Replace the code of an account.
+    /// Returns the original code.
+    fn replace_account_code(
+        &mut self,
+        address: Address,
+        code: Bytecode,
+    ) -> Result<Bytecode, SoflError> {
+        let mut account_info = self
+            .basic(address)
+            .map_err(|e| {
+                SoflError::BcState(format!(
+                    "failed to get account basic: {:?}",
+                    e
+                ))
+            })?
+            .unwrap_or_default();
+        let original_code = account_info.code.unwrap_or_default();
+        account_info.code_hash = code.hash_slow();
+        account_info.code = Some(code);
+        let account = Account {
+            info: account_info,
+            storage: Default::default(),
+            status: AccountStatus::Touched,
+        };
+        let mut changes = StateChange::new();
+        changes.insert(address, account);
+        self.commit(changes);
+        Ok(original_code)
     }
 }
 

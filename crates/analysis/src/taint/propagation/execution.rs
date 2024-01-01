@@ -3,11 +3,12 @@ use libsofl_core::{
     engine::{state::BcState, types::opcode},
 };
 
-use super::PropagationPolicy;
+use crate::taint::policy::TaintPolicy;
 
+#[derive(Debug, Clone, Default)]
 pub struct ExecutionPolicy {}
 
-impl<S: BcState> PropagationPolicy<S> for ExecutionPolicy {
+impl<S: BcState> TaintPolicy<S> for ExecutionPolicy {
     #[inline]
     fn before_step(
         &mut self,

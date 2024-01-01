@@ -56,7 +56,7 @@ pub fn run_sol<S: BcState>(
     config: SolScriptConfig,
 ) -> Result<Bytes, SoflError> {
     // compile
-    let contracts = compile_contract(solidity_version, code)?;
+    let contracts = compile_solidity(solidity_version, code)?;
     let (_, bytecode) = contracts
         .iter()
         .filter(|(n, _)| n.ends_with("Script"))
@@ -105,7 +105,7 @@ pub fn deploy_contracts<S: BcState>(
     contract_names: Vec<&str>,
     config: SolScriptConfig,
 ) -> Result<Vec<Address>, SoflError> {
-    let contracts = compile_contract(solidity_version, contract_code)?;
+    let contracts = compile_solidity(solidity_version, contract_code)?;
     let deployer = config.deployer.unwrap_or_default();
     let mut addresses = Vec::new();
     for n in contract_names {
@@ -133,17 +133,33 @@ pub fn deploy_contracts<S: BcState>(
 
 /// Compile a solidity string.
 /// Return a map from contract name to its deployment bytecode.
+pub fn compile_solidity(
+    compiler_version: &str,
+    code: impl ToString,
+) -> Result<Vec<(String, Bytes)>, SoflError> {
+    compile_contract(compiler_version, code, false)
+}
+
+pub fn compile_yul(
+    compiler_version: &str,
+    code: impl ToString,
+) -> Result<Vec<(String, Bytes)>, SoflError> {
+    compile_contract(compiler_version, code, true)
+}
+
 pub fn compile_contract(
-    solidity_version: &str,
+    compiler_version: &str,
     contract_code: impl ToString,
+    is_yul: bool,
 ) -> Result<Vec<(String, Bytes)>, SoflError> {
     // prepare compiler input
-    let compiler = Solc::find_or_install_svm_version(solidity_version)
+    let compiler = Solc::find_or_install_svm_version(compiler_version)
         .expect("solc version not found");
     let version = compiler.version().expect("failed to get solc version");
     let source = Source::new(contract_code.to_string());
     let mut sources = Sources::new();
-    sources.insert(PathBuf::from("code.sol"), source);
+    let file = if is_yul { "code.yul" } else { "code.sol" };
+    sources.insert(PathBuf::from(file), source);
     let compiler_input = CompilerInput::with_sources(sources)
         .remove(0)
         .normalize_evm_version(&version);
@@ -159,7 +175,7 @@ pub fn compile_contract(
         .map(|e| e.to_owned())
         .collect();
     if errs.len() > 0 {
-        error!(errors = errs.len(), "failed to compile yul code",);
+        error!(errors = errs.len(), "failed to compile code",);
         for e in errs {
             eprintln!("{}", e);
         }
@@ -167,7 +183,7 @@ pub fn compile_contract(
     } else {
         let contracts = compiler_output
             .contracts
-            .get("code.sol")
+            .get(file)
             .expect("file not found in compiler output")
             .into_iter()
             .map(|(n, c)| {
@@ -191,6 +207,50 @@ pub fn compile_contract(
     }
 }
 
+#[derive(Debug, Clone, Default)]
+pub struct YulScriptConfig {
+    pub contract: Address, // under the context of which the yul code is executed
+    pub caller: Address,
+    pub value: U256,
+    pub data: Bytes,
+    pub gas_limit: Option<u64>,
+    pub block: BlockEnv,
+    pub cfg: CfgEnv,
+}
+
+/// Run yul code under the state of a contract.
+/// The code of the config.contract will be first replaced to the yul code,
+/// and then the yul code will be executed with the env speicified in config.
+/// Note that if there are multiple yul contract in the code, only the first one will be executed.
+pub fn run_yul<S: BcState>(
+    mut state: S,
+    compiler_version: &str,
+    code: &str,
+    config: YulScriptConfig,
+) -> Result<Bytes, SoflError> {
+    let (_, bytecode) = compile_yul(compiler_version, code)?.remove(0);
+    let original_code = state
+        .basic(config.contract)
+        .unwrap()
+        .unwrap_or_default()
+        .code
+        .unwrap_or_default();
+    state.replace_account_code(config.contract, bytecode.cvt())?;
+    let ret = HighLevelCaller::new(config.caller)
+        .bypass_check()
+        .set_block(config.block)
+        .set_cfg(config.cfg)
+        .call(
+            &mut state,
+            config.contract,
+            config.data,
+            Some(config.value),
+            no_inspector(),
+        )?;
+    state.replace_account_code(config.contract, original_code)?;
+    Ok(ret)
+}
+
 #[cfg(test)]
 mod tests {
     use alloy_dyn_abi::JsonAbiExt;
@@ -209,7 +269,7 @@ mod tests {
         caller::HighLevelCaller, scripting::SolScriptConfig,
     };
 
-    use super::{deploy_contracts, run_sol};
+    use super::{deploy_contracts, run_sol, run_yul, YulScriptConfig};
 
     #[test]
     pub fn test_run_sol_simple() {
@@ -330,5 +390,56 @@ mod tests {
             .unwrap();
         let ret = sol_data::String::abi_decode(&ret, true).unwrap();
         assert_eq!(ret, "first");
+    }
+
+    #[test]
+    fn test_run_yul() {
+        let mut state = MemoryBcState::fresh();
+        let code = r#"
+                contract A {
+                    uint public x = 1;
+                }
+            "#;
+        let addr = deploy_contracts(
+            &mut state,
+            "0.8.12",
+            code,
+            vec!["A"],
+            Default::default(),
+        )
+        .unwrap()
+        .remove(0);
+
+        let yul = r#"
+            object "A" {
+                code {
+                    let slot := 0x00
+                    let value := sload(slot)
+                    value := add(value, 1)
+                    mstore(0x00, value)
+                    return (0x00, 0x20)
+                }
+            }
+        "#;
+        let ret = run_yul(
+            &mut state,
+            "0.8.12",
+            yul,
+            YulScriptConfig {
+                contract: addr,
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        let ret = sol_data::Uint::<256>::abi_decode(&ret, true).unwrap();
+        assert_eq!(ConvertTo::<usize>::cvt(&ret), 2);
+
+        // the code of the contract should remain unchanged
+        let ret = HighLevelCaller::default()
+            .bypass_check()
+            .view(&mut state, addr, "x() returns (uint)", &[], no_inspector())
+            .unwrap()
+            .remove(0);
+        assert_eq!(ConvertTo::<usize>::cvt(&ret.as_uint().unwrap().0), 1);
     }
 }

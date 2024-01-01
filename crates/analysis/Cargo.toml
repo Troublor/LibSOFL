@@ -13,5 +13,9 @@ edition.workspace = true
 [dependencies]
 
 libsofl-core.workspace = true
+libsofl-utils.workspace = true
+
+alloy-sol-types.workspace = true
+alloy-dyn-abi.workspace = true
 
 auto_impl.workspace = true

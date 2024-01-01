@@ -53,7 +53,7 @@ impl<BS: BcState> EvmInspector<BS> for ExtractCreationInspector {}
 mod tests {
     use libsofl_core::engine::memory::MemoryBcState;
     use libsofl_utils::solidity::{
-        caller::HighLevelCaller, scripting::compile_contract,
+        caller::HighLevelCaller, scripting::compile_solidity,
     };
 
     #[test]
@@ -74,7 +74,7 @@ mod tests {
             }}
             "#,
         );
-        let (_, bytecode) = compile_contract("0.8.12", code)
+        let (_, bytecode) = compile_solidity("0.8.12", code)
             .unwrap()
             .into_iter()
             .filter(|(n, _)| n == "B")

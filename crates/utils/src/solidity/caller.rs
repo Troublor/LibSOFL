@@ -1,3 +1,6 @@
+pub use alloy_dyn_abi::{DynSolEvent, DynSolType};
+use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
+use alloy_json_abi::Function;
 use alloy_sol_types::{Revert, SolError};
 use libsofl_core::{
     blockchain::{provider::BcProvider, transaction::Tx},
@@ -285,68 +288,40 @@ impl HighLevelCaller {
         }
     }
 
-    // pub fn view<'a, BS: BcState, I: EvmInspector<&'a mut BS>, F: SolInterface>(
-    //     &self,
-    //     state: &'a mut BS,
-    //     callee: Address,
-    //     func: &F,
-    //     args: &[ethers::abi::Token],
-    //     inspector: &mut I,
-    // ) -> Result<Vec<ethers::abi::Token>, SoflError> {
-    // let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
-    // let ret = self.static_call(state, callee, &calldata, inspector)?;
-    // func.decode_output(ret.to_vec().as_slice())
-    //     .map_err(SoflError::Abi)
-    // todo!()
-    // }
+    pub fn view<'a, BS: BcState, I: EvmInspector<&'a mut BS>>(
+        &self,
+        state: &'a mut BS,
+        callee: Address,
+        func: &str,
+        args: &[DynSolValue],
+        inspector: &mut I,
+    ) -> Result<Vec<DynSolValue>, SoflError> {
+        let f = Function::parse(func)
+            .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
+        let calldata = f
+            .abi_encode_input(args)
+            .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
+        let ret = self.static_call(state, callee, calldata.cvt(), inspector)?;
+        f.abi_decode_output(&ret, true)
+            .map_err(|e| SoflError::Abi(format!("{:?}", e)))
+    }
 
-    // pub fn invoke<'a, BS: Database + DatabaseCommit, I: InspectorWithTxHook<&'a mut BS>>(
-    //     &self,
-    //     state: &'a mut BS,
-    //     callee: Address,
-    //     func: &ethers::abi::Function,
-    //     args: &[ethers::abi::Token],
-    //     value: Option<U256>,
-    //     inspector: &mut I,
-    // ) -> Result<Vec<ethers::abi::Token>, SoflError<BS::Error>> {
-    //     let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
-    //     let ret = self.call(state, callee, &calldata, value, inspector)?;
-    //     func.decode_output(ret.to_vec().as_slice())
-    //         .map_err(SoflError::Abi)
-    // }
-
-    // pub fn view_ignore_return<
-    //     'a,
-    //     BS: Database + DatabaseCommit,
-    //     I: InspectorWithTxHook<&'a mut BS>,
-    // >(
-    //     &self,
-    //     state: &'a mut BS,
-    //     callee: Address,
-    //     func: &ethers::abi::Function,
-    //     args: &[ethers::abi::Token],
-    //     inspector: &mut I,
-    // ) -> Result<(), SoflError<BS::Error>> {
-    //     let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
-    //     self.static_call(state, callee, &calldata, inspector)?;
-    //     Ok(())
-    // }
-
-    // pub fn invoke_ignore_return<
-    //     'a,
-    //     BS: Database + DatabaseCommit,
-    //     I: InspectorWithTxHook<&'a mut BS>,
-    // >(
-    //     &self,
-    //     state: &'a mut BS,
-    //     callee: Address,
-    //     func: &ethers::abi::Function,
-    //     args: &[ethers::abi::Token],
-    //     value: Option<U256>,
-    //     inspector: &mut I,
-    // ) -> Result<(), SoflError<BS::Error>> {
-    //     let calldata = func.encode_input(args).map_err(SoflError::Abi)?;
-    //     self.call(state, callee, &calldata, value, inspector)?;
-    //     Ok(())
-    // }
+    pub fn invoke<'a, BS: BcState, I: EvmInspector<&'a mut BS>>(
+        &self,
+        state: &'a mut BS,
+        callee: Address,
+        func: &str,
+        args: &[DynSolValue],
+        value: Option<U256>,
+        inspector: &mut I,
+    ) -> Result<Vec<DynSolValue>, SoflError> {
+        let f = Function::parse(func)
+            .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
+        let calldata = f
+            .abi_encode_input(args)
+            .map_err(|e| SoflError::Abi(format!("{:?}", e)))?;
+        let ret = self.call(state, callee, calldata.cvt(), value, inspector)?;
+        f.abi_decode_output(&ret, true)
+            .map_err(|e| SoflError::Abi(format!("{:?}", e)))
+    }
 }

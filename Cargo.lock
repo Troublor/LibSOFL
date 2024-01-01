@@ -3760,8 +3760,11 @@ dependencies = [
 name = "libsofl-analysis"
 version = "0.1.0"
 dependencies = [
+ "alloy-dyn-abi",
+ "alloy-sol-types",
  "auto_impl",
  "libsofl-core",
+ "libsofl-utils",
 ]
 
 [[package]]

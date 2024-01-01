@@ -9,35 +9,35 @@ use libsofl_core::engine::{
     types::{EVMData, Interpreter},
 };
 
-use super::TaintTracker;
-
-#[auto_impl::auto_impl(&mut, Box)]
-pub trait PropagationPolicy<S: BcState> {
-    /// Propagate taint before the execution of an instruction.
-    /// The returned vector contains the stack taint effects of the instruction.
-    /// The stack taint effects specifies which stack elements are tainted after the execution of the instruction.
-    /// The returned vector is considered to match the stack top, i.e., the last element of the vector is the top of the stack.
-    /// True means that the stack element at the position should be tainted.
-    /// False means that the stack element at the position should be clean.
-    /// None means that the stack element at the position should be left unchanged.
-    fn before_step(
-        &mut self,
-        taint_tracker: &mut TaintTracker,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, S>,
-    ) -> Vec<Option<bool>>;
-
-    /// Propagate taint after the execution of an instruction.
-    fn after_step(
-        &mut self,
-        _taint_tracker: &mut TaintTracker,
-        _interp: &mut Interpreter<'_>,
-        _data: &mut EVMData<'_, S>,
-    ) {
-    }
+#[macro_export]
+macro_rules! default_policy {
+    () => {
+        policies![
+            crate::taint::propagation::math::MathPolicy::default(),
+            crate::taint::propagation::env::EnvPolicy::default(),
+            crate::taint::propagation::call::CallPolicy::default(),
+            crate::taint::propagation::execution::ExecutionPolicy::default(),
+            crate::taint::propagation::nested_call::NestedCallPolicy::default()
+        ]
+    };
 }
 
-impl<S: BcState> PropagationPolicy<S> for () {
+#[macro_export]
+macro_rules! policies {
+    ($p:expr) => {
+        $p
+    };
+    ($p1:expr, $p2:expr) => {
+        ($p1, $p2)
+    };
+    ($p1:expr, $p2:expr, $($pTail:expr),+) => {
+        ($p1, policies!($p2, $($pTail),+))
+    };
+}
+
+use super::{policy::TaintPolicy, TaintTracker};
+
+impl<S: BcState> TaintPolicy<S> for () {
     #[inline]
     fn before_step(
         &mut self,
@@ -52,14 +52,15 @@ impl<S: BcState> PropagationPolicy<S> for () {
     fn after_step(
         &mut self,
         _taint_tracker: &mut TaintTracker,
+        _op: u8,
         _interp: &mut Interpreter<'_>,
         _data: &mut EVMData<'_, S>,
     ) {
     }
 }
 
-impl<S: BcState, P1: PropagationPolicy<S>, P2: PropagationPolicy<S>>
-    PropagationPolicy<S> for (P1, P2)
+impl<S: BcState, P1: TaintPolicy<S>, P2: TaintPolicy<S>> TaintPolicy<S>
+    for (P1, P2)
 {
     /// Propagate taint before the execution of an instruction.
     /// First, propagate taint according to the first policy.
@@ -103,42 +104,11 @@ impl<S: BcState, P1: PropagationPolicy<S>, P2: PropagationPolicy<S>>
     fn after_step(
         &mut self,
         taint_tracker: &mut TaintTracker,
+        op: u8,
         interp: &mut Interpreter<'_>,
         data: &mut EVMData<'_, S>,
     ) {
-        self.0.after_step(taint_tracker, interp, data);
-        self.1.after_step(taint_tracker, interp, data);
-    }
-}
-
-#[allow(unused_macros)]
-macro_rules! policies {
-    ($p:expr) => {
-        $p
-    };
-    ($p1:expr, $p2:expr) => {
-        ($p1, $p2)
-    };
-    ($p1:expr, $p2:expr, $($pTail:expr),+) => {
-        ($p1, policies!($p2, $($pTail),+))
-    };
-}
-
-#[cfg(test)]
-mod tests {
-    use libsofl_core::engine::{
-        memory::MemoryBcState, state::BcState,
-        transition::TransitionSpecBuilder,
-    };
-
-    use super::{env::EnvPolicy, math::MathPolicy};
-
-    #[test]
-    fn test_compose_multiple_policy() {
-        let policy = policies![MathPolicy {}, EnvPolicy {}];
-        let mut analyzer = super::super::TaintAnalyzer::new(policy, 32);
-        let mut state = MemoryBcState::fresh();
-        let spec = TransitionSpecBuilder::default().bypass_check().build();
-        state.transit(spec, &mut analyzer).unwrap();
+        self.0.after_step(taint_tracker, op, interp, data);
+        self.1.after_step(taint_tracker, op, interp, data);
     }
 }

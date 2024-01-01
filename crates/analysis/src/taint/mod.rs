@@ -7,6 +7,9 @@ pub mod stack;
 #[macro_use]
 pub mod policy;
 pub mod call;
+pub mod propagation;
+pub mod sink;
+pub mod source;
 pub mod storage;
 
 use std::collections::HashMap;
@@ -20,7 +23,7 @@ use libsofl_core::{
 };
 
 use self::{
-    call::TaintableCall, memory::TaintableMemory, policy::PropagationPolicy,
+    call::TaintableCall, memory::TaintableMemory, policy::TaintPolicy,
     stack::TaintableStack, storage::TaintableStorage,
 };
 
@@ -61,7 +64,7 @@ pub trait TaintMarker<S: BcState> {
 
 pub trait TaintAnalysisSpec<S: BcState>: TaintMarker<S> {}
 
-pub struct TaintAnalyzer<S: BcState, P: PropagationPolicy<S>> {
+pub struct TaintAnalyzer<S: BcState, P: TaintPolicy<S>> {
     memory_word_size: usize,
     policy: P,
     storages: HashMap<Address, TaintableStorage>,
@@ -69,7 +72,7 @@ pub struct TaintAnalyzer<S: BcState, P: PropagationPolicy<S>> {
     // nested taintable objects (akin to call stack)
     stacks: Vec<TaintableStack>,
     memories: Vec<TaintableMemory>,
-    calls: Vec<TaintableCall>,
+    calls: Vec<(TaintableCall, Option<u8>)>,
     child_calls: Vec<Option<TaintableCall>>,
 
     /// stack taint effects of the current instruction
@@ -77,7 +80,7 @@ pub struct TaintAnalyzer<S: BcState, P: PropagationPolicy<S>> {
     _phantom: std::marker::PhantomData<S>,
 }
 
-impl<S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<S, P> {
+impl<S: BcState, P: TaintPolicy<S>> TaintAnalyzer<S, P> {
     #[allow(unused)]
     fn new(policy: P, memory_word_size: usize) -> Self {
         Self {
@@ -94,4 +97,4 @@ impl<S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<S, P> {
     }
 }
 
-impl<S: BcState, P: PropagationPolicy<S>> TaintAnalyzer<S, P> {}
+impl<S: BcState, P: TaintPolicy<S>> TaintAnalyzer<S, P> {}

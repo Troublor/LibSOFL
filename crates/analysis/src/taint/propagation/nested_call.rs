@@ -3,11 +3,12 @@ use libsofl_core::{
     engine::{state::BcState, types::opcode},
 };
 
-use super::PropagationPolicy;
+use crate::taint::policy::TaintPolicy;
 
+#[derive(Debug, Clone, Default)]
 pub struct NestedCallPolicy {}
 
-impl<S: BcState> PropagationPolicy<S> for NestedCallPolicy {
+impl<S: BcState> TaintPolicy<S> for NestedCallPolicy {
     #[inline]
     fn before_step(
         &mut self,
@@ -181,10 +182,11 @@ impl<S: BcState> PropagationPolicy<S> for NestedCallPolicy {
     fn after_step(
         &mut self,
         taint_tracker: &mut crate::taint::TaintTracker,
-        interp: &mut libsofl_core::engine::types::Interpreter<'_>,
+        op: u8,
+        _interp: &mut libsofl_core::engine::types::Interpreter<'_>,
         _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
     ) {
-        match interp.current_opcode() {
+        match op {
             opcode::CALL
             | opcode::CALLCODE
             | opcode::DELEGATECALL

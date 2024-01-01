@@ -29,12 +29,20 @@ impl TaintableMemory {
         }
     }
 
+    /// Copy a slice of the taintable memory.
     pub fn slice(&self, offset: usize, size: usize) -> TaintableMemory {
         let start = offset / self.word_size;
         let end = (offset + size) / self.word_size;
         let mut rs = Vec::new();
-        for i in start..end {
-            rs.push(self.memory[i]);
+        if end < self.memory.len() {
+            for i in start..end {
+                rs.push(self.memory[i]);
+            }
+        } else {
+            for i in start..self.memory.len() {
+                rs.push(self.memory[i]);
+            }
+            rs.resize(end - self.memory.len(), false);
         }
         TaintableMemory {
             memory: rs,

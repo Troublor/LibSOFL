@@ -60,6 +60,8 @@ impl<S: revm::DatabaseRef> MemoryBcState<S> {
     }
 }
 
+pub type EmptyMemoryBcState = MemoryBcState<revm::db::EmptyDB>;
+
 impl MemoryBcState<revm::db::EmptyDB> {
     pub fn fresh() -> MemoryBcState<revm::db::EmptyDB> {
         let empty = revm::db::EmptyDB::default();
