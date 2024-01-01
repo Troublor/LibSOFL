@@ -19,11 +19,10 @@ impl MigratorTrait for Migrator {
 #[tokio::main]
 async fn main() {
     // Set databse url env var to the one in the config file
-    let cfg =
-        libsofl_knowledge_index::config::KnowledgeConfig::load_or(
-            Default::default(),
-        )
-        .expect("load config failed");
+    let cfg = libsofl_knowledge_index::config::KnowledgeConfig::load_or(
+        Default::default(),
+    )
+    .expect("load config failed");
     let database_env = std::env::var("DATABASE_URL").ok();
     std::env::set_var("DATABASE_URL", cfg.database_url);
 
