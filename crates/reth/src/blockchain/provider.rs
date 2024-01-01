@@ -29,10 +29,13 @@ use reth_blockchain_tree::{
 use reth_db::{open_db_read_only, DatabaseEnv};
 use reth_primitives::revm::env::fill_tx_env;
 use reth_primitives::ChainSpecBuilder;
-use reth_provider::{
+pub use reth_provider::{
     providers::BlockchainProvider, BlockHashReader, BlockNumReader,
-    ChainSpecProvider, EvmEnvProvider, ProviderFactory, StateProviderBox,
-    StateProviderFactory, TransactionsProvider,
+    BlockchainTreePendingStateProvider, ChainSpecProvider, EvmEnvProvider,
+    HeaderProvider, HistoricalStateProvider, ProviderFactory, ReceiptProvider,
+    ReceiptProviderIdExt, StateProvider, StateProviderBox,
+    StateProviderFactory, StateRootProvider, TransactionsProvider,
+    TransactionsProviderExt,
 };
 use reth_revm::{database::StateProviderDatabase, EvmProcessorFactory};
 
