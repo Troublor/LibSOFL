@@ -20,7 +20,7 @@ impl MigratorTrait for Migrator {
 async fn main() {
     // Set databse url env var to the one in the config file
     let cfg =
-        libsofl_knowledge_index::config::KnowledgeConfig::load_or_default(
+        libsofl_knowledge_index::config::KnowledgeConfig::load_or(
             Default::default(),
         )
         .expect("load config failed");

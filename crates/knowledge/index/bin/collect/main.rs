@@ -93,7 +93,7 @@ async fn collect_blocks(
     task_tracker: &TaskTracker,
     db_flush_threshold: u64,
 ) {
-    let cfg = KnowledgeConfig::load_or_default(Default::default())
+    let cfg = KnowledgeConfig::load_or(Default::default())
         .expect("failed to load config");
     let db = cfg.get_database_connection().await.unwrap();
     info!(url = cfg.database_url, "database connected");
