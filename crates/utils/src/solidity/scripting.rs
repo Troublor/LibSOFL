@@ -2,6 +2,7 @@ use std::path::PathBuf;
 
 use alloy_dyn_abi::JsonAbiExt;
 use alloy_json_abi::Function;
+pub use alloy_sol_types::sol_data;
 use foundry_compilers::{
     artifacts::{Error, Source, Sources},
     CompilerInput, Solc,
