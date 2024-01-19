@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use revm::db::CacheDB;
 
 use super::types::{AccountInfo, Address, Bytecode, Hash, StateChange, U256};
@@ -10,7 +12,7 @@ pub struct MemoryBcState<S: revm::DatabaseRef>(
     #[as_ref]
     #[deref]
     #[deref_mut]
-    revm::db::CacheDB<S>,
+    revm::db::CacheDB<Arc<S>>,
 );
 
 impl<S: revm::DatabaseRef> revm::Database for MemoryBcState<S> {
@@ -54,8 +56,16 @@ impl<S: revm::DatabaseRef> revm::DatabaseCommit for MemoryBcState<S> {
     }
 }
 
+// impl<S: revm::DatabaseRef> BcState for MemoryBcState<S>
+// where
+//     S::Error: std::fmt::Debug
+// {
+//     type DatabaseErr = S::Error;
+// }
+
 impl<S: revm::DatabaseRef> MemoryBcState<S> {
     pub fn new(state_ref: S) -> Self {
+        let state_ref = Arc::new(state_ref);
         Self(revm::db::CacheDB::new(state_ref))
     }
 }
@@ -69,9 +79,9 @@ impl MemoryBcState<revm::db::EmptyDB> {
     }
 }
 
-impl<S: revm::DatabaseRef + Clone> MemoryBcState<S> {
+impl<S: revm::DatabaseRef> MemoryBcState<S> {
     /// fork a new MemoryBcState from the current state.
-    pub fn fork(&self) -> MemoryBcState<CacheDB<S>> {
+    pub fn fork(&self) -> MemoryBcState<CacheDB<Arc<S>>> {
         let c = self.0.clone();
         MemoryBcState::new(c)
     }

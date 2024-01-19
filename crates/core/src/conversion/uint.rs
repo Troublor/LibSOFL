@@ -147,17 +147,23 @@ impl<const BITS: usize, const LIMBS: usize> ConvertTo<Uint<BITS, LIMBS>>
 ///*** Convert to Bytes */
 impl ConvertTo<Bytes> for String {
     fn cvt(&self) -> Bytes {
-        let mut bytes = Vec::new();
-        hex::decode_to_slice(self.as_str(), &mut bytes)
-            .expect("failed to convert string to Bytes");
+        let s = if self.starts_with("0x") {
+            &self[2..]
+        } else {
+            self
+        };
+        let bytes = hex::decode(s).expect("failed to convert string to Bytes");
         bytes.into()
     }
 }
 impl ConvertTo<Bytes> for &str {
     fn cvt(&self) -> Bytes {
-        let mut bytes = Vec::new();
-        hex::decode_to_slice(self, &mut bytes)
-            .expect("failed to convert string to Bytes");
+        let s = if self.starts_with("0x") {
+            &self[2..]
+        } else {
+            self
+        };
+        let bytes = hex::decode(s).expect("failed to convert string to Bytes");
         bytes.into()
     }
 }

@@ -94,6 +94,7 @@ pub type ExecutionResult = revm::primitives::ExecutionResult;
 pub type Gas = revm::interpreter::Gas;
 pub type CreateInputs = revm::interpreter::CreateInputs;
 pub type CallInputs = revm::interpreter::CallInputs;
+pub type CallScheme = revm::interpreter::CallScheme;
 pub type Output = revm::primitives::Output;
 pub type CreateScheme = revm::primitives::CreateScheme;
 

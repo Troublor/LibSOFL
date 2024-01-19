@@ -25,6 +25,17 @@ impl AsyncRuntime {
             None => futures::executor::block_on(f),
         }
     }
+
+    pub fn spawn_blocking<F, R>(&self, f: F) -> tokio::task::JoinHandle<R>
+    where
+        F: FnOnce() -> R + Send + 'static,
+        R: Send + 'static,
+    {
+        match self.runtime {
+            Some(ref rt) => rt.spawn_blocking(f),
+            None => tokio::task::spawn_blocking(f),
+        }
+    }
 }
 
 impl Clone for AsyncRuntime {

@@ -1,7 +1,6 @@
 pub use alloy_dyn_abi::{DynSolEvent, DynSolType};
 use alloy_dyn_abi::{DynSolValue, FunctionExt, JsonAbiExt};
 use alloy_json_abi::Function;
-use alloy_sol_types::{Revert, SolError};
 use libsofl_core::{
     blockchain::{provider::BcProvider, transaction::Tx},
     conversion::ConvertTo,
@@ -234,12 +233,8 @@ impl HighLevelCaller {
             }
             ExecutionResult::Revert {
                 gas_used: _,
-                output,
-            } => {
-                let x = Revert::abi_decode(&output, false).unwrap();
-                println!("revert: {:?}", x.reason);
-                Err(SoflError::Exec(result))
-            }
+                output: _,
+            } => Err(SoflError::Exec(result)),
             _ => Err(SoflError::Exec(result)),
         }
     }
@@ -278,12 +273,8 @@ impl HighLevelCaller {
             }
             ExecutionResult::Revert {
                 gas_used: _,
-                output,
-            } => {
-                let x = Revert::abi_decode(&output, false).unwrap();
-                println!("revert: {:?}", x.reason);
-                Err(SoflError::Exec(result))
-            }
+                output: _,
+            } => Err(SoflError::Exec(result)),
             _ => Err(SoflError::Exec(result)),
         }
     }
