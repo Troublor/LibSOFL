@@ -19,9 +19,7 @@ impl MigrationTrait for Migration {
         manager
             .drop_table(
                 Table::drop()
-                    .table(
-                        libsofl_knowledge_code::entities::code::Entity,
-                    )
+                    .table(libsofl_knowledge_code::entities::code::Entity)
                     .to_owned(),
             )
             .await

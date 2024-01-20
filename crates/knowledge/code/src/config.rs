@@ -24,7 +24,9 @@ impl Config for CodeKnowledgeConfig {
 }
 
 impl CodeKnowledgeConfig {
-    pub fn get_client(&self) -> Result<foundry_block_explorers::Client, EtherscanError> {
+    pub fn get_client(
+        &self,
+    ) -> Result<foundry_block_explorers::Client, EtherscanError> {
         foundry_block_explorers::Client::new(
             Chain::from(self.chain_id),
             self.api_key.as_str(),

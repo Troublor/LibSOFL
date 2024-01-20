@@ -33,9 +33,9 @@ pub struct Analyzer<
 }
 
 impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>> Clone
-for Analyzer<T, S, P>
-    where
-        S::Error: std::fmt::Debug,
+    for Analyzer<T, S, P>
+where
+    S::Error: std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -46,9 +46,9 @@ for Analyzer<T, S, P>
 }
 
 impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
-Analyzer<T, S, P>
-    where
-        S::Error: std::fmt::Debug,
+    Analyzer<T, S, P>
+where
+    S::Error: std::fmt::Debug,
 {
     pub fn new(provider: Arc<P>) -> Self {
         Self {
@@ -59,9 +59,9 @@ Analyzer<T, S, P>
 }
 
 impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
-Analyzer<T, S, P>
-    where
-        S::Error: std::fmt::Debug,
+    Analyzer<T, S, P>
+where
+    S::Error: std::fmt::Debug,
 {
     pub fn analyze_one_block(
         &mut self,
