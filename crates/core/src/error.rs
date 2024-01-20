@@ -1,5 +1,7 @@
 use crate::engine::types::ExecutionResult;
 
+pub type Result<T, E = SoflError> = std::result::Result<T, E>;
+
 #[derive(Debug, derive_more::Display, thiserror::Error)]
 pub enum SoflError {
     #[display(fmt = "Err not found: {}", _0)]

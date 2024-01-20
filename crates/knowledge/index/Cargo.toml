@@ -12,10 +12,6 @@ edition.workspace = true
 path = "src/lib.rs"
 
 [[bin]]
-name = "migration"
-path = "bin/migration/main.rs"
-
-[[bin]]
 name = "collect"
 path = "bin/collect/main.rs"
 

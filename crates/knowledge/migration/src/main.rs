@@ -1,5 +1,6 @@
 mod create_metadata;
 mod tx_index;
+mod source_code;
 
 use libsofl_utils::config::Config;
 pub use sea_orm_migration::prelude::*;
@@ -12,6 +13,7 @@ impl MigratorTrait for Migrator {
         vec![
             Box::new(create_metadata::Migration),
             Box::new(tx_index::Migration),
+            Box::new(source_code::Migration),
         ]
     }
 }
@@ -22,7 +24,7 @@ async fn main() {
     let cfg = libsofl_knowledge_index::config::KnowledgeConfig::load_or(
         Default::default(),
     )
-    .expect("load config failed");
+        .expect("load config failed");
     let database_env = std::env::var("DATABASE_URL").ok();
     std::env::set_var("DATABASE_URL", cfg.database_url);
 

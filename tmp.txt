@@ -1,0 +1,112 @@
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/interfaces/IOwnableV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestFillQuoteTransformerHost.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/external/IAllowanceTarget.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/LibBytesV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestDelegateCaller.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/IOwnable.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/TransformERC20.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/ZeroEx.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/transformers/WethTransformer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/external/TransformerDeployer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/transformers/PayTakerTransformer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestCallTarget.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestTokenSpenderERC20Token.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestWethTransformerHost.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/errors/LibWalletRichErrors.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/transformers/IERC20Transformer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/external/AllowanceTarget.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/SimpleFunctionRegistry.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/vendor/v3/IExchange.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestTokenSpender.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestTransformERC20.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/storage/LibStorage.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/errors/LibCommonRichErrors.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/errors/LibTransformERC20RichErrors.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestMintableERC20Token.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestFillQuoteTransformerExchange.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/transformers/AffiliateFeeTransformer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/TokenSpender.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-erc20/contracts/src/v06/IEtherTokenV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/storage/LibOwnableStorage.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/LibSafeMathV06.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/LibMathV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/migrations/LibBootstrap.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/errors/LibOwnableRichErrorsV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/storage/LibTransformERC20Storage.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-erc20/contracts/src/v06/IERC20TokenV06.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/errors/LibSafeMathRichErrorsV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/ITestSimpleFunctionRegistryFeature.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/OwnableV06.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/errors/LibAuthorizableRichErrorsV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/IFeature.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-erc20/contracts/src/v06/LibERC20TokenV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/migrations/FullMigration.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestWeth.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestZeroExFeature.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/storage/LibSimpleFunctionRegistryStorage.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestSimpleFunctionRegistryFeatureImpl1.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/errors/LibBytesRichErrorsV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/ISimpleFunctionRegistry.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/fixins/FixinCommon.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestInitialMigration.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestMintTokenERC20Transformer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/errors/LibProxyRichErrors.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/ITransformERC20.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/errors/LibOwnableRichErrors.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/storage/LibProxyStorage.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/storage/LibTokenSpenderStorage.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/transformers/FillQuoteTransformer.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/errors/LibMathRichErrorsV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/errors/LibSpenderRichErrors.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/transformers/LibERC20Transformer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/transformers/Transformer.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/errors/LibRichErrorsV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/Ownable.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestTransformerDeployerTransformer.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/ITokenSpender.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/external/FlashWallet.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestTransformerBase.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/interfaces/IAuthorizableV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestTransformerHost.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestSimpleFunctionRegistryFeatureImpl2.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/migrations/LibMigrate.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/migrations/InitialMigration.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/Bootstrap.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestFullMigration.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/features/IBootstrap.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/errors/LibSimpleFunctionRegistryRichErrors.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/test/TestMigrator.sol
+/home/cluracan/code/0x-monorepo/node_modules/@0x/contracts-utils/contracts/src/v06/AuthorizableV06.sol
+/home/cluracan/code/0x-monorepo/contracts/zero-ex/contracts/src/external/IFlashWallet.sol
+"/*
+
+  Copyright 2020 ZeroEx Intl.
+
+  Licensed under the Apache License, Version 2.0 (the "License");
+  you may not use this file except in compliance with the License.
+  You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+  Unless required by applicable law or agreed to in writing, software
+  distributed under the License is distributed on an "AS IS" BASIS,
+  WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+  See the License for the specific language governing permissions and
+  limitations under the License.
+
+*/
+
+pragma solidity ^0.6.5;
+pragma experimental ABIEncoderV2;
+
+import "@0x/contracts-utils/contracts/src/v06/LibBytesV06.sol";
+import "./migrations/LibBootstrap.sol";
+import "./features/Bootstrap.sol";
+import "./storage/LibProxyStorage.sol";
+import "./errors/LibProxyRichErrors.sol";
+
+
+/// @dev An extensible proxy contract that serves as a universal entry point for
+///      interacting with the 0x protocol.
+contract ZeroEx {
+    // solhint-disab..."

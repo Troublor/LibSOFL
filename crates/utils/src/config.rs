@@ -83,6 +83,17 @@ pub trait Config: Deserialize<'static> + Serialize {
     }
 }
 
+pub trait ConfigDefault: Sized + Config + Default {
+    fn load_or_default() -> Result<Self, SoflError> {
+        Self::load_or(Default::default())
+    }
+    fn must_load_or_default() -> Self {
+        Self::load_or_default().expect("failed to load config")
+    }
+}
+
+impl<T: Config + Default> ConfigDefault for T {}
+
 #[cfg(test)]
 mod tests {
     use super::{Config, CONFIG_ENV_PREFIX, CONFIG_ENV_SEPARATOR};
@@ -104,6 +115,7 @@ mod tests {
         test: String,
         other: String,
     }
+
     impl Config for TestConfig {
         fn section_name() -> &'static str {
             "abc"

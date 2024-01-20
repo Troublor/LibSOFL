@@ -33,9 +33,9 @@ pub struct Analyzer<
 }
 
 impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>> Clone
-    for Analyzer<T, S, P>
-where
-    S::Error: std::fmt::Debug,
+for Analyzer<T, S, P>
+    where
+        S::Error: std::fmt::Debug,
 {
     fn clone(&self) -> Self {
         Self {
@@ -46,9 +46,9 @@ where
 }
 
 impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
-    Analyzer<T, S, P>
-where
-    S::Error: std::fmt::Debug,
+Analyzer<T, S, P>
+    where
+        S::Error: std::fmt::Debug,
 {
     pub fn new(provider: Arc<P>) -> Self {
         Self {
@@ -59,9 +59,9 @@ where
 }
 
 impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
-    Analyzer<T, S, P>
-where
-    S::Error: std::fmt::Debug,
+Analyzer<T, S, P>
+    where
+        S::Error: std::fmt::Debug,
 {
     pub fn analyze_one_block(
         &mut self,
@@ -101,7 +101,7 @@ where
                 .created
                 .iter()
                 .map(|(addr, destruct)| {
-                    (tx_hash.clone(), ConvertTo::<String>::cvt(addr), *destruct)
+                    (ConvertTo::<String>::cvt(addr), tx_hash.clone(), *destruct)
                 })
                 .collect();
             total_creations.extend(creations);

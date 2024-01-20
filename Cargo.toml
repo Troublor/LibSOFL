@@ -76,6 +76,8 @@ alloy-sol-macro = { version = "0.6", features = ["json"] }
 alloy-dyn-abi = "0.6"
 alloy-json-abi = "0.6"
 
+alloy-chains = "0.1"
+
 # alloy
 alloy-providers = { git = "https://github.com/alloy-rs/alloy" }
 alloy-transport = { git = "https://github.com/alloy-rs/alloy" }
