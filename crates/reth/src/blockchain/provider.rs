@@ -273,10 +273,7 @@ impl BcProvider<RethTx> for RethProvider {
     }
 
     fn chain_id(&self) -> u64 {
-        match self.bp.chain_spec().chain {
-            reth_primitives::Chain::Named(c) => c.into(),
-            reth_primitives::Chain::Id(id) => id,
-        }
+        self.bp.chain_spec().chain.id()
     }
 }
 

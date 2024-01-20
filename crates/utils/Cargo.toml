@@ -14,7 +14,7 @@ edition.workspace = true
 
 libsofl-core.workspace = true
 
-foundry-compilers = { version = "0.1.1", features = ["svm-solc"] }
+foundry-compilers = { version = "0.2.2", features = ["svm-solc"] }
 futures.workspace = true
 tokio.workspace = true
 serde.workspace = true
