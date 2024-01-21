@@ -8,15 +8,25 @@ rust-version.workspace = true
 license.workspace = true
 edition.workspace = true
 
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "code_knowledge_server"
+path = "bin/server/main.rs"
+
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 libsofl-core.workspace = true
 libsofl-utils.workspace = true
 libsofl-knowledge-base.workspace = true
+libsofl-reth.workspace = true
 
 alloy-json-abi.workspace = true
 alloy-chains.workspace = true
+
+crossbeam.workspace = true
 
 tokio.workspace = true
 tokio-util.workspace = true
@@ -26,6 +36,15 @@ sea-orm-migration.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 
-foundry-block-explorers = { version = "0.2.1", features = ["foundry-compilers"] }
+signal-hook = "0.3"
+signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
+
+foundry-block-explorers = { version = "0.2.1", features = [
+    "foundry-compilers",
+] }
 foundry-compilers = { version = "0.2.2", features = ["svm-solc"] }
 regex = "1.10.2"
+
+jsonrpsee = "0.21"
+
+clap = { version = "4.4", features = ["derive"] }

@@ -10,6 +10,14 @@ pub struct RethConfig {
     pub datadir: String,
 }
 
+impl Default for RethConfig {
+    fn default() -> Self {
+        Self {
+            datadir: "blockchain".to_string(),
+        }
+    }
+}
+
 impl RethConfig {
     pub fn bc_provider(&self) -> Result<RethProvider, SoflError> {
         info!("loading bc provider with reth db from {}", self.datadir);

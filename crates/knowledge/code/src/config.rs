@@ -2,10 +2,11 @@ use alloy_chains::Chain;
 use foundry_block_explorers::errors::EtherscanError;
 use libsofl_utils::config::Config;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct CodeKnowledgeConfig {
     pub chain_id: u64,
     pub api_key: String,
+    pub requests_per_second: Option<f32>,
 }
 
 impl Default for CodeKnowledgeConfig {
@@ -13,6 +14,7 @@ impl Default for CodeKnowledgeConfig {
         Self {
             chain_id: 1,
             api_key: "".to_string(),
+            requests_per_second: None,
         }
     }
 }

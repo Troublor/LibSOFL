@@ -130,7 +130,14 @@ impl BcStateProvider<StateProviderDatabase<StateProviderBox>> for RethProvider {
                 .ok_or(SoflError::NotFound(format!("block {}", hash)))?,
             BlockHashOrNumber::Number(n) => n,
         };
-        let sp = self.bp.state_by_block_id((bn - 1).into()).map_err(|e| {
+        let sp = if bn > 0 {
+            self.bp.state_by_block_id((bn - 1).into())
+        } else {
+            self.bp.state_by_block_number_or_tag(
+                reth_primitives::BlockNumberOrTag::Earliest,
+            )
+        }
+        .map_err(|e| {
             SoflError::Provider(format!(
                 "failed to create reth state provider: {}",
                 e

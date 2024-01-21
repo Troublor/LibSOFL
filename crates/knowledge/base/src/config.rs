@@ -3,7 +3,7 @@ use std::str::FromStr;
 use libsofl_utils::config::Config;
 use sea_orm::ConnectOptions;
 
-#[derive(Debug, serde::Deserialize, serde::Serialize)]
+#[derive(Debug, Clone, serde::Deserialize, serde::Serialize)]
 pub struct KnowledgeConfig {
     pub database_url: String,
     pub database_log_level: String,

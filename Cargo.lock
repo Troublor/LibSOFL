@@ -1425,6 +1425,19 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7059fff8937831a9ae6f0fe4d658ffabf58f2ca96aa9dec1c889f936f705f216"
 
 [[package]]
+name = "crossbeam"
+version = "0.8.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1137cd7e7fc0fb5d3c5a8678be38ec56e819125d8d7907411fe24ccb943faca8"
+dependencies = [
+ "crossbeam-channel",
+ "crossbeam-deque",
+ "crossbeam-epoch",
+ "crossbeam-queue",
+ "crossbeam-utils",
+]
+
+[[package]]
 name = "crossbeam-channel"
 version = "0.5.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3418,6 +3431,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "jsonrpsee"
+version = "0.21.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "9579d0ca9fb30da026bac2f0f7d9576ec93489aeb7cd4971dd5b4617d82c79b2"
+
+[[package]]
 name = "jsonrpsee-types"
 version = "0.20.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3646,17 +3665,23 @@ version = "0.1.0"
 dependencies = [
  "alloy-chains",
  "alloy-json-abi",
+ "clap",
+ "crossbeam",
  "foundry-block-explorers",
  "foundry-compilers",
  "futures",
+ "jsonrpsee",
  "libsofl-core",
  "libsofl-knowledge-base",
+ "libsofl-reth",
  "libsofl-utils",
  "regex",
  "sea-orm",
  "sea-orm-migration",
  "serde",
  "serde_json",
+ "signal-hook",
+ "signal-hook-tokio",
  "tokio",
  "tokio-util",
 ]
