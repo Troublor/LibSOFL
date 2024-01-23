@@ -1,6 +1,6 @@
+use crate::engine::types::BcStateRef;
 use auto_impl::auto_impl;
 use mockall::automock;
-use revm::DatabaseRef;
 
 use crate::engine::memory::MemoryBcState;
 use crate::engine::types::BlockEnv;
@@ -17,7 +17,7 @@ use super::tx_position::TxPosition;
 
 #[auto_impl(&, Box, Arc, Rc)]
 #[automock]
-pub trait BcProvider<T: Tx> {
+pub trait BcProvider<T: Tx>: Send + Sync {
     // chain info
     fn chain_id(&self) -> u64;
 
@@ -58,9 +58,37 @@ pub trait BcProvider<T: Tx> {
 
 #[auto_impl(&, Box, Arc, Rc)]
 #[automock]
-pub trait BcStateProvider<S: DatabaseRef> {
+pub trait BcStateProvider<S: BcStateRef>: Send + Sync {
     fn bc_state_at(
         &self,
         pos: TxPosition,
     ) -> Result<MemoryBcState<S>, SoflError>;
+}
+
+#[cfg(test)]
+mod tests {
+    use std::thread;
+
+    use crate::{
+        blockchain::{
+            provider::{BcProvider, BcStateProvider},
+            transaction::Tx,
+        },
+        engine::types::BcStateRef,
+    };
+
+    #[test]
+    pub fn test_move_to_thread() {
+        // purely type check test
+        #[allow(unused)]
+        fn move_to_thread<
+            T: Tx,
+            S: BcStateRef,
+            P: BcProvider<T> + BcStateProvider<S> + 'static,
+        >(
+            p: P,
+        ) {
+            thread::spawn(move || p);
+        }
+    }
 }

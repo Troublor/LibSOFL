@@ -1,4 +1,7 @@
-use std::{cell::RefCell, collections::HashMap, sync::Arc};
+use std::{
+    collections::HashMap,
+    sync::{Arc, RwLock},
+};
 
 use alloy_providers::provider::{Provider, TempProvider};
 use alloy_rpc_types::{Block, BlockNumberOrTag};
@@ -28,11 +31,11 @@ pub struct JsonRpcProvider {
 
     // caches
     pub(crate) chain_id: u64,
-    pub(crate) txs: RefCell<HashMap<TxHashOrPosition, JsonRpcTx>>,
+    pub(crate) txs: Arc<RwLock<HashMap<TxHashOrPosition, JsonRpcTx>>>,
     pub(crate) txs_in_block:
-        RefCell<HashMap<BlockHashOrNumber, Vec<JsonRpcTx>>>,
-    pub(crate) block_by_hash: RefCell<HashMap<BlockHash, Block>>,
-    pub(crate) block_by_number: RefCell<HashMap<BlockNumber, Block>>,
+        Arc<RwLock<HashMap<BlockHashOrNumber, Vec<JsonRpcTx>>>>,
+    pub(crate) block_by_hash: Arc<RwLock<HashMap<BlockHash, Block>>>,
+    pub(crate) block_by_number: Arc<RwLock<HashMap<BlockNumber, Block>>>,
 }
 
 impl JsonRpcProvider {
@@ -77,7 +80,10 @@ impl JsonRpcProvider {
     fn block(&self, block: BlockHashOrNumber) -> Result<Block, SoflError> {
         match block {
             BlockHashOrNumber::Hash(hash) => {
-                let mut block_by_hash = self.block_by_hash.borrow_mut();
+                let mut block_by_hash = self
+                    .block_by_hash
+                    .write()
+                    .expect("failed to get write lock for block_by_hash");
                 block_by_hash
                     .get(&hash)
                     .map(|b| Result::<Block, SoflError>::Ok(b.clone()))
@@ -94,13 +100,19 @@ impl JsonRpcProvider {
                         let bn: u64 =
                             blk.header.number.expect("block number").cvt();
                         self.block_by_number
-                            .borrow_mut()
+                            .write()
+                            .expect(
+                                "failed to get write lock for block_by_number",
+                            )
                             .insert(bn, blk.clone());
                         Ok(blk)
                     })
             }
             BlockHashOrNumber::Number(number) => {
-                let mut block_by_number = self.block_by_number.borrow_mut();
+                let mut block_by_number = self
+                    .block_by_number
+                    .write()
+                    .expect("failed to get write lock for block_by_number");
                 block_by_number
                     .get(&number)
                     .map(|b| Result::<Block, SoflError>::Ok(b.clone()))
@@ -119,7 +131,10 @@ impl JsonRpcProvider {
                         block_by_number.insert(number, blk.clone());
                         let hash = blk.header.hash.expect("block hash");
                         self.block_by_hash
-                            .borrow_mut()
+                            .write()
+                            .expect(
+                                "failed to get write lock for block_by_hash",
+                            )
                             .insert(hash, blk.clone());
                         Ok(blk)
                     })
@@ -134,7 +149,7 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
     }
 
     fn tx(&self, tx: TxHashOrPosition) -> Result<JsonRpcTx, SoflError> {
-        let mut txs = self.txs.borrow_mut();
+        let mut txs = self.txs.write().expect("failed to get write lock");
         txs.get(&tx)
             .map(|t| Result::<JsonRpcTx, SoflError>::Ok(t.clone()))
             .unwrap_or_else(move || {
@@ -182,7 +197,8 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
         &self,
         block: BlockHashOrNumber,
     ) -> Result<Vec<JsonRpcTx>, SoflError> {
-        let mut txs_in_block = self.txs_in_block.borrow_mut();
+        let mut txs_in_block =
+            self.txs_in_block.write().expect("failed to get write lock");
         txs_in_block
             .get(&block)
             .map(|ts| Result::<Vec<JsonRpcTx>, SoflError>::Ok(ts.clone()))

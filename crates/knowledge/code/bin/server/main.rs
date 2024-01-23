@@ -1,16 +1,17 @@
-use std::{sync::Arc, thread};
+use std::sync::Arc;
 
 use clap::{arg, command, Parser};
-use crossbeam::{atomic::AtomicConsume, sync::WaitGroup};
 use futures::StreamExt;
-use libsofl_reth::{blockchain::provider::BlockNumReader, config::RethConfig};
+use libsofl_knowledge_code::{
+    collect::collector::CollectorService, rpc::service::CodeRpcService,
+};
+use libsofl_reth::config::RethConfig;
 use libsofl_utils::{
     config::ConfigDefault,
     log::{config::LogConfig, info},
 };
 use signal_hook::consts::{SIGINT, SIGTERM};
 use signal_hook_tokio::Signals;
-use tokio_util::sync::CancellationToken;
 
 #[derive(Parser, Debug)]
 #[command(author, version, about)]
@@ -20,6 +21,12 @@ pub struct Cli {
 
     #[arg(long, default_value = "false")]
     disable_miner: bool,
+
+    #[arg(long, default_value = "19000000")]
+    miner_max_block: u64,
+
+    #[arg(long, default_value = "127.0.0.1")]
+    host: String,
 
     #[arg(short, long, default_value = "2425")]
     port: usize,
@@ -72,45 +79,44 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
     code_knowledge_cfg.api_key =
         args.api_key.unwrap_or(code_knowledge_cfg.api_key);
     code_knowledge_cfg.requests_per_second = Some(5.0);
-    let fetcher = libsofl_knowledge_code::collect::fetcher::Fetcher::new(
-        code_knowledge_cfg.clone(),
+    let query = libsofl_knowledge_code::query::query::CodeQuery::new(
+        &knowledge_cfg,
+        &code_knowledge_cfg,
+        args.eager,
     )
+    .await
     .expect("failed to create fetcher");
-    let fetcher = Arc::new(fetcher);
+    let query = Arc::new(query);
 
-    let collector = if !args.disable_miner {
-        let collector =
-            libsofl_knowledge_code::collect::CodeKnowledgeCollector::new(
-                provider.clone(),
-                knowledge_cfg.clone(),
-                fetcher.clone(),
-                args.eager,
-            )
-            .await;
-        collector.start();
-        Some(collector)
+    let mut collector = if !args.disable_miner {
+        let db = knowledge_cfg
+            .get_database_connection()
+            .await
+            .expect("failed to connect to database");
+        let service = CollectorService::new(
+            provider.clone(),
+            query.clone(),
+            db,
+            args.miner_max_block,
+        )
+        .await;
+        Some(service)
     } else {
         None
     };
-    let collector_task_tx = collector
-        .as_ref()
-        .map(|c| (c.task_tx.clone(), c.progress.load_consume()));
 
-    let cancellation_token = CancellationToken::new();
-    let wg = WaitGroup::new();
+    let rpc = CodeRpcService::new(query.clone(), &args.host, args.port)
+        .await
+        .expect("failed to start rpc service");
 
     // handle signals
     let mut signals =
         Signals::new(&[SIGINT, SIGTERM]).expect("failed to register signals");
-    let handle = signals.handle();
-    let cancel = cancellation_token.clone();
-    let signal_task = tokio::spawn(async move {
+    let interrupt = tokio::spawn(async move {
         while let Some(sig) = signals.next().await {
             match sig {
                 SIGINT | SIGTERM => {
                     info!(sig = sig, "received signal, stopping...");
-                    cancel.cancel();
-                    collector.as_ref().map(|c| c.stop());
                     break;
                 }
                 _ => unreachable!(),
@@ -118,47 +124,11 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         }
     });
 
-    let task_feeder = if let Some((task_tx, progress)) = collector_task_tx {
-        let p = provider.clone();
-        let wg = wg.clone();
-        let task_feeder = thread::spawn(move || {
-            let mut current = progress;
-            let mut latest_block = p.bp.best_block_number().unwrap();
-            let mut should_break = false;
-            while latest_block > current {
-                if should_break {
-                    break;
-                }
-                for block in current..latest_block {
-                    if cancellation_token.is_cancelled() {
-                        should_break = true;
-                        break;
-                    }
-                    match task_tx.send(block) {
-                        Ok(_) => {}
-                        Err(_) => {
-                            should_break = true;
-                            break;
-                        }
-                    }
-                    current = block;
-                }
-                latest_block = p.bp.best_block_number().unwrap();
-            }
-            drop(wg);
-        });
-        Some(task_feeder)
-    } else {
-        None
-    };
+    interrupt.await.unwrap();
 
-    wg.wait();
-    task_feeder.map(|t| t.join().unwrap());
-    info!("task feeder stopped");
-
-    handle.close();
-    signal_task.await.unwrap();
-    info!("signal handler stopped");
+    // cleanup
+    collector.take().map(|c| drop(c));
+    drop(rpc);
 
     Ok(())
 }

@@ -8,7 +8,7 @@ use crate::{
 use super::tx_position::TxPosition;
 
 #[automock]
-pub trait Tx {
+pub trait Tx: Send + Sync {
     /// Returns the hash of the transaction.
     fn hash(&self) -> TxHash;
 

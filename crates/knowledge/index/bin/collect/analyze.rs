@@ -10,7 +10,7 @@ use libsofl_core::{
         inspector::CombinedInspector,
         state::BcState,
         transition::TransitionSpec,
-        types::{BlockEnv, CfgEnv, DatabaseRef, TxEnv},
+        types::{BlockEnv, CfgEnv, BcStateRef, TxEnv},
     },
     error::SoflError,
 };
@@ -22,7 +22,7 @@ use libsofl_utils::log::debug;
 
 pub struct Analyzer<
     T: Tx,
-    S: DatabaseRef,
+    S: BcStateRef,
     P: BcProvider<T> + BcStateProvider<S>,
 > where
     S::Error: std::fmt::Debug,
@@ -32,7 +32,7 @@ pub struct Analyzer<
     _phantom: std::marker::PhantomData<(T, S)>,
 }
 
-impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>> Clone
+impl<T: Tx, S: BcStateRef, P: BcProvider<T> + BcStateProvider<S>> Clone
     for Analyzer<T, S, P>
 where
     S::Error: std::fmt::Debug,
@@ -45,7 +45,7 @@ where
     }
 }
 
-impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
+impl<T: Tx, S: BcStateRef, P: BcProvider<T> + BcStateProvider<S>>
     Analyzer<T, S, P>
 where
     S::Error: std::fmt::Debug,
@@ -58,7 +58,7 @@ where
     }
 }
 
-impl<T: Tx, S: DatabaseRef, P: BcProvider<T> + BcStateProvider<S>>
+impl<T: Tx, S: BcStateRef, P: BcProvider<T> + BcStateProvider<S>>
     Analyzer<T, S, P>
 where
     S::Error: std::fmt::Debug,

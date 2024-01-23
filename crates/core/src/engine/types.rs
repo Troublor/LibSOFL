@@ -65,6 +65,7 @@ pub enum TxHashOrPosition {
 pub type ChainId = alloy_primitives::ChainId;
 pub type SpecId = revm::primitives::SpecId;
 
+pub type FixedBytes<const M: usize> = revm::primitives::FixedBytes<M>;
 pub type AccountInfo = revm::primitives::AccountInfo;
 pub type Account = revm::primitives::Account;
 pub type AccountStatus = revm::primitives::AccountStatus;
@@ -78,6 +79,8 @@ pub use revm::interpreter::opcode;
 pub use revm::Database;
 pub use revm::DatabaseCommit;
 pub use revm::DatabaseRef;
+pub trait BcStateRef: revm::DatabaseRef + Sync + Send {}
+impl<T: revm::DatabaseRef + Sync + Send> BcStateRef for T {}
 pub use revm::Inspector;
 pub type InstructionResult = revm::interpreter::InstructionResult;
 pub type Interpreter<'a> = revm::interpreter::Interpreter<'a>;

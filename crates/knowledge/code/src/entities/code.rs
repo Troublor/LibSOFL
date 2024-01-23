@@ -1,9 +1,13 @@
+use std::collections::BTreeMap;
+
+use alloy_json_abi::JsonAbi;
 use foundry_compilers::{
     artifacts::{output_selection::OutputSelection, Settings},
     CompilerInput, CompilerOutput,
 };
-use regex::Regex;
+use libsofl_core::engine::types::FixedBytes;
 use sea_orm::entity::prelude::*;
+use semver::Version;
 
 use crate::error::Error;
 
@@ -63,14 +67,29 @@ pub enum Relation {}
 impl ActiveModelBehavior for ActiveModel {}
 
 impl Model {
-    pub fn compiler_version(&self) -> String {
-        let regex = Regex::new(r"v?(\d+\.\d+\.\d+)(\+.*)?")
-            .expect("failed to compile regex");
-        let captures = regex
-            .captures(&self.compiler_version)
-            .expect("failed to capture compiler version");
-        let version = captures.get(1).expect("invalid version").as_str();
-        version.to_string()
+    pub fn compiler_version(&self) -> Version {
+        let compiler_version: &str = if self.compiler_version.starts_with("v") {
+            &self.compiler_version[1..]
+        } else {
+            self.compiler_version.as_str()
+        };
+        Version::parse(compiler_version).expect("invalid version")
+    }
+
+    pub fn abi(&self) -> JsonAbi {
+        let json_str = serde_json::to_string(&self.abi).expect("invalid ABI");
+        JsonAbi::from_json_str(&json_str).expect("invalid ABI")
+    }
+
+    pub fn function_signatures(&self) -> BTreeMap<FixedBytes<4>, String> {
+        let abi = self.abi();
+        let signatures = abi
+            .functions
+            .values()
+            .flatten()
+            .map(|f| (f.selector(), f.full_signature()))
+            .collect::<BTreeMap<_, _>>();
+        return signatures;
     }
 
     pub fn compiler_input(&self) -> CompilerInput {
@@ -90,9 +109,11 @@ impl Model {
 
     pub fn compile(&self) -> Result<CompilerOutput, Error> {
         let version = self.compiler_version();
-        let compiler =
-            foundry_compilers::Solc::find_or_install_svm_version(&version)
-                .map_err(Error::Solc)?;
+        let compiler = foundry_compilers::Solc::find_or_install_svm_version(
+            format!("{}.{}.{}", version.major, version.minor, version.patch)
+                .as_str(),
+        )
+        .map_err(Error::Solc)?;
         let input = self.compiler_input();
         compiler.compile_exact(&input).map_err(Error::Solc)
     }

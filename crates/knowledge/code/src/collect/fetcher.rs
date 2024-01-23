@@ -212,6 +212,7 @@ mod tests {
             chain_id: 1,
             api_key: "".to_string(),
             requests_per_second: None,
+            ..Default::default()
         };
         let fetcher = super::Fetcher::new(cfg).unwrap();
         let address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" // WETH
@@ -231,6 +232,7 @@ mod tests {
             chain_id: 1,
             api_key: "".to_string(),
             requests_per_second: None,
+            ..Default::default()
         };
         let fetcher = super::Fetcher::new(cfg).unwrap();
         let address = "0x3fC91A3afd70395Cd496C647d5a6CC9D4B2b7FAD" // Uniswap Universal Router
@@ -250,6 +252,7 @@ mod tests {
             chain_id: 1,
             api_key: "".to_string(),
             requests_per_second: None,
+            ..Default::default()
         };
         let fetcher = super::Fetcher::new(cfg).unwrap();
         let address = "0xDef1C0ded9bec7F1a1670819833240f027b25EfF" // 0x: Exchange Proxy
@@ -269,6 +272,7 @@ mod tests {
             chain_id: 1,
             api_key: "".to_string(),
             requests_per_second: None,
+            ..Default::default()
         };
         let fetcher = super::Fetcher::new(cfg).unwrap();
         let address = "0xA2B47E3D5c44877cca798226B7B8118F9BFb7A56" // Curve.fi Compound Swap
@@ -289,6 +293,7 @@ mod tests {
             chain_id: 1,
             api_key: "".to_string(),
             requests_per_second: Some(0.1),
+            ..Default::default()
         };
         let fetcher = super::Fetcher::new(cfg).unwrap();
         let address = "0xC02aaA39b223FE8D0A0e5C4F27eAD9083C756Cc2" // WETH

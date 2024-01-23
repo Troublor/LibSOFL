@@ -45,6 +45,9 @@ foundry-block-explorers = { version = "0.2.1", features = [
 foundry-compilers = { version = "0.2.2", features = ["svm-solc"] }
 regex = "1.10.2"
 
-jsonrpsee = "0.21"
+semver = "1.0"
+jsonrpsee = { version = "0.21", features = ["client", "server", "macros"] }
+moka = { version = "0.12", features = ["sync", "future"] }
+lazy_static.workspace = true
 
 clap = { version = "4.4", features = ["derive"] }
