@@ -111,7 +111,7 @@ revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_fr
     "optional_eip3607",
     "optional_gas_refund",
     "optional_no_base_fee",
-], default-features = false }
+], default-features = false } 
 
 # reth
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15", features = [

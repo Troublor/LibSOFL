@@ -180,7 +180,7 @@ pub fn compile_contract(
         for e in errs {
             eprintln!("{}", e);
         }
-        Err(SoflError::Custom("failed to compile yul code".to_string()))
+        Err(SoflError::Custom("failed to compile code".to_string()))
     } else {
         let contracts = compiler_output
             .contracts

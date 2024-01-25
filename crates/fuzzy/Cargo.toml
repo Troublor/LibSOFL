@@ -1,0 +1,22 @@
+[package]
+name = "libsofl-fuzzy"
+version.workspace = true
+authors.workspace = true
+description.workspace = true
+homepage.workspace = true
+rust-version.workspace = true
+license.workspace = true
+edition.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+libsofl-core.workspace = true
+libsofl-utils.workspace = true
+
+revm.workspace = true
+
+alloy-dyn-abi.workspace = true
+alloy-json-abi.workspace = true
+
+derive_more.workspace = true
