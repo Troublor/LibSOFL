@@ -41,7 +41,7 @@ use reth_revm::{database::StateProviderDatabase, EvmProcessorFactory};
 
 use crate::conversion::ConvertTo;
 
-use super::transaction::RethTx;
+use super::{state::RethBcStateRef, transaction::RethTx};
 
 pub type RethBlockchainProvider = BlockchainProvider<
     Arc<DatabaseEnv>,
@@ -110,13 +110,12 @@ impl RethProvider {
     }
 }
 
-impl BcStateProvider<StateProviderDatabase<StateProviderBox>> for RethProvider {
+impl BcStateProvider<RethBcStateRef> for RethProvider {
     /// Create a BcState from the the state before the transaction at the position is executed.
     fn bc_state_at(
         &self,
         pos: TxPosition,
-    ) -> Result<MemoryBcState<StateProviderDatabase<StateProviderBox>>, SoflError>
-    {
+    ) -> Result<MemoryBcState<RethBcStateRef>, SoflError> {
         let bn = match pos.block {
             BlockHashOrNumber::Hash(hash) => self
                 .bp

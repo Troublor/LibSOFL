@@ -16,7 +16,9 @@ members = [
     "crates/jsonrpc",
     "crates/knowledge/base",
     "crates/knowledge/index",
-    "crates/analysis", "crates/knowledge/code", "crates/knowledge/migration",
+    "crates/analysis",
+    "crates/knowledge/code",
+    "crates/knowledge/migration",
 ]
 resolver = "2"
 
@@ -40,7 +42,7 @@ lazy_static = "1.4.0"
 # async
 tokio = { version = "1", features = ["full"] }
 tokio-util = { version = "0.7.10", features = ["full"] }
-futures = {version = "0.3", features = ["default", "thread-pool"] }
+futures = { version = "0.3", features = ["default", "thread-pool"] }
 
 # concurrency
 crossbeam = "0.8"
@@ -74,7 +76,7 @@ serde_json = "1.0.102"
 mockall = "0.12.0"
 
 # alloy core
-alloy-primitives = "0.6"
+alloy-primitives = { version = "0.6", features = ["rlp"] }
 alloy-sol-types = "0.6"
 alloy-sol-macro = { version = "0.6", features = ["json"] }
 alloy-dyn-abi = "0.6"
@@ -91,27 +93,38 @@ alloy-rpc-types = { git = "https://github.com/alloy-rs/alloy" }
 
 
 # revm
-revm = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze", features = [
+# revm = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze", features = [
+#     "std",
+#     "secp256k1",
+#     "serde",
+#     "memory_limit",
+#     "optional_balance_check",
+#     "optional_block_gas_limit",
+#     "optional_eip3607",
+#     "optional_gas_refund",
+#     "optional_no_base_fee",
+# ], default-features = false }
+# revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze", features = [
+#     "std",
+#     "serde",
+#     "memory_limit",
+#     "optional_balance_check",
+#     "optional_block_gas_limit",
+#     "optional_eip3607",
+#     "optional_gas_refund",
+#     "optional_no_base_fee",
+# ], default-features = false }
+# revision as of 2024-01-25
+revm = { git = "https://github.com/bluealloy/revm", rev = "b434308", features = [
     "std",
-    "secp256k1",
     "serde",
-    "memory_limit",
-    "optional_balance_check",
-    "optional_block_gas_limit",
-    "optional_eip3607",
-    "optional_gas_refund",
-    "optional_no_base_fee",
-], default-features = false }
-revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze", features = [
+    "dev",
+] }
+revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "b434308", features = [
     "std",
     "serde",
-    "memory_limit",
-    "optional_balance_check",
-    "optional_block_gas_limit",
-    "optional_eip3607",
-    "optional_gas_refund",
-    "optional_no_base_fee",
-], default-features = false }
+    "dev",
+] }
 
 # reth
 reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15", features = [

@@ -1,11 +1,9 @@
+use revm::{inspector_handle_register, GetInspector, Inspector};
 use revm_primitives::StorageSlot;
 
 use crate::error::SoflError;
-pub use revm::Database;
-pub use revm::DatabaseCommit;
-pub use revm::DatabaseRef;
 
-use super::types::Bytecode;
+use super::types::{Bytecode, Database, Env, SpecId};
 use super::{
     inspector::EvmInspector,
     transition::TransitionSpec,
@@ -15,10 +13,28 @@ use super::{
     },
 };
 
+struct InspectorWrapper<'a, S: BcState>(Box<dyn EvmInspector<S> + 'a>);
+
+impl<'a, S: BcState> InspectorWrapper<'a, S> {
+    pub fn new<I: EvmInspector<S> + 'a>(inspector: I) -> Self {
+        Self(Box::new(inspector))
+    }
+
+    pub fn get_evm_inspector(&mut self) -> &mut dyn EvmInspector<S> {
+        &mut self.0
+    }
+}
+
+impl<'a, S: BcState> GetInspector<'a, S> for InspectorWrapper<'a, S> {
+    fn get_inspector(&mut self) -> &mut dyn Inspector<S> {
+        &mut self.0
+    }
+}
+
 /// BcState is a wrapper of revm's Database trait.
 /// It provides a set of basic methods to read the state of the blockchain.
 pub trait BcState:
-    revm::Database<Error = Self::DatabaseErr> + revm::DatabaseCommit
+    Database<Error = Self::DatabaseErr> + revm::DatabaseCommit
 {
     type DatabaseErr: std::fmt::Debug;
 
@@ -32,33 +48,36 @@ pub trait BcState:
         Self: 'a,
         I: EvmInspector<&'a mut Self>,
     {
-        let TransitionSpec { cfg, block, txs } = spec.into();
-        let mut evm = revm::EVM::new();
-        evm.env.cfg = cfg;
-        evm.env.block = block;
-        evm.database(self);
+        let envs: Vec<Env> = spec.into();
         let mut results = Vec::new();
-        for tx in txs.into_iter() {
-            let insp = &mut inspector;
-            evm.env.tx = tx;
+        let mut evm = revm::EvmBuilder::default()
+            .with_db(self)
+            .with_external_context(InspectorWrapper::new(&mut inspector))
+            .spec_id(SpecId::LATEST)
+            .append_handler_register(inspector_handle_register)
+            .build();
+        for env in envs.into_iter() {
+            evm = revm::EvmBuilder::new(evm)
+                .modify_env(|e| {
+                    e.cfg = env.cfg;
+                    e.block = env.block;
+                    e.tx = env.tx;
+                })
+                .build();
 
             // inspector pre-transaction hook
-            if !insp.transaction(
-                &evm.env.tx,
-                evm.db
-                    .as_ref()
-                    .expect("impossible: db does not exists while database has been set in evm"),
-            ) {
+            let insp = evm.context.external.get_evm_inspector();
+            if !insp.transaction(&evm.context.evm.env.tx, &evm.context.evm.db) {
                 // return false to skip transaction
                 results.push(revm::primitives::ExecutionResult::Halt {
-                    reason: revm::primitives::Halt::NotActivated,
+                    reason: revm::primitives::HaltReason::NotActivated,
                     gas_used: 0,
                 });
                 continue;
             }
 
             // execute transaction
-            let result = evm.inspect_commit(insp).map_err(|e| match e {
+            let result = evm.transact_commit().map_err(|e| match e {
                 revm::primitives::EVMError::Transaction(ee) => {
                     SoflError::InvalidTransaction(ee)
                 }
@@ -68,16 +87,19 @@ pub trait BcState:
                 revm::primitives::EVMError::Database(ee) => {
                     SoflError::BcState(format!("{:?}", ee))
                 }
+                revm::primitives::EVMError::Custom(ee) => {
+                    SoflError::BcState(format!("{:?}", ee))
+                }
             })?;
 
             // inspector post-transaction hook
-            (&mut inspector).transaction_end(
-                &evm.env.tx,
-                evm.db
-                    .as_ref()
-                    .expect("impossible: db does not exists while database has been set in evm"),
+            let insp = evm.context.external.get_evm_inspector();
+            insp.transaction_end(
+                &evm.context.evm.env.tx,
+                &evm.context.evm.db,
                 &result,
             );
+
             results.push(result);
         }
         Ok(results)
@@ -92,14 +114,23 @@ pub trait BcState:
     where
         Self::Error: std::fmt::Debug,
     {
-        let TransitionSpec { cfg, block, txs } = spec;
-        let mut evm = revm::EVM::new();
-        evm.env.cfg = cfg;
-        evm.env.block = block;
-        evm.database(self);
+        let envs: Vec<Env> = spec.into();
         let mut results = Vec::new();
-        for tx in txs.into_iter() {
-            evm.env.tx = tx;
+        let mut evm = revm::EvmBuilder::default()
+            .with_db(self)
+            .spec_id(SpecId::LATEST)
+            .build();
+
+        for env in envs.into_iter() {
+            evm = revm::EvmBuilder::new(evm)
+                .modify_env(|e| {
+                    e.cfg = env.cfg;
+                    e.block = env.block;
+                    e.tx = env.tx;
+                })
+                .build();
+
+            // execute transaction
             let result = evm.transact_commit().map_err(|e| match e {
                 revm::primitives::EVMError::Transaction(ee) => {
                     SoflError::InvalidTransaction(ee)
@@ -110,8 +141,11 @@ pub trait BcState:
                 revm::primitives::EVMError::Database(ee) => {
                     SoflError::BcState(format!("{:?}", ee))
                 }
+                revm::primitives::EVMError::Custom(ee) => {
+                    SoflError::BcState(format!("{:?}", ee))
+                }
             })?;
-            // inspector post-transaction hook
+
             results.push(result);
         }
         Ok(results)
@@ -129,36 +163,39 @@ pub trait BcState:
         Self::Error: std::fmt::Debug,
         I: EvmInspector<&'a mut Self>,
     {
-        let TransitionSpec { cfg, block, txs } = spec;
-        let mut evm = revm::EVM::new();
-        evm.env.cfg = cfg;
-        evm.env.block = block;
-        evm.database(self);
+        let envs: Vec<Env> = spec.into();
         let mut results = Vec::new();
         let mut changes = Vec::new();
-        for tx in txs.into_iter() {
-            evm.env.tx = tx;
+        let mut evm = revm::EvmBuilder::default()
+            .with_db(self)
+            .with_external_context(InspectorWrapper::new(&mut inspector))
+            .spec_id(SpecId::LATEST)
+            .append_handler_register(inspector_handle_register)
+            .build();
 
-            let insp = &mut inspector;
+        for env in envs.into_iter() {
+            evm = revm::EvmBuilder::new(evm)
+                .modify_env(|e| {
+                    e.cfg = env.cfg;
+                    e.block = env.block;
+                    e.tx = env.tx;
+                })
+                .build();
+
             // inspector pre-transaction hook
-            if !insp.transaction(
-                &evm.env.tx,
-                evm.db
-                    .as_ref()
-                    .expect("impossible: db does not exists while database has been set in evm"),
-            ) {
+            let insp = evm.context.external.get_evm_inspector();
+            if !insp.transaction(&evm.context.evm.env.tx, &evm.context.evm.db) {
                 // return false to skip transaction
-                let r = revm::primitives::ExecutionResult::Halt {
-                    reason: revm::primitives::Halt::NotActivated,
+                results.push(revm::primitives::ExecutionResult::Halt {
+                    reason: revm::primitives::HaltReason::NotActivated,
                     gas_used: 0,
-                };
-                results.push(r);
-                changes.push(revm::primitives::State::default());
+                });
                 continue;
             }
 
+            // execute
             let revm::primitives::ResultAndState { result, state } =
-                evm.inspect(insp).map_err(|e| match e {
+                evm.transact().map_err(|e| match e {
                     revm::primitives::EVMError::Transaction(ee) => {
                         SoflError::InvalidTransaction(ee)
                     }
@@ -168,20 +205,23 @@ pub trait BcState:
                     revm::primitives::EVMError::Database(ee) => {
                         SoflError::BcState(format!("{:?}", ee))
                     }
+                    revm_primitives::EVMError::Custom(ee) => {
+                        SoflError::BcState(format!("{:?}", ee))
+                    }
                 })?;
 
             // inspector post-transaction hook
-            (&mut inspector).transaction_end(
-                &evm.env.tx,
-                evm.db
-                    .as_ref()
-                    .expect("impossible: db does not exists while database has been set in evm"),
+            let insp = evm.context.external.get_evm_inspector();
+            insp.transaction_end(
+                &evm.context.evm.env.tx,
+                &evm.context.evm.db,
                 &result,
             );
 
             results.push(result);
             changes.push(state);
         }
+
         Ok((changes, results))
     }
 

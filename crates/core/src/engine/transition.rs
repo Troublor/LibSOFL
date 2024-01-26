@@ -7,7 +7,7 @@ use crate::{
     error::SoflError,
 };
 
-use super::types::{BlockHashOrNumber, TxHash};
+use super::types::{BlockHashOrNumber, Env, TxHash};
 
 #[derive(Default, Clone, Debug, serde::Deserialize, serde::Serialize)]
 pub struct TransitionSpec {
@@ -62,6 +62,20 @@ pub struct TransitionSpecBuilder {
 impl TransitionSpecBuilder {
     pub fn new() -> Self {
         Self::default()
+    }
+}
+
+impl From<TransitionSpec> for Vec<Env> {
+    fn from(spec: TransitionSpec) -> Self {
+        let mut envs = Vec::new();
+        for tx in spec.txs.into_iter() {
+            let mut env = Env::default();
+            env.cfg = spec.cfg.clone();
+            env.block = spec.block.clone();
+            env.tx = tx;
+            envs.push(env);
+        }
+        envs
     }
 }
 
