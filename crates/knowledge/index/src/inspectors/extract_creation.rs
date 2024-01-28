@@ -1,10 +1,7 @@
 use libsofl_core::engine::{
     inspector::EvmInspector,
     state::BcState,
-    types::{
-        Address, Bytes, CreateInputs, EVMData, Gas, Inspector,
-        InstructionResult, U256,
-    },
+    types::{Address, Inspector, InstructionResult, U256},
 };
 
 #[derive(Default)]
@@ -15,18 +12,20 @@ pub struct ExtractCreationInspector {
 impl<BS: BcState> Inspector<BS> for ExtractCreationInspector {
     fn create_end(
         &mut self,
-        _data: &mut EVMData<'_, BS>,
-        _inputs: &CreateInputs,
-        ret: InstructionResult,
-        address: Option<Address>,
-        remaining_gas: Gas,
-        out: Bytes,
-    ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
+        _context: &mut libsofl_core::engine::types::EvmContext<BS>,
+        _inputs: &libsofl_core::engine::types::CreateInputs,
+        result: libsofl_core::engine::types::InterpreterResult,
+        address: Option<libsofl_core::engine::types::Address>,
+    ) -> libsofl_core::engine::types::CreateOutcome {
         let addr = match address {
             Some(addr) => addr,
-            None => return (ret, address, remaining_gas, out),
+            None => {
+                return libsofl_core::engine::types::CreateOutcome::new(
+                    result, address,
+                )
+            }
         };
-        match ret {
+        match result.result {
             InstructionResult::Continue
             | InstructionResult::Stop
             | InstructionResult::Return => {
@@ -34,7 +33,7 @@ impl<BS: BcState> Inspector<BS> for ExtractCreationInspector {
             }
             _ => {}
         }
-        (ret, address, remaining_gas, out)
+        libsofl_core::engine::types::CreateOutcome::new(result, address)
     }
 
     fn selfdestruct(
@@ -51,7 +50,7 @@ impl<BS: BcState> EvmInspector<BS> for ExtractCreationInspector {}
 
 #[cfg(test)]
 mod tests {
-    use libsofl_core::engine::memory::MemoryBcState;
+    use libsofl_core::engine::{memory::MemoryBcState, types::SpecId};
     use libsofl_utils::solidity::{
         caller::HighLevelCaller, scripting::compile_solidity,
     };
@@ -82,6 +81,7 @@ mod tests {
             .unwrap();
         HighLevelCaller::default()
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .create(&mut state, None, &bytecode, None, &mut inspector)
             .unwrap();
 

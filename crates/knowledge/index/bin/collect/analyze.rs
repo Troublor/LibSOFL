@@ -10,7 +10,7 @@ use libsofl_core::{
         inspector::CombinedInspector,
         state::BcState,
         transition::TransitionSpec,
-        types::{BlockEnv, CfgEnv, BcStateRef, TxEnv},
+        types::{BcStateRef, BlockEnv, CfgEnv, TxEnv},
     },
     error::SoflError,
 };
@@ -20,11 +20,8 @@ use libsofl_knowledge_index::inspectors::{
 };
 use libsofl_utils::log::debug;
 
-pub struct Analyzer<
-    T: Tx,
-    S: BcStateRef,
-    P: BcProvider<T> + BcStateProvider<S>,
-> where
+pub struct Analyzer<T: Tx, S: BcStateRef, P: BcProvider<T> + BcStateProvider<S>>
+where
     S::Error: std::fmt::Debug,
 {
     provider: Arc<P>,
@@ -81,6 +78,7 @@ where
             let mut tx_env = TxEnv::default();
             tx.fill_tx_env(&mut tx_env)?;
             let spec = TransitionSpec {
+                evm_version: None,
                 cfg: cfg_env.clone(),
                 block: block_env.clone(),
                 txs: vec![tx_env],

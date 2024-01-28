@@ -507,7 +507,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new()
+        let mut cheatcodes = CheatCodes::new(1, 17000001)
             .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
         let curve_yvault: Address =
@@ -529,7 +529,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 17000001);
 
         let uniswap_v2: Address =
             "0x004375Dff511095CC5A197A54140a24eFEF3A416".cvt();
@@ -583,7 +583,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::default()
+        let mut cheatcodes = CheatCodes::new(1, 17000001)
             .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
         let token = "0x3Ba78eC6Fdd9E1AD64c1a28F5Db6D63156565fF9".cvt();

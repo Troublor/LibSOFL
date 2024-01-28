@@ -460,7 +460,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 17000001);
 
         let weth = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2".cvt();
         let price = cheatcodes.get_price_in_ether(&mut state, weth).unwrap();
@@ -475,7 +475,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 17000001);
 
         let wbtc = "0x2260fac5e5542a773aa44fbcfedf7c193bc2c599".cvt();
         let price = cheatcodes.get_price_in_ether(&mut state, wbtc).unwrap();
@@ -491,7 +491,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 17000001);
 
         let usdc: Address = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48".cvt();
         let price0 = cheatcodes.get_price_in_ether(&mut state, usdc).unwrap();

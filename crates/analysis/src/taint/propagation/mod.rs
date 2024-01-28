@@ -6,7 +6,7 @@ pub mod nested_call;
 
 use libsofl_core::engine::{
     state::BcState,
-    types::{EVMData, Interpreter},
+    types::{EvmContext, Interpreter},
 };
 
 #[macro_export]
@@ -42,8 +42,8 @@ impl<S: BcState> TaintPolicy<S> for () {
     fn before_step(
         &mut self,
         _taint_tracker: &mut TaintTracker,
-        _interp: &mut Interpreter<'_>,
-        _data: &mut EVMData<'_, S>,
+        _interp: &mut Interpreter,
+        _data: &mut EvmContext<S>,
     ) -> Vec<Option<bool>> {
         Vec::new()
     }
@@ -53,8 +53,8 @@ impl<S: BcState> TaintPolicy<S> for () {
         &mut self,
         _taint_tracker: &mut TaintTracker,
         _op: u8,
-        _interp: &mut Interpreter<'_>,
-        _data: &mut EVMData<'_, S>,
+        _interp: &mut Interpreter,
+        _data: &mut EvmContext<S>,
     ) {
     }
 }
@@ -72,8 +72,8 @@ impl<S: BcState, P1: TaintPolicy<S>, P2: TaintPolicy<S>> TaintPolicy<S>
     fn before_step(
         &mut self,
         taint_tracker: &mut TaintTracker,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, S>,
+        interp: &mut Interpreter,
+        data: &mut EvmContext<S>,
     ) -> Vec<Option<bool>> {
         let stack_taint0 = self.0.before_step(taint_tracker, interp, data);
         let stack_taint1 = self.1.before_step(taint_tracker, interp, data);
@@ -105,8 +105,8 @@ impl<S: BcState, P1: TaintPolicy<S>, P2: TaintPolicy<S>> TaintPolicy<S>
         &mut self,
         taint_tracker: &mut TaintTracker,
         op: u8,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, S>,
+        interp: &mut Interpreter,
+        data: &mut EvmContext<S>,
     ) {
         self.0.after_step(taint_tracker, op, interp, data);
         self.1.after_step(taint_tracker, op, interp, data);

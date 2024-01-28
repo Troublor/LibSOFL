@@ -5,20 +5,22 @@ use crate::blockchain::tx_position::TxPosition;
 
 // Low level types
 pub type Uint<const BITS: usize, const LIMBS: usize> =
-    revm::primitives::ruint::Uint<BITS, LIMBS>;
+    alloy_primitives::ruint::Uint<BITS, LIMBS>;
 pub type Signed<const BITS: usize, const LIMBS: usize> =
     alloy_primitives::Signed<BITS, LIMBS>;
-pub type U64 = revm::primitives::ruint::Uint<64, 1>;
-pub type U128 = revm::primitives::ruint::Uint<128, 2>;
-pub type U256 = revm::primitives::U256;
-pub type I256 = revm::primitives::I256;
-pub type B256 = revm::primitives::B256;
+pub type U64 = alloy_primitives::ruint::Uint<64, 1>;
+pub type U128 = alloy_primitives::ruint::Uint<128, 2>;
+pub type U256 = alloy_primitives::U256;
+pub type I256 = alloy_primitives::I256;
+pub type B256 = alloy_primitives::B256;
 
 // High level types
-pub type Address = revm::primitives::Address;
-pub type Hash = revm::primitives::B256;
-pub type Bytes = revm::primitives::Bytes;
+pub type Address = alloy_primitives::Address;
+pub type Hash = alloy_primitives::B256;
+pub type Bytes = alloy_primitives::Bytes;
 pub type Bytecode = revm::primitives::Bytecode;
+pub type BytecodeState = revm::primitives::BytecodeState;
+pub type JumpMap = revm::primitives::JumpMap;
 
 #[derive(Clone, Debug, derive_more::Deref)]
 #[deref(forward)]
@@ -75,16 +77,17 @@ pub type Storage =
     revm::primitives::HashMap<U256, revm::primitives::StorageSlot>;
 pub type StorageSlot = revm::primitives::StorageSlot;
 
+pub use revm::db::DatabaseRef;
 pub use revm::interpreter::opcode;
 pub use revm::Database;
 pub use revm::DatabaseCommit;
-pub use revm::DatabaseRef;
-pub trait BcStateRef: revm::DatabaseRef + Sync + Send {}
-impl<T: revm::DatabaseRef + Sync + Send> BcStateRef for T {}
+pub trait BcStateRef: revm::db::DatabaseRef + Sync + Send {}
+impl<T: revm::db::DatabaseRef + Sync + Send> BcStateRef for T {}
 pub use revm::Inspector;
 pub type InstructionResult = revm::interpreter::InstructionResult;
-pub type Interpreter<'a> = revm::interpreter::Interpreter<'a>;
-pub type EVMData<'a, D> = revm::EVMData<'a, D>;
+pub type Interpreter = revm::interpreter::Interpreter;
+pub type EvmContext<D> = revm::EvmContext<D>;
+pub type Env = revm::primitives::Env;
 pub type AnalysisKind = revm::primitives::AnalysisKind;
 pub type BlobExcessGasAndPrice = revm::primitives::BlobExcessGasAndPrice;
 
@@ -95,11 +98,14 @@ pub type CfgEnv = revm::primitives::CfgEnv;
 pub type StateChange = revm::primitives::State;
 pub type ExecutionResult = revm::primitives::ExecutionResult;
 pub type Gas = revm::interpreter::Gas;
+pub type InterpreterResult = revm::interpreter::InterpreterResult;
 pub type CreateInputs = revm::interpreter::CreateInputs;
 pub type CallInputs = revm::interpreter::CallInputs;
+pub type CallOutcome = revm::interpreter::CallOutcome;
 pub type CallScheme = revm::interpreter::CallScheme;
 pub type Output = revm::primitives::Output;
 pub type CreateScheme = revm::primitives::CreateScheme;
+pub type CreateOutcome = revm::interpreter::CreateOutcome;
 
 pub const KECCAK_EMPTY: B256 = revm::primitives::KECCAK_EMPTY;
 pub use revm::primitives::keccak256;

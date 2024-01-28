@@ -10,7 +10,8 @@ use libsofl_core::{
         transition::TransitionSpecBuilder,
         types::{
             Address, BlockEnv, BlockHashOrNumber, Bytes, CfgEnv, CreateScheme,
-            ExecutionResult, Output, StateChange, TransactTo, TxEnv, U256,
+            ExecutionResult, Output, SpecId, StateChange, TransactTo, TxEnv,
+            U256,
         },
     },
     error::SoflError,
@@ -69,6 +70,11 @@ impl HighLevelCaller {
 
     pub fn set_block(mut self, block: BlockEnv) -> Self {
         self.spec_builder = self.spec_builder.set_block(block);
+        self
+    }
+
+    pub fn set_evm_version(mut self, evm_version: SpecId) -> Self {
+        self.spec_builder = self.spec_builder.set_evm_version(evm_version);
         self
     }
 

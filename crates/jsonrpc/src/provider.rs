@@ -13,8 +13,7 @@ use libsofl_core::{
     conversion::ConvertTo,
     engine::types::{
         AnalysisKind, BlobExcessGasAndPrice, BlockEnv, BlockHash,
-        BlockHashOrNumber, BlockNumber, CfgEnv, SpecId, TxEnv,
-        TxHashOrPosition,
+        BlockHashOrNumber, BlockNumber, CfgEnv, TxEnv, TxHashOrPosition,
     },
     error::SoflError,
 };
@@ -244,33 +243,35 @@ impl BcProvider<JsonRpcTx> for JsonRpcProvider {
     fn fill_cfg_env(
         &self,
         env: &mut CfgEnv,
-        block: BlockHashOrNumber,
+        _block: BlockHashOrNumber,
     ) -> Result<(), SoflError> {
-        let number = match block {
-            BlockHashOrNumber::Hash(hash) => self.block_number_by_hash(hash)?,
-            BlockHashOrNumber::Number(number) => number,
-        };
+        // let number = match block {
+        //     BlockHashOrNumber::Hash(hash) => self.block_number_by_hash(hash)?,
+        //     BlockHashOrNumber::Number(number) => number,
+        // };
         env.chain_id = self.chain_id;
+        env.kzg_settings = Default::default();
         env.perf_analyse_created_bytecodes = AnalysisKind::Analyse;
-        env.spec_id = match number {
-            0..=199999 => SpecId::FRONTIER,
-            200000..=1149999 => SpecId::FRONTIER_THAWING,
-            1150000..=1919999 => SpecId::HOMESTEAD,
-            1920000..=2462999 => SpecId::DAO_FORK,
-            2463000..=2674999 => SpecId::TANGERINE,
-            2675000..=4369999 => SpecId::SPURIOUS_DRAGON,
-            4370000..=7279999 => SpecId::BYZANTIUM,
-            // 7280000..9069000 => SpecId::CONSTANTINOPLE,
-            7280000..=9068999 => SpecId::PETERSBURG,
-            9069000..=9199999 => SpecId::ISTANBUL,
-            9200000..=12243999 => SpecId::MUIR_GLACIER,
-            12244000..=12964999 => SpecId::BERLIN,
-            12965000..=13772999 => SpecId::LONDON,
-            13773000..=15049999 => SpecId::ARROW_GLACIER,
-            15050000..=15537393 => SpecId::GRAY_GLACIER,
-            15537394..=17034869 => SpecId::MERGE,
-            17034870.. => SpecId::SHANGHAI,
-        };
+        env.limit_contract_code_size = None;
+        // env.spec_id = match number {
+        //     0..=199999 => SpecId::FRONTIER,
+        //     200000..=1149999 => SpecId::FRONTIER_THAWING,
+        //     1150000..=1919999 => SpecId::HOMESTEAD,
+        //     1920000..=2462999 => SpecId::DAO_FORK,
+        //     2463000..=2674999 => SpecId::TANGERINE,
+        //     2675000..=4369999 => SpecId::SPURIOUS_DRAGON,
+        //     4370000..=7279999 => SpecId::BYZANTIUM,
+        //     // 7280000..9069000 => SpecId::CONSTANTINOPLE,
+        //     7280000..=9068999 => SpecId::PETERSBURG,
+        //     9069000..=9199999 => SpecId::ISTANBUL,
+        //     9200000..=12243999 => SpecId::MUIR_GLACIER,
+        //     12244000..=12964999 => SpecId::BERLIN,
+        //     12965000..=13772999 => SpecId::LONDON,
+        //     13773000..=15049999 => SpecId::ARROW_GLACIER,
+        //     15050000..=15537393 => SpecId::GRAY_GLACIER,
+        //     15537394..=17034869 => SpecId::MERGE,
+        //     17034870.. => SpecId::SHANGHAI,
+        // };
         Ok(())
     }
 

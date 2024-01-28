@@ -291,7 +291,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::default()
+        let mut cheatcodes = CheatCodes::new(1, 17000001)
             .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
         {
@@ -366,7 +366,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::default()
+        let mut cheatcodes = CheatCodes::new(1, 17000001)
             .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
         {

@@ -1,6 +1,6 @@
 use libsofl_core::{
     blockchain::transaction::Log,
-    engine::types::{Address, BlockHashOrNumber, Bytes},
+    engine::types::{AccountInfo, Address, BlockHashOrNumber, Bytecode, Bytes},
 };
 
 use super::ConvertTo;
@@ -36,6 +36,17 @@ impl ConvertTo<Log> for reth_primitives::Log {
             address: self.address.cvt(),
             topics: self.topics.into_iter().map(|h| h).collect(),
             data: self.data.cvt(),
+        }
+    }
+}
+
+impl ConvertTo<AccountInfo> for reth_revm::primitives::AccountInfo {
+    fn cvt(self) -> AccountInfo {
+        AccountInfo {
+            balance: self.balance.cvt(),
+            nonce: self.nonce,
+            code_hash: self.code_hash.cvt(),
+            code: self.code.map(|c| ConvertTo::<Bytecode>::cvt(c)),
         }
     }
 }

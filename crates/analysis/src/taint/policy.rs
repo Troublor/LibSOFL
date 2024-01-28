@@ -1,6 +1,5 @@
 use libsofl_core::engine::{
-    state::BcState,
-    types::{EVMData, Interpreter},
+    state::BcState, types::EvmContext, types::Interpreter,
 };
 
 use crate::taint::TaintTracker;
@@ -17,8 +16,8 @@ pub trait TaintPolicy<S: BcState> {
     fn before_step(
         &mut self,
         _taint_tracker: &mut TaintTracker,
-        _interp: &mut Interpreter<'_>,
-        _data: &mut EVMData<'_, S>,
+        _interp: &mut Interpreter,
+        _data: &mut EvmContext<S>,
     ) -> Vec<Option<bool>> {
         vec![]
     }
@@ -28,8 +27,8 @@ pub trait TaintPolicy<S: BcState> {
         &mut self,
         _taint_tracker: &mut TaintTracker,
         _op: u8,
-        _interp: &mut Interpreter<'_>,
-        _data: &mut EVMData<'_, S>,
+        _interp: &mut Interpreter,
+        _data: &mut EvmContext<S>,
     ) {
     }
 }

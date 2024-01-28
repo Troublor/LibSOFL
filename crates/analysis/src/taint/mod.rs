@@ -17,7 +17,7 @@ use std::collections::HashMap;
 use libsofl_core::{
     engine::{
         state::BcState,
-        types::{Address, EVMData, Interpreter},
+        types::{Address, EvmContext, Interpreter},
     },
     error::SoflError,
 };
@@ -50,15 +50,15 @@ pub trait TaintMarker<S: BcState> {
     fn before_step(
         &self,
         taint_tracker: &mut TaintTracker,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, S>,
+        interp: &mut Interpreter,
+        data: &mut EvmContext<S>,
     ) -> Result<(), SoflError>;
 
     fn after_step(
         &self,
         taint_tracker: &mut TaintTracker,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, S>,
+        interp: &mut Interpreter,
+        data: &mut EvmContext<S>,
     ) -> Result<(), SoflError>;
 }
 

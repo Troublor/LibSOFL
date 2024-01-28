@@ -1,13 +1,15 @@
-use auto_impl::auto_impl;
+use std::ops::Range;
 
 use super::{
     state::BcState,
     types::{
-        Address, Bytes, CallInputs, CreateInputs, Database, EVMData,
-        ExecutionResult, Gas, Inspector, InstructionResult, Interpreter, TxEnv,
-        B256, U256,
+        Address, CallInputs, CreateInputs, Database, EvmContext,
+        ExecutionResult, Inspector, Interpreter, TxEnv, U256,
     },
 };
+use alloy_primitives::Log;
+use auto_impl::auto_impl;
+use revm::interpreter::{CallOutcome, CreateOutcome, InterpreterResult};
 
 /// EvmInspector is an extended revm::Inspector with additional methods called at each transaction start and end.
 #[auto_impl(&mut, Box)]
@@ -78,12 +80,12 @@ impl<'a, DB: Database> Inspector<DB> for CombinedInspector<'a, DB> {
     #[inline]
     fn initialize_interp(
         &mut self,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, DB>,
+        interp: &mut Interpreter,
+        data: &mut EvmContext<DB>,
     ) {
-        self.inspectors.iter_mut().for_each(|i| {
+        for i in self.inspectors.iter_mut() {
             i.initialize_interp(interp, data);
-        });
+        }
     }
 
     #[doc = r" Called on each step of the interpreter."]
@@ -95,27 +97,17 @@ impl<'a, DB: Database> Inspector<DB> for CombinedInspector<'a, DB> {
     #[doc = r""]
     #[doc = r" To get the current opcode, use `interp.current_opcode()`."]
     #[inline]
-    fn step(
-        &mut self,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, DB>,
-    ) {
-        self.inspectors.iter_mut().for_each(|i| {
+    fn step(&mut self, interp: &mut Interpreter, data: &mut EvmContext<DB>) {
+        for i in self.inspectors.iter_mut() {
             i.step(interp, data);
-        });
+        }
     }
 
     #[doc = r" Called when a log is emitted."]
     #[inline]
-    fn log(
-        &mut self,
-        evm_data: &mut EVMData<'_, DB>,
-        address: &Address,
-        topics: &[B256],
-        data: &Bytes,
-    ) {
+    fn log(&mut self, context: &mut EvmContext<DB>, log: &Log) {
         self.inspectors.iter_mut().for_each(|i| {
-            i.log(evm_data, address, topics, data);
+            i.log(context, log);
         });
     }
 
@@ -126,8 +118,8 @@ impl<'a, DB: Database> Inspector<DB> for CombinedInspector<'a, DB> {
     #[inline]
     fn step_end(
         &mut self,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, DB>,
+        interp: &mut Interpreter,
+        data: &mut EvmContext<DB>,
     ) {
         self.inspectors.iter_mut().for_each(|i| {
             i.step_end(interp, data);
@@ -142,96 +134,59 @@ impl<'a, DB: Database> Inspector<DB> for CombinedInspector<'a, DB> {
     /// If any inspector returns a non-Continue result, the other inspectors are skipped.
     fn call(
         &mut self,
-        data: &mut EVMData<'_, DB>,
+        data: &mut EvmContext<DB>,
         inputs: &mut CallInputs,
-    ) -> (InstructionResult, Gas, Bytes) {
+        return_memory_offset: Range<usize>,
+    ) -> Option<CallOutcome> {
         for i in self.inspectors.iter_mut() {
-            let (ret, gas, out) = i.call(data, inputs);
-            if ret != InstructionResult::Continue {
-                return (ret, gas, out);
+            let outcome = i.call(data, inputs, return_memory_offset.clone());
+            if let Some(outcome) = outcome {
+                return Some(outcome);
             }
         }
-        (InstructionResult::Continue, Gas::new(0), Bytes::new())
+        None
     }
 
-    #[doc = r" Called when a call to a contract has concluded."]
-    #[doc = r""]
-    #[doc = r" InstructionResulting anything other than the values passed to this function (`(ret, remaining_gas,"]
-    #[doc = r" out)`) will alter the result of the call."]
-    #[inline]
-    /// Inspectors are called in the order they are added.
-    /// If any inspector returns a different result other than the value passed to this function, the other inspectors are skipped.
     fn call_end(
         &mut self,
-        data: &mut EVMData<'_, DB>,
+        data: &mut EvmContext<DB>,
         inputs: &CallInputs,
-        remaining_gas: Gas,
-        ret: InstructionResult,
-        out: Bytes,
-    ) -> (InstructionResult, Gas, Bytes) {
+        result: InterpreterResult,
+    ) -> InterpreterResult {
+        let mut r = result;
         for i in self.inspectors.iter_mut() {
-            let (r, g, o) =
-                i.call_end(data, inputs, remaining_gas, ret, out.clone());
-            if r != ret || g != remaining_gas || o != out {
-                return (r, g, out);
-            }
+            r = i.call_end(data, inputs, r);
         }
-        (ret, remaining_gas, out)
+        r
     }
 
-    #[doc = r" Called when a contract is about to be created."]
-    #[doc = r""]
-    #[doc = r" InstructionResulting anything other than [InstructionResult::Continue] overrides the result of the creation."]
-    #[inline]
-    /// Inspectors are called in the order they are added.
-    /// If any inspector returns a non-Continue result, the other inspectors are skipped.
     fn create(
         &mut self,
-        data: &mut EVMData<'_, DB>,
+        data: &mut EvmContext<DB>,
         inputs: &mut CreateInputs,
-    ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
+    ) -> Option<CreateOutcome> {
         for i in self.inspectors.iter_mut() {
-            let (ret, address, gas, out) = i.create(data, inputs);
-            if ret != InstructionResult::Continue {
-                return (ret, address, gas, out);
+            let outcome = i.create(data, inputs);
+            if outcome.is_some() {
+                return outcome;
             }
         }
-        (
-            InstructionResult::Continue,
-            None,
-            Gas::new(0),
-            Bytes::default(),
-        )
+        None
     }
 
-    #[doc = r" Called when a contract has been created."]
-    #[doc = r""]
-    #[doc = r" InstructionResulting anything other than the values passed to this function (`(ret, remaining_gas,"]
-    #[doc = r" address, out)`) will alter the result of the create."]
-    #[inline]
     fn create_end(
         &mut self,
-        data: &mut EVMData<'_, DB>,
+        data: &mut EvmContext<DB>,
         inputs: &CreateInputs,
-        ret: InstructionResult,
+        result: InterpreterResult,
         address: Option<Address>,
-        remaining_gas: Gas,
-        out: Bytes,
-    ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
+    ) -> CreateOutcome {
+        let mut r = result;
         for i in self.inspectors.iter_mut() {
-            let (r, addr, g, o) = i.create_end(
-                data,
-                inputs,
-                ret,
-                address,
-                remaining_gas,
-                out.clone(),
-            );
-            if r != ret || addr != address || g != remaining_gas || o != out {
-                return (r, addr, g, o);
-            }
+            let outcome = i.create_end(data, inputs, r, address);
+            r = outcome.result;
         }
-        (ret, address, remaining_gas, out)
+        CreateOutcome::new(r, address)
     }
 
     #[doc = r" Called when a contract has been self-destructed with funds transferred to target."]
