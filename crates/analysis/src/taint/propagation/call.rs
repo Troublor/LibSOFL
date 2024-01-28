@@ -13,8 +13,8 @@ impl<S: BcState> TaintPolicy<S> for CallPolicy {
     fn before_step(
         &mut self,
         taint_tracker: &mut crate::taint::TaintTracker,
-        interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-        _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+        interp: &mut libsofl_core::engine::types::Interpreter,
+        _data: &mut libsofl_core::engine::types::EvmContext<S>,
     ) -> Vec<Option<bool>> {
         match interp.current_opcode() {
             opcode::CALLER => {
@@ -98,8 +98,8 @@ mod tests {
         fn before_step(
             &mut self,
             taint_tracker: &mut crate::taint::TaintTracker,
-            interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-            _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+            interp: &mut libsofl_core::engine::types::Interpreter,
+            _data: &mut libsofl_core::engine::types::EvmContext<S>,
         ) -> Vec<Option<bool>> {
             taint_tracker.call.calldata.taint(0, 10240);
             let op = interp.current_opcode();
@@ -117,8 +117,8 @@ mod tests {
             &mut self,
             taint_tracker: &mut crate::taint::TaintTracker,
             op: u8,
-            _interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-            _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+            _interp: &mut libsofl_core::engine::types::Interpreter,
+            _data: &mut libsofl_core::engine::types::EvmContext<S>,
         ) {
             match op {
                 opcode::CALLDATALOAD => {

@@ -78,6 +78,7 @@ where
             let mut tx_env = TxEnv::default();
             tx.fill_tx_env(&mut tx_env)?;
             let spec = TransitionSpec {
+                evm_version: None,
                 cfg: cfg_env.clone(),
                 block: block_env.clone(),
                 txs: vec![tx_env],

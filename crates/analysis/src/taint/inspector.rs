@@ -1,10 +1,7 @@
 use libsofl_core::engine::{
     inspector::EvmInspector,
     state::BcState,
-    types::{
-        opcode, Address, Bytes, CallInputs, CreateInputs, EVMData, Gas,
-        Inspector, InstructionResult, Interpreter,
-    },
+    types::{opcode, Inspector},
 };
 
 use crate::taint::{
@@ -17,8 +14,8 @@ use super::{policy::TaintPolicy, stack::OPCODE_STACK_DELTA, TaintAnalyzer};
 impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
     fn step(
         &mut self,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, S>,
+        interp: &mut libsofl_core::engine::types::Interpreter,
+        context: &mut libsofl_core::engine::types::EvmContext<S>,
     ) {
         let state_addr = interp.contract().address;
         let taint_stack = self.stacks.last_mut().unwrap();
@@ -48,9 +45,11 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
             child_call: taint_child_call,
         };
 
-        self.stack_taint_effects =
-            self.policy
-                .before_step(&mut current_taint_tracker, interp, data);
+        self.stack_taint_effects = self.policy.before_step(
+            &mut current_taint_tracker,
+            interp,
+            context,
+        );
         // pop values from taintable stack
         match interp.current_opcode() {
             op if opcode::PUSH0 <= op && op <= opcode::PUSH32 => {}
@@ -67,8 +66,8 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
 
     fn step_end(
         &mut self,
-        interp: &mut Interpreter<'_>,
-        data: &mut EVMData<'_, S>,
+        interp: &mut libsofl_core::engine::types::Interpreter,
+        context: &mut libsofl_core::engine::types::EvmContext<S>,
     ) {
         let state_addr = interp.contract().address;
         let taint_stack = self.stacks.last_mut().unwrap();
@@ -136,7 +135,7 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         );
 
         self.policy
-            .after_step(&mut current_taint_tracker, op, interp, data);
+            .after_step(&mut current_taint_tracker, op, interp, context);
 
         // sanity check
         assert_eq!(
@@ -147,14 +146,15 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
 
     fn call(
         &mut self,
-        data: &mut EVMData<'_, S>,
-        _inputs: &mut CallInputs,
-    ) -> (InstructionResult, Gas, Bytes) {
+        context: &mut libsofl_core::engine::types::EvmContext<S>,
+        _inputs: &mut libsofl_core::engine::types::CallInputs,
+        _return_memory_offset: std::ops::Range<usize>,
+    ) -> Option<libsofl_core::engine::types::CallOutcome> {
         let taint_stack = TaintableStack::default();
         self.stacks.push(taint_stack);
         let taint_memory = TaintableMemory::new(self.memory_word_size);
         self.memories.push(taint_memory);
-        let child_call = if data.journaled_state.depth() != 0 {
+        let child_call = if context.journaled_state.depth() != 0 {
             self.child_calls.last_mut().unwrap().take().unwrap()
         } else {
             TaintableCall::new(self.memory_word_size)
@@ -167,22 +167,21 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         assert_eq!(self.calls.len(), self.memories.len());
         assert_eq!(self.calls.len(), self.child_calls.len());
 
-        (InstructionResult::Continue, Gas::new(0), Bytes::new())
+        None
     }
 
     fn call_end(
         &mut self,
-        data: &mut EVMData<'_, S>,
-        _inputs: &CallInputs,
-        remaining_gas: Gas,
-        ret: InstructionResult,
-        out: Bytes,
-    ) -> (InstructionResult, Gas, Bytes) {
+        context: &mut libsofl_core::engine::types::EvmContext<S>,
+        _inputs: &libsofl_core::engine::types::CallInputs,
+        result: libsofl_core::engine::types::InterpreterResult,
+    ) -> libsofl_core::engine::types::InterpreterResult {
         self.stacks.pop();
         self.memories.pop();
         self.child_calls.pop();
         let (child_call, _) = self.calls.pop().unwrap();
-        if data.journaled_state.depth() != 0 {
+        if context.journaled_state.depth() != 1 {
+            // call depth is shifted in call_end hook: https://github.com/bluealloy/revm/issues/1018
             self.child_calls.last_mut().unwrap().replace(child_call);
         }
 
@@ -191,14 +190,14 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         assert_eq!(self.calls.len(), self.memories.len());
         assert_eq!(self.calls.len(), self.child_calls.len());
 
-        (ret, remaining_gas, out)
+        result
     }
 
     fn create(
         &mut self,
-        _data: &mut EVMData<'_, S>,
-        _inputs: &mut CreateInputs,
-    ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
+        _context: &mut libsofl_core::engine::types::EvmContext<S>,
+        _inputs: &mut libsofl_core::engine::types::CreateInputs,
+    ) -> Option<libsofl_core::engine::types::CreateOutcome> {
         let taint_stack = TaintableStack::default();
         self.stacks.push(taint_stack);
         let taint_memory = TaintableMemory::new(self.memory_word_size);
@@ -211,23 +210,16 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         assert_eq!(self.calls.len(), self.memories.len());
         assert_eq!(self.calls.len(), self.child_calls.len());
 
-        (
-            InstructionResult::Continue,
-            None,
-            Gas::new(0),
-            Bytes::default(),
-        )
+        None
     }
 
     fn create_end(
         &mut self,
-        _data: &mut EVMData<'_, S>,
-        _inputs: &CreateInputs,
-        ret: InstructionResult,
-        address: Option<Address>,
-        remaining_gas: Gas,
-        out: Bytes,
-    ) -> (InstructionResult, Option<Address>, Gas, Bytes) {
+        _context: &mut libsofl_core::engine::types::EvmContext<S>,
+        _inputs: &libsofl_core::engine::types::CreateInputs,
+        result: libsofl_core::engine::types::InterpreterResult,
+        address: Option<libsofl_core::engine::types::Address>,
+    ) -> libsofl_core::engine::types::CreateOutcome {
         self.stacks.pop();
         self.memories.pop();
         let (child_call, _) = self.calls.pop().unwrap();
@@ -238,7 +230,7 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         assert_eq!(self.calls.len(), self.memories.len());
         assert_eq!(self.calls.len(), self.child_calls.len());
 
-        (ret, address, remaining_gas, out)
+        libsofl_core::engine::types::CreateOutcome::new(result, address)
     }
 }
 

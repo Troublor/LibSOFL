@@ -274,7 +274,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 17000001);
 
         let balance_before = cheatcodes
             .get_erc20_balance(&mut state, token, account)
@@ -352,7 +352,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(14972421, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 14972421);
 
         let usdt = ADDRESS_BOOK.usdt.must_on_chain(Chain::Mainnet);
         let balance1 = cheatcodes
@@ -419,7 +419,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(14972421, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 14972421);
 
         let deposit_amount = 300479464706193878654u128.cvt();
         let yv_curve_3crypto_token =

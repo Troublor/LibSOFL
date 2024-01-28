@@ -13,8 +13,8 @@ impl<S: BcState> TaintPolicy<S> for NestedCallPolicy {
     fn before_step(
         &mut self,
         taint_tracker: &mut crate::taint::TaintTracker,
-        interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-        _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+        interp: &mut libsofl_core::engine::types::Interpreter,
+        _data: &mut libsofl_core::engine::types::EvmContext<S>,
     ) -> Vec<Option<bool>> {
         match interp.current_opcode() {
             opcode::RETURNDATASIZE => {
@@ -183,8 +183,8 @@ impl<S: BcState> TaintPolicy<S> for NestedCallPolicy {
         &mut self,
         taint_tracker: &mut crate::taint::TaintTracker,
         op: u8,
-        _interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-        _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+        _interp: &mut libsofl_core::engine::types::Interpreter,
+        _data: &mut libsofl_core::engine::types::EvmContext<S>,
     ) {
         match op {
             opcode::CALL

@@ -12,7 +12,7 @@ use libsofl_core::{
     engine::{
         inspector::no_inspector,
         state::BcState,
-        types::{Address, BlockEnv, Bytes, CfgEnv, U256},
+        types::{Address, BlockEnv, Bytes, CfgEnv, SpecId, U256},
     },
     error::SoflError,
 };
@@ -71,6 +71,7 @@ pub fn run_sol<S: BcState>(
     state.add_ether_balance(deployer, config.prefund)?;
     let h_caller = HighLevelCaller::new(deployer)
         .bypass_check()
+        .set_evm_version(SpecId::LATEST)
         .set_block(config.block.clone())
         .set_cfg(config.cfg.clone());
     let (_, addr) = h_caller.create(
@@ -117,6 +118,7 @@ pub fn deploy_contracts<S: BcState>(
         state.add_ether_balance(deployer, config.prefund)?;
         let (_, addr) = HighLevelCaller::new(deployer)
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .set_block(config.block.clone())
             .set_cfg(config.cfg.clone())
             .create(
@@ -239,6 +241,7 @@ pub fn run_yul<S: BcState>(
     state.replace_account_code(config.contract, bytecode.cvt())?;
     let ret = HighLevelCaller::new(config.caller)
         .bypass_check()
+        .set_evm_version(SpecId::LATEST)
         .set_block(config.block)
         .set_cfg(config.cfg)
         .call(
@@ -262,7 +265,7 @@ mod tests {
         engine::{
             inspector::no_inspector,
             memory::MemoryBcState,
-            types::{Address, Database},
+            types::{Address, Database, SpecId},
         },
     };
 
@@ -354,6 +357,7 @@ mod tests {
             .cvt();
         let ret = HighLevelCaller::default()
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .call(&mut state, contract, input, None, no_inspector())
             .unwrap();
         let ret = sol_data::String::abi_decode(&ret, true).unwrap();
@@ -387,6 +391,7 @@ mod tests {
             .cvt();
         let ret = HighLevelCaller::default()
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .call(&mut state, addr, input, None, no_inspector())
             .unwrap();
         let ret = sol_data::String::abi_decode(&ret, true).unwrap();
@@ -438,6 +443,7 @@ mod tests {
         // the code of the contract should remain unchanged
         let ret = HighLevelCaller::default()
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .view(&mut state, addr, "x() returns (uint)", &[], no_inspector())
             .unwrap()
             .remove(0);

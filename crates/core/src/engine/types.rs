@@ -98,11 +98,14 @@ pub type CfgEnv = revm::primitives::CfgEnv;
 pub type StateChange = revm::primitives::State;
 pub type ExecutionResult = revm::primitives::ExecutionResult;
 pub type Gas = revm::interpreter::Gas;
+pub type InterpreterResult = revm::interpreter::InterpreterResult;
 pub type CreateInputs = revm::interpreter::CreateInputs;
 pub type CallInputs = revm::interpreter::CallInputs;
+pub type CallOutcome = revm::interpreter::CallOutcome;
 pub type CallScheme = revm::interpreter::CallScheme;
 pub type Output = revm::primitives::Output;
 pub type CreateScheme = revm::primitives::CreateScheme;
+pub type CreateOutcome = revm::interpreter::CreateOutcome;
 
 pub const KECCAK_EMPTY: B256 = revm::primitives::KECCAK_EMPTY;
 pub use revm::primitives::keccak256;

@@ -15,8 +15,8 @@ impl<S: BcState> TaintPolicy<S> for TxOutputSink {
     fn before_step(
         &mut self,
         taint_tracker: &mut crate::taint::TaintTracker,
-        interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-        data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+        interp: &mut libsofl_core::engine::types::Interpreter,
+        data: &mut libsofl_core::engine::types::EvmContext<S>,
     ) -> Vec<Option<bool>> {
         if data.journaled_state.depth() == 1 {
             match interp.current_opcode() {

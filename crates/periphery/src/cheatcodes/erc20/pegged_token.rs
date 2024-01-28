@@ -227,7 +227,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(14972419, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new()
+        let mut cheatcodes = CheatCodes::new(1, 14972419)
             .set_caller(&|caller| caller.at_block(&bp, fork_at.block));
 
         let token = "0xE537B5cc158EB71037D4125BDD7538421981E6AA".cvt();

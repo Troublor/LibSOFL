@@ -13,8 +13,8 @@ impl<S: BcState> TaintPolicy<S> for MathPolicy {
     fn before_step(
         &mut self,
         taint_tracker: &mut crate::taint::TaintTracker,
-        interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-        _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+        interp: &mut libsofl_core::engine::types::Interpreter,
+        _data: &mut libsofl_core::engine::types::EvmContext<S>,
     ) -> Vec<Option<bool>> {
         let op = interp.current_opcode();
         match op {
@@ -79,7 +79,7 @@ mod tests {
         engine::{
             memory::MemoryBcState,
             state::BcState,
-            types::{opcode, Address, U256},
+            types::{opcode, Address, SpecId, U256},
         },
     };
     use libsofl_utils::solidity::{
@@ -105,8 +105,8 @@ mod tests {
         fn before_step(
             &mut self,
             taint_tracker: &mut crate::taint::TaintTracker,
-            interp: &mut libsofl_core::engine::types::Interpreter<'_>,
-            _data: &mut libsofl_core::engine::types::EVMData<'_, S>,
+            interp: &mut libsofl_core::engine::types::Interpreter,
+            _data: &mut libsofl_core::engine::types::EvmContext<S>,
         ) -> Vec<Option<bool>> {
             match interp.current_opcode() {
                 opcode::CALLDATALOAD => {
@@ -158,6 +158,7 @@ mod tests {
         state.replace_account_code(contract, code.cvt()).unwrap();
         HighLevelCaller::default()
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .call(&mut state, contract, calldata.cvt(), None, &mut analyzer)
             .unwrap();
         assert!(oracle.tainted);

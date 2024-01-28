@@ -3,7 +3,7 @@ use std::collections::BTreeMap;
 use libsofl_core::engine::{
     inspector::EvmInspector,
     state::BcState,
-    types::{opcode, Address, EVMData, Inspector, Interpreter, U256},
+    types::{opcode, Address, Inspector, U256},
 };
 
 /// Returns [InstructionResult::Continue] on an error, discarding the error.
@@ -44,18 +44,10 @@ impl<DB> Inspector<DB> for CheatcodeInspector
 where
     DB: BcState,
 {
-    #[doc = " Called on each step of the interpreter."]
-    #[doc = ""]
-    #[doc = " Information about the current execution, including the memory, stack and more is available"]
-    #[doc = " on `interp` (see [Interpreter])."]
-    #[doc = ""]
-    #[doc = " # Example"]
-    #[doc = ""]
-    #[doc = " To get the current opcode, use `interp.current_opcode()`."]
     fn step(
         &mut self,
-        interpreter: &mut Interpreter,
-        _data: &mut EVMData<'_, DB>,
+        interpreter: &mut libsofl_core::engine::types::Interpreter,
+        _context: &mut libsofl_core::engine::types::EvmContext<DB>,
     ) {
         // Record writes and reads if `record` has been called
         if let Some(storage_accesses) = &mut self.accesses {

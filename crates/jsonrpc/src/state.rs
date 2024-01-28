@@ -13,10 +13,9 @@ use libsofl_core::{
     conversion::ConvertTo,
     engine::{
         memory::MemoryBcState,
-        state::DatabaseRef,
         types::{
-            keccak256, AccountInfo, Address, BlockHashOrNumber, Bytecode, Hash,
-            B256, KECCAK_EMPTY, U256,
+            keccak256, AccountInfo, Address, BlockHashOrNumber, Bytecode,
+            DatabaseRef, Hash, B256, KECCAK_EMPTY, U256,
         },
     },
     error::SoflError,

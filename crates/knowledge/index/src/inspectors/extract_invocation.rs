@@ -3,9 +3,7 @@ use std::collections::HashSet;
 use libsofl_core::engine::{
     inspector::EvmInspector,
     state::BcState,
-    types::{
-        Address, Bytes, CallInputs, EVMData, Gas, Inspector, InstructionResult,
-    },
+    types::{Address, Inspector},
 };
 
 #[derive(Default)]
@@ -16,18 +14,19 @@ pub struct ExtractInvocationInspector {
 impl<BS: BcState> Inspector<BS> for ExtractInvocationInspector {
     fn call(
         &mut self,
-        data: &mut EVMData<'_, BS>,
-        inputs: &mut CallInputs,
-    ) -> (InstructionResult, Gas, Bytes) {
+        context: &mut libsofl_core::engine::types::EvmContext<BS>,
+        inputs: &mut libsofl_core::engine::types::CallInputs,
+        _return_memory_offset: std::ops::Range<usize>,
+    ) -> Option<libsofl_core::engine::types::CallOutcome> {
         let addr = inputs.context.code_address;
         let account_info =
-            data.db.basic(addr).expect("failed to get account info");
+            context.db.basic(addr).expect("failed to get account info");
         if account_info.is_none() || account_info.unwrap().is_empty_code_hash()
         {
-            return (InstructionResult::Continue, Gas::new(0), Bytes::new());
+            return None;
         }
         self.invocations.insert(addr);
-        (InstructionResult::Continue, Gas::new(0), Bytes::new())
+        None
     }
 }
 
@@ -41,7 +40,7 @@ mod tests {
         conversion::ConvertTo,
         engine::{
             memory::MemoryBcState,
-            types::{Address, U256},
+            types::{Address, SpecId, U256},
         },
     };
     use libsofl_utils::solidity::{
@@ -98,6 +97,7 @@ mod tests {
             .unwrap();
         HighLevelCaller::default()
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .call(&mut state, addr_b, input.cvt(), None, &mut inspector)
             .unwrap();
         let invocations = inspector.invocations;
@@ -143,6 +143,7 @@ mod tests {
 
         HighLevelCaller::default()
             .bypass_check()
+            .set_evm_version(SpecId::LATEST)
             .call(&mut state, contract, input.cvt(), None, &mut inspector)
             .unwrap();
 

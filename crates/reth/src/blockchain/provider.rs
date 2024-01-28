@@ -27,7 +27,6 @@ use reth_blockchain_tree::{
     BlockchainTree, ShareableBlockchainTree, TreeExternals,
 };
 use reth_db::{open_db_read_only, DatabaseEnv};
-use reth_primitives::revm::env::fill_tx_env;
 use reth_primitives::ChainSpecBuilder;
 pub use reth_provider::{
     providers::BlockchainProvider, BlockHashReader, BlockNumReader,
@@ -143,7 +142,8 @@ impl BcStateProvider<RethBcStateRef> for RethProvider {
             ))
         })?;
         let wrapped = StateProviderDatabase::new(sp);
-        let mut state = MemoryBcState::new(wrapped);
+        let mut state: MemoryBcState<RethBcStateRef> =
+            MemoryBcState::new(wrapped.into());
 
         // execute proceeding transactions
         if pos.index > 0 {
@@ -225,9 +225,45 @@ impl BcProvider<RethTx> for RethProvider {
         env: &mut CfgEnv,
         block: BlockHashOrNumber,
     ) -> Result<(), SoflError> {
-        self.bp.fill_cfg_env_at(env, block.cvt()).map_err(|e| {
-            SoflError::Provider(format!("failed to fill cfg env: {}", e))
-        })
+        let mut reth_env: reth_revm::primitives::CfgEnv = env.clone().cvt();
+        self.bp
+            .fill_cfg_env_at(&mut reth_env, block.cvt())
+            .map_err(|e| {
+                SoflError::Provider(format!("failed to fill cfg env: {}", e))
+            })?;
+        env.chain_id = reth_env.chain_id;
+        env.kzg_settings = match reth_env.kzg_settings {
+            reth_revm::primitives::EnvKzgSettings::Default => {
+                libsofl_core::engine::revm::primitives::EnvKzgSettings::Default
+            }
+            reth_revm::primitives::EnvKzgSettings::Custom(s) => {
+                libsofl_core::engine::revm::primitives::EnvKzgSettings::Custom(
+                    s,
+                )
+            }
+        };
+        env.perf_analyse_created_bytecodes = match reth_env
+            .perf_analyse_created_bytecodes
+        {
+            reth_revm::primitives::AnalysisKind::Raw => {
+                libsofl_core::engine::revm::primitives::AnalysisKind::Raw
+            }
+            reth_revm::primitives::AnalysisKind::Check => {
+                libsofl_core::engine::revm::primitives::AnalysisKind::Check
+            }
+            reth_revm::primitives::AnalysisKind::Analyse => {
+                libsofl_core::engine::revm::primitives::AnalysisKind::Analyse
+            }
+        };
+        env.limit_contract_code_size = reth_env.limit_contract_code_size;
+        env.memory_limit = 2u64.pow(32) - 1;
+        env.disable_balance_check = false;
+        env.disable_balance_check = false;
+        env.disable_eip3607 = false;
+        env.disable_gas_refund = false;
+        env.disable_base_fee = false;
+        env.disable_beneficiary_reward = false;
+        Ok(())
     }
 
     fn fill_block_env(
@@ -235,9 +271,27 @@ impl BcProvider<RethTx> for RethProvider {
         env: &mut BlockEnv,
         block: BlockHashOrNumber,
     ) -> Result<(), SoflError> {
-        self.bp.fill_block_env_at(env, block.cvt()).map_err(|e| {
-            SoflError::Provider(format!("failed to fill block env: {}", e))
-        })
+        let mut reth_env: reth_revm::primitives::BlockEnv = env.clone().cvt();
+        self.bp
+            .fill_block_env_at(&mut reth_env, block.cvt())
+            .map_err(|e| {
+                SoflError::Provider(format!("failed to fill block env: {}", e))
+            })?;
+        env.number = reth_env.number.cvt();
+        env.coinbase = reth_env.coinbase.cvt();
+        env.timestamp = reth_env.timestamp.cvt();
+        env.gas_limit = reth_env.gas_limit.cvt();
+        env.basefee = reth_env.basefee.cvt();
+        env.difficulty = reth_env.difficulty.cvt();
+        env.prevrandao = reth_env.prevrandao.map(|p| p.cvt());
+        env.blob_excess_gas_and_price =
+            reth_env.blob_excess_gas_and_price.map(|b| {
+                libsofl_core::engine::revm::primitives::BlobExcessGasAndPrice {
+                    excess_blob_gas: b.excess_blob_gas,
+                    blob_gasprice: b.blob_gasprice,
+                }
+            });
+        Ok(())
     }
 
     fn fill_tx_env(
@@ -246,8 +300,7 @@ impl BcProvider<RethTx> for RethProvider {
         tx: TxHashOrPosition,
     ) -> Result<(), SoflError> {
         let tx = self.tx(tx)?;
-        let sender = tx.sender();
-        fill_tx_env(env, Box::new(tx.tx.transaction), sender.cvt());
+        tx.fill_tx_env(env)?;
         Ok(())
     }
 
@@ -351,8 +404,8 @@ mod tests_with_db {
         assert_eq!(receipt.logs.len(), r.logs().len());
         for (log, receipt_log) in r.logs().iter().zip(receipt.logs.iter()) {
             assert_eq!(log.address, receipt_log.address);
-            assert_eq!(log.topics, receipt_log.topics);
-            assert_eq!(*log.data, *receipt_log.data);
+            assert_eq!(log.topics(), receipt_log.topics);
+            assert_eq!(*log.data.data, *receipt_log.data);
         }
         assert_eq!(receipt.cumulative_gas_used, r.gas_used());
     }

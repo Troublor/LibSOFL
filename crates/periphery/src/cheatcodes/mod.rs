@@ -12,6 +12,7 @@ use libsofl_core::{
     conversion::ConvertTo,
     engine::{
         state::BcState,
+        transition::get_evm_version,
         types::{Address, Bytecode, Bytes, B256, U256},
     },
     error::SoflError,
@@ -50,17 +51,14 @@ pub struct CheatCodes {
 //     [fsig.as_slice(), args.as_slice()].concat().into()
 // }
 
-impl Default for CheatCodes {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 // basic functionality
 impl CheatCodes {
-    pub fn new() -> Self {
+    pub fn new(chain_id: u64, block_number: u64) -> Self {
+        let evm_version = get_evm_version(chain_id, block_number);
         Self {
-            caller: HighLevelCaller::default().bypass_check(),
+            caller: HighLevelCaller::default()
+                .bypass_check()
+                .set_evm_version(evm_version),
             inspector: CheatcodeInspector::default(),
             slots: BTreeMap::new(),
             // abi_parser: AbiParser::default(),
@@ -104,11 +102,17 @@ impl CheatCodes {
     {
         // staticcall to get the slot, where we force the return type as u256
         self.inspector.reset_access_recording();
-        let ret = self
-            .caller
-            .static_call(state, to, calldata.clone(), &mut self.inspector)
-            .ok()?;
-        let cdata = SolUint256::abi_decode(&ret, true);
+        let ret = self.caller.static_call(
+            state,
+            to,
+            calldata.clone(),
+            &mut self.inspector,
+        );
+        let ret = ret.ok()?;
+        let cdata: Result<
+            libsofl_core::engine::revm::primitives::ruint::Uint<256, 4>,
+            alloy_sol_types::Error,
+        > = SolUint256::abi_decode(&ret, true);
         if cdata.is_err() {
             return None;
         }
@@ -483,7 +487,7 @@ mod tests_with_dep {
         let fork_at = TxPosition::new(17000001, 0);
         let mut state = bp.bc_state_at(fork_at).unwrap();
 
-        let mut cheatcodes = CheatCodes::new();
+        let mut cheatcodes = CheatCodes::new(1, 17000001);
 
         let token: Address = "0xdAC17F958D2ee523a2206206994597C13D831ec7".cvt();
         let account: Address =

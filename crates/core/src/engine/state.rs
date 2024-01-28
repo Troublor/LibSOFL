@@ -3,7 +3,7 @@ use revm_primitives::StorageSlot;
 
 use crate::error::SoflError;
 
-use super::types::{Bytecode, Database, Env, SpecId};
+use super::types::{Bytecode, Database, Env};
 use super::{
     inspector::EvmInspector,
     transition::TransitionSpec,
@@ -48,12 +48,13 @@ pub trait BcState:
         Self: 'a,
         I: EvmInspector<&'a mut Self>,
     {
+        let spec_id = spec.get_evm_version();
         let envs: Vec<Env> = spec.into();
         let mut results = Vec::new();
         let mut evm = revm::EvmBuilder::default()
             .with_db(self)
             .with_external_context(InspectorWrapper::new(&mut inspector))
-            .spec_id(SpecId::LATEST)
+            .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();
         for env in envs.into_iter() {
@@ -114,11 +115,12 @@ pub trait BcState:
     where
         Self::Error: std::fmt::Debug,
     {
+        let spec_id = spec.get_evm_version();
         let envs: Vec<Env> = spec.into();
         let mut results = Vec::new();
         let mut evm = revm::EvmBuilder::default()
             .with_db(self)
-            .spec_id(SpecId::LATEST)
+            .spec_id(spec_id)
             .build();
 
         for env in envs.into_iter() {
@@ -163,13 +165,14 @@ pub trait BcState:
         Self::Error: std::fmt::Debug,
         I: EvmInspector<&'a mut Self>,
     {
+        let spec_id = spec.get_evm_version();
         let envs: Vec<Env> = spec.into();
         let mut results = Vec::new();
         let mut changes = Vec::new();
         let mut evm = revm::EvmBuilder::default()
             .with_db(self)
             .with_external_context(InspectorWrapper::new(&mut inspector))
-            .spec_id(SpecId::LATEST)
+            .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();
 
