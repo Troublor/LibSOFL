@@ -18,7 +18,7 @@ use semver::Version;
 use crate::{config::CodeKnowledgeConfig, entities, error::Error};
 
 pub struct CodeQuery {
-    fetcher: super::fetcher::Fetcher,
+    fetcher: super::fetcher::MultiplexedFetcher,
     eager: bool,
     db: DatabaseConnection,
     source_code_cache: Cache<Address, Arc<Metadata>>,
@@ -37,8 +37,7 @@ impl CodeQuery {
         cfg: &CodeKnowledgeConfig,
         eager: bool,
     ) -> Result<Self, Error> {
-        let fetcher =
-            super::fetcher::Fetcher::new(cfg).map_err(Error::Etherscan)?;
+        let fetcher = super::fetcher::MultiplexedFetcher::new(cfg);
         let db = db_cfg
             .get_database_connection()
             .await
@@ -250,163 +249,171 @@ impl CodeQuery {
 
         // try fetch from block explorer
         let data = self.get_verified_code_async(address).await?;
-        let data = match data {
-            Some(data) => data,
-            None => return Ok(None),
-        };
-        let mut model = {
-            let data = data.clone();
-            entities::code::Model {
-                contract: address.to_string(),
-                verified: true,
-                source: serde_json::Value::Null, // to fill
-                language: "".to_string(),        // to fill
-                abi: serde_json::Value::Null,    // to fill
-                compiler_version: data.compiler_version.clone(),
-                deployment_code: "".to_string(), // to fill
-                storage_layout: serde_json::Value::Null, // to fill
-                name: data.contract_name.clone(),
-                settings: serde_json::Value::Null, // to fill
-                constructor_args: data.constructor_arguments.to_string(),
-                license: if data.license_type.is_empty()
-                    || data.license_type.to_lowercase() == "none"
-                {
-                    None
-                } else {
-                    Some(data.license_type.clone())
-                },
-                proxy: data.proxy > 0,
-                implementation: data.implementation.map(|s| s.to_string()),
-                swarm_source: if data.swarm_source.is_empty() {
-                    None
-                } else {
-                    Some(data.swarm_source.clone())
-                },
-            }
-        };
-        let mut settings = data.settings().expect("failed to parse settings");
-        settings.output_selection =
-            OutputSelection::complete_output_selection();
-        {
-            // workaround for https://github.com/foundry-rs/compilers/issues/47
-            settings.remappings = settings
-                .remappings
-                .into_iter()
-                .map(|mut m| {
-                    m.name = if !m.name.ends_with("/") {
-                        m.name.push('/');
-                        m.name
+        let model = if let Some(data) = data {
+            let mut model = {
+                let data = data.clone();
+                entities::code::Model {
+                    contract: address.to_string(),
+                    verified: true,
+                    source: serde_json::Value::Null, // to fill
+                    language: "".to_string(),        // to fill
+                    abi: serde_json::Value::Null,    // to fill
+                    compiler_version: data.compiler_version.clone(),
+                    deployment_code: "".to_string(), // to fill
+                    storage_layout: serde_json::Value::Null, // to fill
+                    name: data.contract_name.clone(),
+                    settings: serde_json::Value::Null, // to fill
+                    constructor_args: data.constructor_arguments.to_string(),
+                    license: if data.license_type.is_empty()
+                        || data.license_type.to_lowercase() == "none"
+                    {
+                        None
                     } else {
-                        m.name
-                    };
-                    m
-                })
-                .collect();
-        }
-        model.settings = serde_json::to_value(&settings)
-            .expect("failed to serialize settings");
+                        Some(data.license_type.clone())
+                    },
+                    proxy: data.proxy > 0,
+                    implementation: data.implementation.map(|s| s.to_string()),
+                    swarm_source: if data.swarm_source.is_empty() {
+                        None
+                    } else {
+                        Some(data.swarm_source.clone())
+                    },
+                }
+            };
+            let mut settings =
+                data.settings().expect("failed to parse settings");
+            settings.output_selection =
+                OutputSelection::complete_output_selection();
+            {
+                // workaround for https://github.com/foundry-rs/compilers/issues/47
+                settings.remappings = settings
+                    .remappings
+                    .into_iter()
+                    .map(|mut m| {
+                        m.name = if !m.name.ends_with("/") {
+                            m.name.push('/');
+                            m.name
+                        } else {
+                            m.name
+                        };
+                        m
+                    })
+                    .collect();
+            }
+            model.settings = serde_json::to_value(&settings)
+                .expect("failed to serialize settings");
 
-        // prepare compiler
-        if data.compiler_version.starts_with("vyper") {
-            model.source =
-                serde_json::Value::String(data.source_code.source_code());
-            // Vyper's ABI does not fit into JsonAbi, yet.
-            model.abi = serde_json::Value::String(data.abi.clone());
-            model.language = "Vyper".to_string();
+            // prepare compiler
+            if data.compiler_version.starts_with("vyper") {
+                model.source =
+                    serde_json::Value::String(data.source_code.source_code());
+                // Vyper's ABI does not fit into JsonAbi, yet.
+                model.abi = serde_json::Value::String(data.abi.clone());
+                model.language = "Vyper".to_string();
+                let model = Arc::new(model);
+                self.model_cache.insert(address, model.clone());
+                return Ok(Some(model));
+            } else {
+                model.language = "Solidity".to_string();
+                match JsonAbi::from_json_str(&data.abi) {
+                    Ok(abi) => {
+                        model.abi = serde_json::to_value(abi)
+                            .expect("failed to serialize ABI");
+                    }
+                    Err(_) => {
+                        // many ancient contract ABIs do not fit into JsonAbi, due to missing some fields, such as "stateMutability"
+                        model.abi = serde_json::Value::String(data.abi.clone());
+                    }
+                };
+            }
+
+            let sources: Sources = data
+                .source_code
+                .sources()
+                .into_iter()
+                .map(|(name, source)| {
+                    (
+                        PathBuf::from(name),
+                        Source {
+                            content: Arc::new(source.content),
+                        },
+                    )
+                })
+                .collect::<Sources>();
+            model.source = serde_json::to_value(&sources)
+                .expect("failed to serialize sources");
+
+            let compiler_version = if data.compiler_version.starts_with("v") {
+                data.compiler_version[1..].to_string()
+            } else {
+                data.compiler_version.clone()
+            };
+            let version = Version::parse(&compiler_version)
+                .expect("failed to parse version");
+            if let Ok(compiler) = Solc::find_or_install_svm_version(format!(
+                "{}.{}.{}",
+                version.major, version.minor, version.patch
+            ))
+            .map_err(Error::Solc)
+            {
+                // compile
+                let input = CompilerInput {
+                    language: "Solidity".to_string(),
+                    sources,
+                    settings,
+                };
+                let output =
+                    compiler.compile_exact(&input).map_err(Error::Solc)?;
+                let output = Arc::new(output);
+                self.compiler_output_cache.insert(address, output.clone());
+
+                // handle errors
+                let errs = output
+                    .errors
+                    .iter()
+                    .filter(|e| e.severity.is_error())
+                    .map(|e| e.to_owned())
+                    .collect::<Vec<_>>();
+                if !errs.is_empty() {
+                    return Err(Error::CompilationFailed(errs));
+                }
+
+                // obtain storage layout
+                let contracts = output
+                    .contracts
+                    .values()
+                    .map(|f| {
+                        f.into_iter()
+                            .map(|(n, m)| (n.clone(), m.clone()))
+                            .collect::<Vec<(String, Contract)>>()
+                    })
+                    .flatten()
+                    .collect::<Vec<_>>();
+                let (_, contract_meta) = contracts
+                    .iter()
+                    .find(|(name, _)| *name == data.contract_name)
+                    .or(contracts.last())
+                    .expect("main contract not found");
+                model.storage_layout =
+                    serde_json::to_value(&contract_meta.storage_layout)
+                        .expect("failed to serialize storage layout");
+                model.deployment_code = contract_meta
+                    .get_bytecode_bytes()
+                    .map(|b| b.to_string())
+                    .unwrap_or_default();
+            };
             let model = Arc::new(model);
             self.model_cache.insert(address, model.clone());
-            return Ok(Some(model));
+            model
         } else {
-            model.language = "Solidity".to_string();
-            match JsonAbi::from_json_str(&data.abi) {
-                Ok(abi) => {
-                    model.abi = serde_json::to_value(abi)
-                        .expect("failed to serialize ABI");
-                }
-                Err(_) => {
-                    // many ancient contract ABIs do not fit into JsonAbi, due to missing some fields, such as "stateMutability"
-                    model.abi = serde_json::Value::String(data.abi.clone());
-                }
+            let model = entities::code::Model {
+                contract: address.to_string(),
+                verified: false,
+                ..Default::default()
             };
-        }
-
-        let sources: Sources = data
-            .source_code
-            .sources()
-            .into_iter()
-            .map(|(name, source)| {
-                (
-                    PathBuf::from(name),
-                    Source {
-                        content: Arc::new(source.content),
-                    },
-                )
-            })
-            .collect::<Sources>();
-        model.source = serde_json::to_value(&sources)
-            .expect("failed to serialize sources");
-
-        let compiler_version = if data.compiler_version.starts_with("v") {
-            data.compiler_version[1..].to_string()
-        } else {
-            data.compiler_version.clone()
-        };
-        let version =
-            Version::parse(&compiler_version).expect("failed to parse version");
-        if let Ok(compiler) = Solc::find_or_install_svm_version(format!(
-            "{}.{}.{}",
-            version.major, version.minor, version.patch
-        ))
-        .map_err(Error::Solc)
-        {
-            // compile
-            let input = CompilerInput {
-                language: "Solidity".to_string(),
-                sources,
-                settings,
-            };
-            let output = compiler.compile_exact(&input).map_err(Error::Solc)?;
-            let output = Arc::new(output);
-            self.compiler_output_cache.insert(address, output.clone());
-
-            // handle errors
-            let errs = output
-                .errors
-                .iter()
-                .filter(|e| e.severity.is_error())
-                .map(|e| e.to_owned())
-                .collect::<Vec<_>>();
-            if !errs.is_empty() {
-                return Err(Error::CompilationFailed(errs));
-            }
-
-            // obtain storage layout
-            let contracts = output
-                .contracts
-                .values()
-                .map(|f| {
-                    f.into_iter()
-                        .map(|(n, m)| (n.clone(), m.clone()))
-                        .collect::<Vec<(String, Contract)>>()
-                })
-                .flatten()
-                .collect::<Vec<_>>();
-            let (_, contract_meta) = contracts
-                .iter()
-                .find(|(name, _)| *name == data.contract_name)
-                .or(contracts.last())
-                .expect("main contract not found");
-            model.storage_layout =
-                serde_json::to_value(&contract_meta.storage_layout)
-                    .expect("failed to serialize storage layout");
-            model.deployment_code = contract_meta
-                .get_bytecode_bytes()
-                .map(|b| b.to_string())
-                .unwrap_or_default();
+            Arc::new(model)
         };
 
-        let model = Arc::new(model);
-        self.model_cache.insert(address, model.clone());
         let active_model = entities::code::ActiveModel::from((*model).clone());
         match entities::code::Entity::insert(active_model)
             .on_conflict(
@@ -441,6 +448,10 @@ impl CodeQuery {
                 }
             }
         };
-        Ok(Some(model))
+        if model.verified {
+            Ok(Some(model))
+        } else {
+            Ok(None)
+        }
     }
 }

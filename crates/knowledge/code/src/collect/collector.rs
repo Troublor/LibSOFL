@@ -1,6 +1,7 @@
 use std::sync::{atomic::AtomicU64, Arc};
 
 use crossbeam::atomic::AtomicConsume;
+use foundry_block_explorers::errors::EtherscanError;
 use libsofl_core::{
     blockchain::{
         provider::{BcProvider, BcStateProvider},
@@ -8,9 +9,7 @@ use libsofl_core::{
     },
     conversion::ConvertTo,
     engine::{
-        state::BcState,
-        transition::TransitionSpecBuilder,
-        types::{Address, BcStateRef},
+        state::BcState, transition::TransitionSpecBuilder, types::BcStateRef,
     },
 };
 use libsofl_utils::log::{error, info};
@@ -161,14 +160,50 @@ where
         let mut state = self.provider.bc_state_at(bn.cvt()).unwrap();
         state.transit(spec, &mut insp).map_err(Error::Sofl)?;
 
-        for contract in insp.contracts {
-            match self.process_one_contract(contract).await {
-                Ok(_) => {}
-                Err(err) => {
-                    error!(contract = contract.to_string(), err = ?err, "failed to process contract");
+        info!(
+            block = bn,
+            contracts = insp.contracts.len(),
+            "found contracts"
+        );
+
+        let tasks = insp
+            .contracts
+            .into_iter()
+            .map(|c| {
+                let query = self.query.clone();
+                tokio::spawn(async move { query.get_model_async(c).await })
+            })
+            .collect::<Vec<_>>();
+        let mut verified_contracts = 0;
+        let mut unverified_contracts = 0;
+        let mut failed_contracts = 0;
+        for task in tasks {
+            match task.await.unwrap() {
+                Ok(c) => {
+                    if c.is_some() {
+                        verified_contracts += 1;
+                    } else {
+                        unverified_contracts += 1;
+                    }
                 }
-            };
+                Err(err) => {
+                    failed_contracts += 1;
+                    if !matches!(
+                        err,
+                        Error::Etherscan(EtherscanError::RateLimitExceeded)
+                    ) {
+                        error!(err = ?err, "failed to process contract");
+                    }
+                }
+            }
         }
+        info!(
+            block = bn,
+            verified = verified_contracts,
+            unverified = unverified_contracts,
+            failed = failed_contracts,
+            "processed block"
+        );
 
         // save progress
         let metadata = CodeKnowledgeMetadata {
@@ -194,15 +229,6 @@ where
             .exec(&self.db)
             .await
             .map_err(Error::Database)?;
-        Ok(())
-    }
-
-    async fn process_one_contract(
-        &self,
-        contract: Address,
-    ) -> Result<(), Error> {
-        // get model will update the database implicitly
-        let _ = self.query.get_model_async(contract).await?;
         Ok(())
     }
 }
