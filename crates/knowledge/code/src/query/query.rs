@@ -116,13 +116,17 @@ impl CodeQuery {
 
         let model = self.get_model_async(address).await?;
         if let Some(model) = model {
-            let layout = serde_json::from_value::<StorageLayout>(
-                model.storage_layout.clone(),
-            )
-            .expect("failed to deserialize storage layout");
-            let layout = Arc::new(layout);
-            self.storage_layout_cache.insert(address, layout.clone());
-            Ok(Some(layout))
+            if model.compiler_version().major < 4 {
+                Err(Error::SolidityVersionTooLow)
+            } else {
+                let layout = serde_json::from_value::<StorageLayout>(
+                    model.storage_layout.clone(),
+                )
+                .expect("failed to deserialize storage layout");
+                let layout = Arc::new(layout);
+                self.storage_layout_cache.insert(address, layout.clone());
+                Ok(Some(layout))
+            }
         } else {
             Ok(None)
         }

@@ -171,14 +171,15 @@ where
             .into_iter()
             .map(|c| {
                 let query = self.query.clone();
-                tokio::spawn(async move { query.get_model_async(c).await })
+                tokio::spawn(async move { (c, query.get_model_async(c).await) })
             })
             .collect::<Vec<_>>();
         let mut verified_contracts = 0;
         let mut unverified_contracts = 0;
         let mut failed_contracts = 0;
         for task in tasks {
-            match task.await.unwrap() {
+            let (addr, result) = task.await.unwrap();
+            match result {
                 Ok(c) => {
                     if c.is_some() {
                         verified_contracts += 1;
@@ -192,7 +193,7 @@ where
                         err,
                         Error::Etherscan(EtherscanError::RateLimitExceeded)
                     ) {
-                        error!(err = ?err, "failed to process contract");
+                        error!(contract = addr.to_string(), err = ?err, "failed to process contract");
                     }
                 }
             }
