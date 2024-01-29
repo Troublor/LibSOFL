@@ -1,8 +1,9 @@
-use revm::{inspector_handle_register, GetInspector, Inspector};
+use revm::inspector_handle_register;
 use revm_primitives::StorageSlot;
 
 use crate::error::SoflError;
 
+use super::inspector::InspectorContext;
 use super::types::{Bytecode, Database, Env};
 use super::{
     inspector::EvmInspector,
@@ -12,25 +13,6 @@ use super::{
         StateChange, Storage, U256,
     },
 };
-
-struct InspectorWrapper<'a, S: BcState>(Box<dyn EvmInspector<S> + 'a>);
-
-impl<'a, S: BcState> InspectorWrapper<'a, S> {
-    pub fn new<I: EvmInspector<S> + 'a>(inspector: I) -> Self {
-        Self(Box::new(inspector))
-    }
-
-    pub fn get_evm_inspector(&mut self) -> &mut dyn EvmInspector<S> {
-        &mut self.0
-    }
-}
-
-impl<'a, S: BcState> GetInspector<'a, S> for InspectorWrapper<'a, S> {
-    fn get_inspector(&mut self) -> &mut dyn Inspector<S> {
-        &mut self.0
-    }
-}
-
 /// BcState is a wrapper of revm's Database trait.
 /// It provides a set of basic methods to read the state of the blockchain.
 pub trait BcState:
@@ -53,7 +35,7 @@ pub trait BcState:
         let mut results = Vec::new();
         let mut evm = revm::EvmBuilder::default()
             .with_db(self)
-            .with_external_context(InspectorWrapper::new(&mut inspector))
+            .with_external_context(InspectorContext::new(&mut inspector))
             .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();
@@ -171,7 +153,7 @@ pub trait BcState:
         let mut changes = Vec::new();
         let mut evm = revm::EvmBuilder::default()
             .with_db(self)
-            .with_external_context(InspectorWrapper::new(&mut inspector))
+            .with_external_context(InspectorContext::new(&mut inspector))
             .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();

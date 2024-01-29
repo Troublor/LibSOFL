@@ -9,7 +9,10 @@ use super::{
 };
 use alloy_primitives::Log;
 use auto_impl::auto_impl;
-use revm::interpreter::{CallOutcome, CreateOutcome, InterpreterResult};
+use revm::{
+    interpreter::{CallOutcome, CreateOutcome, InterpreterResult},
+    GetInspector,
+};
 
 /// EvmInspector is an extended revm::Inspector with additional methods called at each transaction start and end.
 #[auto_impl(&mut, Box)]
@@ -41,6 +44,24 @@ pub static mut NO_INSPECTOR: NoInspector = NoInspector {};
 
 pub fn no_inspector() -> &'static mut NoInspector {
     unsafe { &mut NO_INSPECTOR }
+}
+
+pub struct InspectorContext<'a, S: BcState>(Box<dyn EvmInspector<S> + 'a>);
+
+impl<'a, S: BcState> InspectorContext<'a, S> {
+    pub fn new<I: EvmInspector<S> + 'a>(inspector: I) -> Self {
+        Self(Box::new(inspector))
+    }
+
+    pub fn get_evm_inspector(&mut self) -> &mut dyn EvmInspector<S> {
+        &mut self.0
+    }
+}
+
+impl<'a, S: BcState> GetInspector<'a, S> for InspectorContext<'a, S> {
+    fn get_inspector(&mut self) -> &mut dyn Inspector<S> {
+        &mut self.0
+    }
 }
 
 #[derive(
