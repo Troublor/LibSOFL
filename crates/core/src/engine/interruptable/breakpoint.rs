@@ -1,6 +1,6 @@
-use revm_primitives::ResultAndState;
-
-use crate::engine::types::{Address, InterpreterResult};
+use crate::engine::types::{
+    Address, ExecutionResult, InterpreterResult, StateChange,
+};
 
 #[derive(Debug, Clone)]
 pub enum Breakpoint {
@@ -20,7 +20,7 @@ pub enum Breakpoint {
 #[derive(Debug, Clone)]
 pub enum RunResult {
     Breakpoint(Breakpoint),
-    Done(ResultAndState),
+    Done((StateChange, ExecutionResult)),
 }
 
 #[derive(Debug, Clone)]

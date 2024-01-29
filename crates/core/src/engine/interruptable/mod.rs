@@ -14,7 +14,7 @@ use crate::engine::revm::revm::{
 };
 
 use super::{
-    inspector::{no_inspector, EvmInspector, InspectorContext},
+    inspector::{no_inspector, EvmInspector, InspectorContext, NoInspector},
     state::BcState,
     types::SpecId,
 };
@@ -91,7 +91,19 @@ where
     }
 }
 
-impl<'a, S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
+impl<S: BcState> InterruptableEvm<S, NoInspector> {
+    pub fn new(
+        spec_id: SpecId,
+    ) -> InterruptableEvm<S, &'static mut NoInspector> {
+        InterruptableEvm {
+            spec_id,
+            inspector: Some(no_inspector()),
+            _phantom: std::marker::PhantomData,
+        }
+    }
+}
+
+impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     pub fn new_with_inspector(
         spec_id: SpecId,
         inspector: I,

@@ -21,9 +21,17 @@ use super::{
 };
 
 impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
+    #[inline]
+    pub fn run(
+        &self,
+        context: &mut ResumableContext<S>,
+    ) -> Result<RunResult, EVMError<S::Error>> {
+        self.run_until(context, vec![])
+    }
+
     /// Run evm until one of the breakpoints.
     #[inline]
-    pub fn run_until<FN>(
+    pub fn run_until(
         &self,
         context: &mut ResumableContext<S>,
         breakpoints: Vec<Breakpoint>,
@@ -123,7 +131,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
                     main_output,
                     &gas,
                 )?;
-                RunResult::Done(output)
+                RunResult::Done((output.state, output.result))
             }
             BreakpointResult::Hit(bp) => RunResult::Breakpoint(bp),
         };

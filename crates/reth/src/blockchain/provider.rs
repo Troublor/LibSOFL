@@ -347,8 +347,11 @@ mod tests_with_db {
         },
         conversion::ConvertTo,
         engine::{
-            inspector::no_inspector, state::BcState,
-            transition::TransitionSpec, types::TxHash,
+            inspector::no_inspector,
+            interruptable::{breakpoint::RunResult, InterruptableEvm},
+            state::BcState,
+            transition::TransitionSpec,
+            types::TxHash,
         },
     };
     use libsofl_utils::config::Config;
@@ -408,5 +411,36 @@ mod tests_with_db {
             assert_eq!(*log.data.data, *receipt_log.data);
         }
         assert_eq!(receipt.cumulative_gas_used, r.gas_used());
+    }
+
+    #[test]
+    fn test_reproduce_tx_with_interruptable_evm() {
+        let cfg = RethConfig::must_load();
+        let bp = cfg.bc_provider().unwrap();
+        let fork_at = TxPosition::new(17000000, 0);
+
+        // prepare state
+        let mut state = bp.bc_state_at(fork_at).unwrap();
+        // collect the tx
+        let tx_hash: TxHash =
+            "0xa278205118a242c87943b9ed83aacafe9906002627612ac3672d8ea224e38181".cvt();
+        let spec = TransitionSpec::from_tx_hash(&bp, tx_hash).unwrap();
+
+        // run with standard evm
+        let (mut s, mut r) =
+            state.simulate(spec.clone(), no_inspector()).unwrap();
+        let standard_change = s.remove(0);
+        let standard_result = r.remove(0);
+
+        let evm = InterruptableEvm::new(spec.get_evm_version());
+        let mut run_ctx = evm.build_resumable_run_context(&mut state);
+        let output = evm.run(&mut run_ctx).unwrap();
+        assert!(matches!(output, RunResult::Done(_)));
+        let RunResult::Done((state_change, output)) = output else {
+            unreachable!()
+        };
+
+        assert_eq!(state_change, standard_change);
+        assert_eq!(output, standard_result);
     }
 }
