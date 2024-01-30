@@ -38,9 +38,6 @@ pub struct Cli {
     chain_id: Option<u64>,
 
     #[arg(long)]
-    api_key: Option<String>,
-
-    #[arg(long)]
     database: Option<String>,
 
     #[arg(long)]
@@ -76,8 +73,6 @@ async fn main() -> Result<(), Box<dyn std::error::Error>> {
         libsofl_knowledge_code::config::CodeKnowledgeConfig::must_load_or_default();
     code_knowledge_cfg.chain_id =
         args.chain_id.unwrap_or(code_knowledge_cfg.chain_id);
-    code_knowledge_cfg.api_key =
-        args.api_key.unwrap_or(code_knowledge_cfg.api_key);
     code_knowledge_cfg.requests_per_second = Some(5.0);
     let query = libsofl_knowledge_code::query::query::CodeQuery::new(
         &knowledge_cfg,

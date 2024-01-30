@@ -7,6 +7,7 @@ pub enum Error {
     Etherscan(EtherscanError),
     Solc(SolcError),
     VyperNotSupported,
+    SolidityVersionTooLow,
     CompilationFailed(Vec<foundry_compilers::artifacts::Error>),
     Database(DbErr),
     Sofl(libsofl_core::error::SoflError),

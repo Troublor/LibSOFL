@@ -14,18 +14,15 @@ impl<BS: BcState> Inspector<BS> for ExtractCreationInspector {
         &mut self,
         _context: &mut libsofl_core::engine::types::EvmContext<BS>,
         _inputs: &libsofl_core::engine::types::CreateInputs,
-        result: libsofl_core::engine::types::InterpreterResult,
-        address: Option<libsofl_core::engine::types::Address>,
+        result: libsofl_core::engine::types::CreateOutcome,
     ) -> libsofl_core::engine::types::CreateOutcome {
-        let addr = match address {
+        let addr = match result.address {
             Some(addr) => addr,
             None => {
-                return libsofl_core::engine::types::CreateOutcome::new(
-                    result, address,
-                )
+                return result;
             }
         };
-        match result.result {
+        match result.result.result {
             InstructionResult::Continue
             | InstructionResult::Stop
             | InstructionResult::Return => {
@@ -33,7 +30,7 @@ impl<BS: BcState> Inspector<BS> for ExtractCreationInspector {
             }
             _ => {}
         }
-        libsofl_core::engine::types::CreateOutcome::new(result, address)
+        result
     }
 
     fn selfdestruct(
