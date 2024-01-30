@@ -15,11 +15,11 @@ impl<S: BcState> Inspector<S> for ContractInspector {
     fn call(
         &mut self,
         _context: &mut libsofl_core::engine::types::EvmContext<S>,
-        inputs: &mut libsofl_core::engine::types::CallInputs,
+        _inputs: &mut libsofl_core::engine::types::CallInputs,
         _return_memory_offset: std::ops::Range<usize>,
     ) -> Option<libsofl_core::engine::types::CallOutcome> {
-        let contract = inputs.context.code_address;
-        self.contracts.insert(contract);
+        // let contract = inputs.context.code_address;
+        // self.contracts.insert(contract);
         None
     }
 

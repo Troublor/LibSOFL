@@ -44,7 +44,7 @@ pub struct Cli {
     datadir: Option<String>,
 }
 
-#[tokio::main(flavor = "multi_thread")]
+#[tokio::main(flavor = "multi_thread")] 
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let args = Cli::parse();
 
