@@ -174,14 +174,13 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         &mut self,
         context: &mut libsofl_core::engine::types::EvmContext<S>,
         _inputs: &libsofl_core::engine::types::CallInputs,
-        result: libsofl_core::engine::types::InterpreterResult,
-    ) -> libsofl_core::engine::types::InterpreterResult {
+        outcome: libsofl_core::engine::types::CallOutcome,
+    ) -> libsofl_core::engine::types::CallOutcome {
         self.stacks.pop();
         self.memories.pop();
         self.child_calls.pop();
         let (child_call, _) = self.calls.pop().unwrap();
-        if context.journaled_state.depth() != 1 {
-            // call depth is shifted in call_end hook: https://github.com/bluealloy/revm/issues/1018
+        if context.journaled_state.depth() != 0 {
             self.child_calls.last_mut().unwrap().replace(child_call);
         }
 
@@ -190,7 +189,7 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         assert_eq!(self.calls.len(), self.memories.len());
         assert_eq!(self.calls.len(), self.child_calls.len());
 
-        result
+        outcome
     }
 
     fn create(
@@ -217,8 +216,7 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         &mut self,
         _context: &mut libsofl_core::engine::types::EvmContext<S>,
         _inputs: &libsofl_core::engine::types::CreateInputs,
-        result: libsofl_core::engine::types::InterpreterResult,
-        address: Option<libsofl_core::engine::types::Address>,
+        result: libsofl_core::engine::types::CreateOutcome,
     ) -> libsofl_core::engine::types::CreateOutcome {
         self.stacks.pop();
         self.memories.pop();
@@ -230,7 +228,7 @@ impl<S: BcState, P: TaintPolicy<S>> Inspector<S> for TaintAnalyzer<S, P> {
         assert_eq!(self.calls.len(), self.memories.len());
         assert_eq!(self.calls.len(), self.child_calls.len());
 
-        libsofl_core::engine::types::CreateOutcome::new(result, address)
+        result
     }
 }
 

@@ -27,13 +27,12 @@ impl<S: BcState> Inspector<S> for ContractInspector {
         &mut self,
         _context: &mut libsofl_core::engine::types::EvmContext<S>,
         _inputs: &libsofl_core::engine::types::CreateInputs,
-        result: libsofl_core::engine::types::InterpreterResult,
-        address: Option<libsofl_core::engine::types::Address>,
+        result: libsofl_core::engine::types::CreateOutcome,
     ) -> libsofl_core::engine::types::CreateOutcome {
-        if let Some(address) = address {
+        if let Some(address) = result.address {
             self.contracts.insert(address);
         }
-        libsofl_core::engine::types::CreateOutcome::new(result, address)
+        result
     }
 }
 

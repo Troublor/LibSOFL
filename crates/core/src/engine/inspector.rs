@@ -9,7 +9,7 @@ use super::{
 };
 use alloy_primitives::Log;
 use auto_impl::auto_impl;
-use revm::interpreter::{CallOutcome, CreateOutcome, InterpreterResult};
+use revm::interpreter::{CallOutcome, CreateOutcome};
 
 /// EvmInspector is an extended revm::Inspector with additional methods called at each transaction start and end.
 #[auto_impl(&mut, Box)]
@@ -151,9 +151,9 @@ impl<'a, DB: Database> Inspector<DB> for CombinedInspector<'a, DB> {
         &mut self,
         data: &mut EvmContext<DB>,
         inputs: &CallInputs,
-        result: InterpreterResult,
-    ) -> InterpreterResult {
-        let mut r = result;
+        outcome: CallOutcome,
+    ) -> CallOutcome {
+        let mut r = outcome;
         for i in self.inspectors.iter_mut() {
             r = i.call_end(data, inputs, r);
         }
@@ -178,15 +178,14 @@ impl<'a, DB: Database> Inspector<DB> for CombinedInspector<'a, DB> {
         &mut self,
         data: &mut EvmContext<DB>,
         inputs: &CreateInputs,
-        result: InterpreterResult,
-        address: Option<Address>,
+        outcome: CreateOutcome,
     ) -> CreateOutcome {
-        let mut r = result;
+        let mut r = outcome;
         for i in self.inspectors.iter_mut() {
-            let outcome = i.create_end(data, inputs, r, address);
-            r = outcome.result;
+            let outcome = i.create_end(data, inputs, r);
+            r = outcome;
         }
-        CreateOutcome::new(r, address)
+        r
     }
 
     #[doc = r" Called when a contract has been self-destructed with funds transferred to target."]
