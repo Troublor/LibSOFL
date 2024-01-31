@@ -1,18 +1,24 @@
-use revm::Evm;
+use std::ops::Range;
 
-use crate::engine::{
-    inspector::{EvmInspector, InspectorContext},
-    interruptable::breakpoint::RunResult,
-    revm::revm::{
-        interpreter::{
-            opcode::InstructionTables, Interpreter, InterpreterAction,
-            InterpreterResult,
+use revm::{Evm, Frame, FrameResult};
+use revm_primitives::ResultAndState;
+
+use crate::{
+    engine::{
+        inspector::{EvmInspector, InspectorContext},
+        interruptable::breakpoint::RunResult,
+        revm::revm::{
+            interpreter::{
+                opcode::InstructionTables, Interpreter, InterpreterAction,
+                InterpreterResult,
+            },
+            primitives::{EVMError, TransactTo},
+            FrameOrResult,
         },
-        primitives::{EVMError, Output, TransactTo},
-        FrameOrResult,
+        state::BcState,
+        types::{Address, CallInputs, CreateInputs},
     },
-    state::BcState,
-    types::CallInputs,
+    error::SoflError,
 };
 
 use super::{
@@ -25,311 +31,495 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     pub fn run(
         &self,
         context: &mut ResumableContext<S>,
-    ) -> Result<RunResult, EVMError<S::Error>> {
-        self.run_until(context, vec![])
+        breakpoints: Vec<Breakpoint>,
+    ) -> Result<RunResult, SoflError> {
+        self.run_until_breakpoint(context, breakpoints)
+            .map_err(|e| match e {
+                revm::primitives::EVMError::Transaction(ee) => {
+                    SoflError::InvalidTransaction(ee)
+                }
+                revm::primitives::EVMError::Header(ee) => {
+                    SoflError::InvalidHeader(ee)
+                }
+                revm::primitives::EVMError::Database(ee) => {
+                    SoflError::BcState(format!("{:?}", ee))
+                }
+                revm_primitives::EVMError::Custom(ee) => {
+                    SoflError::BcState(format!("{:?}", ee))
+                }
+            })
     }
 
     /// Run evm until one of the breakpoints.
+    /// Akin to `transact` function in the original revm.
     #[inline]
-    pub fn run_until(
+    pub fn run_until_breakpoint(
         &self,
         context: &mut ResumableContext<S>,
         breakpoints: Vec<Breakpoint>,
     ) -> Result<RunResult, EVMError<S::Error>> {
-        let result = {
-            if context.is_empty() {
-                // begin a new transaction
+        let initial_gas_spend = if context.is_new_transaction() {
+            // validate transaction, akin to `transact` function in the original revm.
+            context
+                .revm_ctx
+                .handler
+                .validation()
+                .env(&context.revm_ctx.context.evm.env)?;
+            let initial_gas_spend = context
+                .revm_ctx
+                .handler
+                .validation()
+                .initial_tx_gas(&context.revm_ctx.context.evm.env)?;
+            context
+                .revm_ctx
+                .handler
+                .validation()
+                .tx_against_state(&mut context.revm_ctx.context)?;
+            context.in_progress = true;
+            Some(initial_gas_spend)
+        } else {
+            None
+        };
 
-                // validate transaction
-                context
-                    .revm_ctx
-                    .handler
-                    .validation()
-                    .env(&context.revm_ctx.context.evm.env)?;
-                let initial_gas_spend =
-                    context
-                        .revm_ctx
-                        .handler
-                        .validation()
-                        .initial_tx_gas(&context.revm_ctx.context.evm.env)?;
-                context
-                    .revm_ctx
-                    .handler
-                    .validation()
-                    .tx_against_state(&mut context.revm_ctx.context)?;
+        let output = self.run_until_breakpoint_inner(
+            context,
+            breakpoints,
+            initial_gas_spend,
+        )?;
 
-                // transaction preparation
-                let hndl = &mut context.revm_ctx.handler;
-                let ctx = &mut context.revm_ctx.context;
+        // handle output of call/create calls if the transaction finishes.
+        let r = match output {
+            RunResult::Done(output) => {
+                let r = context.revm_ctx.handler.post_execution().end(
+                    &mut context.revm_ctx.context,
+                    Ok(ResultAndState {
+                        state: output.0,
+                        result: output.1,
+                    }),
+                )?;
+                RunResult::Done((r.state, r.result))
+            }
+            RunResult::Breakpoint(_) => output,
+        };
 
-                // load access list and beneficiary if needed.
-                hndl.pre_execution().load_accounts(ctx)?;
+        Ok(r)
+    }
 
-                // load precompiles
-                let precompiles = hndl.pre_execution().load_precompiles();
-                ctx.evm.set_precompiles(precompiles);
+    /// Akin to `transact_preverified_inner` function in the original revm.
+    #[inline]
+    fn run_until_breakpoint_inner(
+        &self,
+        context: &mut ResumableContext<S>,
+        breakpoints: Vec<Breakpoint>,
+        initial_gas_spend: Option<u64>, // None indicate that this is an resumed execution.
+    ) -> Result<RunResult, EVMError<S::Error>> {
+        // transaction preparation, if this is the new transaction execution
+        let first_frame_or_result = if let Some(initial_gas_spend) =
+            initial_gas_spend
+        {
+            let ctx = &mut context.revm_ctx.context;
+            let pre_exec = context.revm_ctx.handler.pre_execution();
 
-                // deduce caller balance with its limit.
-                hndl.pre_execution().deduct_caller(ctx)?;
-                // gas limit used in calls.
-                let first_frame = hndl.execution_loop().create_first_frame(
+            // load access list and beneficiary if needed.
+            pre_exec.load_accounts(ctx)?;
+
+            // load precompiles
+            let precompiles = pre_exec.load_precompiles();
+            ctx.evm.set_precompiles(precompiles);
+
+            // deduce caller balance with its limit.
+            pre_exec.deduct_caller(ctx)?;
+
+            let gas_limit = ctx.evm.env.tx.gas_limit - initial_gas_spend;
+
+            let exec = context.revm_ctx.handler.execution();
+            // call inner handling of call/create
+            let first_frame_or_result = match ctx.evm.env.tx.transact_to {
+                TransactTo::Call(_) => exec.call(
                     ctx,
-                    ctx.evm.env.tx.gas_limit - initial_gas_spend,
-                );
-                match first_frame {
-                    FrameOrResult::Frame(first_frame) => {
-                        // get created address if any
-                        context.created_address = first_frame.created_address();
-                        // push first frame to call stack
-                        context.call_stack.push(first_frame);
-                        // run from top-level call
-                        self.run_until_inner_wrapper(context, breakpoints)?
-                    }
-                    FrameOrResult::Result(result) => {
-                        // no contract invocation
-                        BreakpointResult::NotNit(result)
-                    }
+                    CallInputs::new_boxed(&ctx.evm.env.tx, gas_limit).unwrap(),
+                    0..0,
+                ),
+                TransactTo::Create(_) => exec.create(
+                    ctx,
+                    CreateInputs::new_boxed(&ctx.evm.env.tx, gas_limit)
+                        .unwrap(),
+                ),
+            };
+            Some(first_frame_or_result)
+        } else {
+            None
+        };
+
+        // Starts the main running loop.
+        let result: BreakpointResult = match first_frame_or_result {
+            Some(first_frame_or_result) => match first_frame_or_result {
+                FrameOrResult::Frame(first_frame) => {
+                    self.start_the_loop(context, breakpoints, Some(first_frame))
                 }
-            } else {
-                // continue running from breakpoint
-                self.run_until_inner_wrapper(context, breakpoints)?
+                FrameOrResult::Result(result) => {
+                    BreakpointResult::NotHit(result)
+                }
+            },
+            None => {
+                // resume the execution
+                self.start_the_loop(context, breakpoints, None)
             }
         };
 
-        let output = match result {
-            BreakpointResult::NotNit(result) => {
-                // get transaction output
-                let main_output =
-                    match context.revm_ctx.context.evm.env.tx.transact_to {
-                        TransactTo::Call(_) => {
-                            Output::Call(result.output.clone())
-                        }
-                        TransactTo::Create(_) => Output::Create(
-                            result.output.clone(),
-                            context.created_address,
-                        ),
-                    };
-
-                // transaction finishes
-                let hndl = &mut context.revm_ctx.handler;
+        // handle transaction execution result if the transaction finishes
+        let r: RunResult = match result {
+            BreakpointResult::Hit(bp) => RunResult::Breakpoint(bp),
+            BreakpointResult::NotHit(mut result) => {
                 let ctx = &mut context.revm_ctx.context;
 
                 // handle output of call/create calls.
-                let gas = hndl.execution_loop().first_frame_return(
-                    &ctx.evm.env,
-                    result.result,
-                    result.gas,
-                );
+                context
+                    .revm_ctx
+                    .handler
+                    .execution()
+                    .last_frame_return(ctx, &mut result);
+
+                let post_exec = context.revm_ctx.handler.post_execution();
                 // Reimburse the caller
-                hndl.post_execution().reimburse_caller(ctx, &gas)?;
+                post_exec.reimburse_caller(ctx, result.gas())?;
                 // Reward beneficiary
-                hndl.post_execution().reward_beneficiary(ctx, &gas)?;
+                post_exec.reward_beneficiary(ctx, result.gas())?;
                 // Returns output of transaction.
-                let output = hndl.post_execution().output(
-                    ctx,
-                    result.result,
-                    main_output,
-                    &gas,
-                )?;
-                RunResult::Done((output.state, output.result))
+                let r = post_exec.output(ctx, result)?;
+                RunResult::Done((r.state, r.result))
             }
-            BreakpointResult::Hit(bp) => RunResult::Breakpoint(bp),
         };
-        Ok(output)
+
+        Ok(r)
     }
 
-    /// Run evm until one of the breakpoints.
     #[inline]
-    pub fn run_until_inner_wrapper(
+    fn start_the_loop(
         &self,
         context: &mut ResumableContext<S>,
         breakpoints: Vec<Breakpoint>,
-    ) -> Result<BreakpointResult, EVMError<S::Error>> {
+        first_frame: Option<Frame>,
+    ) -> BreakpointResult {
         // take instruction talbe
-        let instruction_table = context
+        let table = context
             .revm_ctx
             .handler
             .take_instruction_table()
             .expect("Instruction table should be present");
-        match &instruction_table {
+
+        // run main loop
+        let loop_result = match &table {
             InstructionTables::Plain(table) => {
-                self.run_until_inner(context, table, breakpoints)
+                self.run_the_loop(context, breakpoints, table, first_frame)
             }
             InstructionTables::Boxed(table) => {
-                self.run_until_inner(context, table, breakpoints)
+                self.run_the_loop(context, breakpoints, table, first_frame)
             }
-        }
+        };
+
+        // return back instruction table
+        context.revm_ctx.handler.set_instruction_table(table);
+
+        loop_result
     }
 
-    /// Run evm until one of the breakpoints.
     #[inline]
-    pub fn run_until_inner<'a, FN>(
+    pub fn run_the_loop<'a, FN>(
         &self,
         context: &mut ResumableContext<'a, S>,
-        instruction_table: &[FN; 256],
         breakpoints: Vec<Breakpoint>,
-    ) -> Result<BreakpointResult, EVMError<S::Error>>
+        table: &[FN; 256],
+        first_frame: Option<Frame>, // None indicate that this is an resumed execution.
+    ) -> BreakpointResult
     where
         FN: Fn(&mut Interpreter, &mut Evm<'a, InspectorContext<'a, S>, S>),
     {
-        // take call stack, shared memory, maybe_action for running interpreter
         let mut call_stack = context.take_call_stack();
         let mut shared_memory = context.take_shared_memory();
-        let mut maybe_action = context.take_next_action();
 
-        let breakpoint_result;
+        // push the top-level frame to the call stack, if this is a new transaction
+        if let Some(first_frame) = first_frame {
+            call_stack.push(first_frame);
+            shared_memory.new_context();
+        }
 
+        let mut loop_result: LoopResult =
+            LoopResult::Continue(context.take_next_action());
         loop {
-            match maybe_action {
-                Some(action) => {
-                    // action may be breakpoints
-                    match action {
-                        InterpreterAction::SubCall {
-                            inputs,
-                            return_memory_offset,
-                        } => {
-                            let callee = inputs.contract;
-                            // check MsgCallBefore breakpoint
-                            let breakpoint = breakpoints
-                                .iter()
-                                .filter(|b| {
-                                    if let Breakpoint::MsgCallBefore(addr) = b {
-                                        *addr == callee
-                                    } else {
-                                        false
-                                    }
-                                })
-                                .next();
-                            if let Some(bp) = breakpoint {
-                                // if breakpoint is hit, break interpretation loop
-                                maybe_action =
-                                    Some(InterpreterAction::SubCall {
-                                        inputs,
-                                        return_memory_offset,
-                                    });
-                                breakpoint_result =
-                                    BreakpointResult::Hit(bp.clone());
-                                break;
-                            }
+            // whether or not to interrupt the execution.
+            let action = match loop_result {
+                LoopResult::Pause { .. } => {
+                    // break if hit a breakpoint
+                    break;
+                }
+                LoopResult::Continue(action) => action,
+                LoopResult::Finish(_) => {
+                    // break if the transaction finishes
+                    break;
+                }
+            };
 
-                            // otherwise step into the subcall
-                            let current_stack_frame =
-                                call_stack.last_mut().unwrap();
-                            let sub_call_frame = context
-                                .revm_ctx
-                                .handler
-                                .execution_loop()
-                                .sub_call(
-                                    &mut context.revm_ctx.context,
-                                    inputs,
-                                    current_stack_frame,
-                                    &mut shared_memory,
-                                    return_memory_offset,
-                                );
-                            if let Some(new_frame) = sub_call_frame {
-                                shared_memory.new_context();
-                                call_stack.push(new_frame);
-                            }
-
-                            // check MsgCallBegin breakpoint
-                            let breakpoint = breakpoints
-                                .iter()
-                                .filter(|b| {
-                                    if let Breakpoint::MsgCallBegin(addr) = b {
-                                        *addr == callee
-                                    } else {
-                                        false
-                                    }
-                                })
-                                .next();
-                            if let Some(bp) = breakpoint {
-                                // if breakpoint is hit, break interpretation loop
-                                maybe_action = None;
-                                breakpoint_result =
-                                    BreakpointResult::Hit(bp.clone());
-                                break;
-                            }
-
-                            // no action, continue
-                            maybe_action = None;
-                            continue;
+            // perform action
+            let loop_action = match action {
+                Action::BeforeCall(inputs, return_memory_offset) => {
+                    let exec = &context.revm_ctx.handler.execution;
+                    // create a new call frame, and push to the call stack.
+                    let frame_or_result = exec.call(
+                        &mut context.revm_ctx.context,
+                        inputs.clone(),
+                        return_memory_offset,
+                    );
+                    let loop_result = match frame_or_result {
+                        FrameOrResult::Frame(frame) => {
+                            // step in the subcall
+                            shared_memory.new_context();
+                            call_stack.push(frame);
+                            Action::FrameBegin
                         }
-                        InterpreterAction::Create { inputs } => {
-                            // TODO: breakpoints for create
-
-                            let current_stack_frame =
-                                call_stack.last_mut().unwrap();
-                            let sub_call_frame = context
-                                .revm_ctx
-                                .handler
-                                .execution_loop()
-                                .sub_create(
-                                    &mut context.revm_ctx.context,
-                                    current_stack_frame,
-                                    inputs,
-                                );
-                            if let Some(new_frame) = sub_call_frame {
-                                shared_memory.new_context();
-                                call_stack.push(new_frame);
-                            }
-
-                            // no action, continue
-                            maybe_action = None;
-                            continue;
+                        FrameOrResult::Result(result) => {
+                            // the callee is not a contract, we directly have frame result.
+                            let top_frame = call_stack.last_mut().unwrap();
+                            let FrameResult::Call(outcome) = &result else {
+                                unreachable!()
+                            };
+                            exec.insert_call_outcome(
+                                &mut context.revm_ctx.context,
+                                top_frame,
+                                &mut shared_memory,
+                                outcome.clone(),
+                            );
+                            Action::AfterCall(inputs.contract, result)
                         }
-                        InterpreterAction::Return { result } => {
-                            // free memory context.
-                            shared_memory.free_context();
-
-                            let child_frame = call_stack.pop().unwrap();
-                            let parent_frame = call_stack.last_mut();
-
-                            if let Some(r) = context
-                                .revm_ctx
-                                .handler
-                                .execution_loop()
-                                .frame_return(
-                                    &mut context.revm_ctx.context,
-                                    child_frame,
-                                    parent_frame,
+                    };
+                    loop_result
+                }
+                Action::AfterCall(..) => {
+                    // do nothing, continue the next action
+                    Action::Continue
+                }
+                Action::FrameBegin => {
+                    // do nothing, continue to next action
+                    Action::Continue
+                }
+                Action::FrameEnd(_, result) => {
+                    let exec = &context.revm_ctx.handler.execution;
+                    // free memory context.
+                    shared_memory.free_context();
+                    // pop last frame from the stack and consume it to create FrameResult.
+                    let returned_frame = call_stack
+                        .pop()
+                        .expect("We just returned from Interpreter frame");
+                    // collect frame result
+                    let ctx = &mut context.revm_ctx.context;
+                    enum CalledOrCreated {
+                        Call(Address),
+                        Create(Address),
+                    }
+                    let address: CalledOrCreated = match &returned_frame {
+                        Frame::Call(frame) => CalledOrCreated::Call(
+                            frame.frame_data.interpreter.contract().address,
+                        ),
+                        Frame::Create(frame) => CalledOrCreated::Create(
+                            frame.frame_data.interpreter.contract().address,
+                        ),
+                    };
+                    let frame_result = match returned_frame {
+                        Frame::Call(frame) => {
+                            // return_call
+                            FrameResult::Call(
+                                exec.call_return(ctx, frame, result),
+                            )
+                        }
+                        Frame::Create(frame) => {
+                            // return_create
+                            FrameResult::Create(
+                                exec.create_return(ctx, frame, result),
+                            )
+                        }
+                    };
+                    // insert the frame result to parent frame.
+                    if let Some(top_frame) = call_stack.last_mut() {
+                        let ctx = &mut context.revm_ctx.context;
+                        // Insert result to the top frame.
+                        match &frame_result {
+                            FrameResult::Call(outcome) => {
+                                // return_call
+                                exec.insert_call_outcome(
+                                    ctx,
+                                    top_frame,
                                     &mut shared_memory,
-                                    result,
+                                    outcome.clone(),
                                 )
-                            {
-                                // top-level return
-                                maybe_action = None;
-                                breakpoint_result = BreakpointResult::NotNit(r);
-                                break;
                             }
-
-                            // no action, continue
-                            maybe_action = None;
-                            continue;
+                            FrameResult::Create(outcome) => {
+                                // return_create
+                                exec.insert_create_outcome(
+                                    ctx,
+                                    top_frame,
+                                    outcome.clone(),
+                                )
+                            }
+                        }
+                        // continue the parent frame
+                        match address {
+                            CalledOrCreated::Call(addr) => {
+                                Action::AfterCall(addr, frame_result)
+                            }
+                            CalledOrCreated::Create(_) => {
+                                Action::AfterCreate(frame_result)
+                            }
+                        }
+                    } else {
+                        // there are no more frames, transaction execution is done.
+                        Action::Done(frame_result)
+                    }
+                }
+                Action::BeforeCreate(inputs) => {
+                    let exec = &context.revm_ctx.handler.execution;
+                    // create a new create frame, and push to the call stack.
+                    let frame_or_result =
+                        exec.create(&mut context.revm_ctx.context, inputs);
+                    match frame_or_result {
+                        FrameOrResult::Frame(frame) => {
+                            // step in the subcall
+                            shared_memory.new_context();
+                            call_stack.push(frame);
+                            Action::FrameBegin
+                        }
+                        FrameOrResult::Result(result) => {
+                            // the callee is not a contract, we directly have frame result.
+                            let top_frame = call_stack.last_mut().unwrap();
+                            let FrameResult::Create(outcome) = &result else {
+                                unreachable!()
+                            };
+                            exec.insert_create_outcome(
+                                &mut context.revm_ctx.context,
+                                top_frame,
+                                outcome.clone(),
+                            );
+                            Action::AfterCreate(result)
                         }
                     }
                 }
-                None => {
-                    // continue run the interpreter
-                    let current_stack_frame = call_stack.last_mut().unwrap();
-                    let action = current_stack_frame.interpreter.run(
+                Action::AfterCreate(..) => {
+                    // do nothing, continue the next action
+                    Action::Continue
+                }
+                Action::Continue => {
+                    // continue to run interpreter.
+                    // peek last stack frame.
+                    let stack_frame = call_stack.last_mut().unwrap();
+                    // run interpreter
+                    let interpreter =
+                        &mut stack_frame.frame_data_mut().interpreter;
+                    let action = interpreter.run(
                         shared_memory,
-                        instruction_table,
+                        table,
                         &mut context.revm_ctx,
                     );
-                    maybe_action = Some(action);
                     // take shared memory back.
-                    shared_memory =
-                        current_stack_frame.interpreter.take_memory();
+                    shared_memory = interpreter.take_memory();
+                    let loop_result = match action {
+                        InterpreterAction::Call {
+                            inputs,
+                            return_memory_offset,
+                        } => {
+                            let action = Action::BeforeCall(
+                                inputs,
+                                return_memory_offset,
+                            );
+                            action
+                        }
+                        InterpreterAction::Create { inputs } => {
+                            let action = Action::BeforeCreate(inputs);
+                            action
+                        }
+                        InterpreterAction::Return { result } => {
+                            let action = Action::FrameEnd(
+                                interpreter.contract().address,
+                                result,
+                            );
+                            action
+                        }
+                        InterpreterAction::None => {
+                            unreachable!(
+                                "InterpreterAction::None is not expected"
+                            )
+                        }
+                    };
+                    loop_result
+                }
+                Action::Done(_) => {
+                    unreachable!("Action::Done is not expected")
                 }
             };
+
+            // whether a breakpoint is hit
+            let maybe_breakpoint: Option<Breakpoint> = match &loop_action {
+                Action::BeforeCall(inputs, _) => {
+                    Breakpoint::check_msg_call_before(
+                        &breakpoints,
+                        context,
+                        &*inputs,
+                    )
+                }
+                Action::AfterCall(address, result) => {
+                    Breakpoint::check_msg_call_after(
+                        &breakpoints,
+                        context,
+                        *address,
+                        result,
+                    )
+                }
+                Action::FrameBegin => {
+                    let frame = call_stack.last().unwrap();
+                    Breakpoint::check_msg_call_begin(
+                        &breakpoints,
+                        context,
+                        frame,
+                    )
+                }
+                Action::FrameEnd(address, _) => {
+                    let frame = call_stack.last().unwrap();
+                    Breakpoint::check_msg_call_end(
+                        &breakpoints,
+                        context,
+                        *address,
+                        frame,
+                    )
+                }
+                _ => None,
+            };
+            if let Some(breakpoint) = maybe_breakpoint {
+                loop_result = LoopResult::Pause {
+                    breakpoint,
+                    next: loop_action,
+                };
+            } else {
+                loop_result = match loop_action {
+                    Action::Done(result) => LoopResult::Finish(result),
+                    _ => LoopResult::Continue(loop_action),
+                };
+            }
         }
 
-        // put back call stack, shared memory, and next action
+        // return the result of the loop
+        let ret = match loop_result {
+            LoopResult::Pause { breakpoint, next } => {
+                context.next_action = next;
+                BreakpointResult::Hit(breakpoint)
+            }
+            LoopResult::Continue(_) => {
+                unreachable!("LoopResult::Continue is not expected")
+            }
+            LoopResult::Finish(result) => BreakpointResult::NotHit(result),
+        };
+
         context.call_stack = call_stack;
         context.shared_memory = shared_memory;
-        context.next_action = maybe_action;
 
-        Ok(breakpoint_result)
+        ret
     }
 
     /// Execute custom contract call at current context.
@@ -346,4 +536,26 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     {
         todo!()
     }
+}
+
+pub enum LoopResult {
+    Pause {
+        breakpoint: Breakpoint,
+        next: Action,
+    },
+    Continue(Action),
+    Finish(FrameResult),
+}
+
+#[derive(Default)]
+pub enum Action {
+    #[default]
+    Continue,
+    Done(FrameResult),
+    BeforeCall(Box<CallInputs>, Range<usize>),
+    AfterCall(Address, FrameResult),
+    FrameBegin,
+    FrameEnd(Address, InterpreterResult),
+    BeforeCreate(Box<CreateInputs>),
+    AfterCreate(FrameResult),
 }

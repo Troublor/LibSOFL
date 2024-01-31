@@ -13,12 +13,27 @@ use super::{
         StateChange, Storage, U256,
     },
 };
+
+pub struct TransitionOutcome<I> {
+    pub state_change: StateChange,
+    pub execution_results: Vec<ExecutionResult>,
+    pub inspector: I,
+}
+
 /// BcState is a wrapper of revm's Database trait.
 /// It provides a set of basic methods to read the state of the blockchain.
 pub trait BcState:
     Database<Error = Self::DatabaseErr> + revm::DatabaseCommit
 {
     type DatabaseErr: std::fmt::Debug;
+
+    // fn transact_with_inspector<I: EvmInspector<&mut Self>>(
+    //     &mut self,
+    //     spec: TransitionSpec,
+    //     inspector: I,
+    // ) -> Result<TransitionOutcome<I>, SoflError> {
+    //     todo!()
+    // }
 
     fn transit<'a, I>(
         &'a mut self,

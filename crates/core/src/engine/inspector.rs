@@ -9,7 +9,10 @@ use super::{
 };
 use alloy_primitives::Log;
 use auto_impl::auto_impl;
-use revm::interpreter::{CallOutcome, CreateOutcome};
+use revm::{
+    interpreter::{CallOutcome, CreateOutcome},
+    GetInspector,
+};
 
 /// EvmInspector is an extended revm::Inspector with additional methods called at each transaction start and end.
 #[auto_impl(&mut, Box)]

@@ -1,21 +1,21 @@
 // This module reinvents the EVM and support interrupting the execution of the EVM, and resume the execution of the EVM later.
 // This implementation is based on the fragile branch `reth_freeze`, subject to substantial change.
 pub mod breakpoint;
+pub mod differential_testing;
 pub mod evm;
 
 use std::fmt;
 
-use revm::{inspector_handle_register, Evm, EvmBuilder};
+use revm::{inspector_handle_register, Evm, EvmBuilder, Frame};
 
-use crate::engine::revm::revm::{
-    interpreter::{InterpreterAction, SharedMemory},
-    primitives::Address,
-    CallStackFrame,
-};
+use crate::engine::revm::revm::interpreter::SharedMemory;
+
+use self::evm::Action;
 
 use super::{
     inspector::{no_inspector, EvmInspector, InspectorContext, NoInspector},
     state::BcState,
+    transition::TransitionSpec,
     types::SpecId,
 };
 
@@ -24,10 +24,10 @@ pub const CALL_STACK_LIMIT: u64 = 1024;
 
 pub struct ResumableContext<'a, DB: BcState> {
     pub revm_ctx: Evm<'a, InspectorContext<'a, DB>, DB>,
-    pub call_stack: Vec<Box<CallStackFrame>>,
+    pub call_stack: Vec<Frame>,
     pub shared_memory: SharedMemory,
-    pub next_action: Option<InterpreterAction>,
-    pub created_address: Option<Address>,
+    pub next_action: Action,
+    pub in_progress: bool,
 }
 
 impl<'a, DB: BcState> ResumableContext<'a, DB> {
@@ -46,12 +46,12 @@ impl<'a, DB: BcState> ResumableContext<'a, DB> {
             revm_ctx,
             call_stack,
             shared_memory,
-            next_action: None,
-            created_address: None,
+            next_action: Action::Continue,
+            in_progress: false,
         }
     }
 
-    pub fn take_call_stack(&mut self) -> Vec<Box<CallStackFrame>> {
+    pub fn take_call_stack(&mut self) -> Vec<Frame> {
         std::mem::take(&mut self.call_stack)
     }
 
@@ -59,12 +59,12 @@ impl<'a, DB: BcState> ResumableContext<'a, DB> {
         std::mem::take(&mut self.shared_memory)
     }
 
-    pub fn take_next_action(&mut self) -> Option<InterpreterAction> {
+    pub fn take_next_action(&mut self) -> Action {
         std::mem::take(&mut self.next_action)
     }
 
-    pub fn is_empty(&self) -> bool {
-        self.call_stack.is_empty()
+    pub fn is_new_transaction(&self) -> bool {
+        !self.in_progress
     }
 }
 
@@ -119,8 +119,16 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
         self.inspector.take()
     }
 
-    pub fn build_resumable_run_context(&self, state: S) -> ResumableContext<S> {
-        let ctx = ResumableContext::new(state, self.spec_id);
+    pub fn build_resumable_run_context(
+        &self,
+        state: S,
+        mut spec: TransitionSpec,
+    ) -> ResumableContext<S> {
+        let mut ctx = ResumableContext::new(state, self.spec_id);
+        assert_eq!(spec.txs.len(), 1, "only one tx is supported");
+        ctx.revm_ctx.context.evm.env().cfg = spec.cfg;
+        ctx.revm_ctx.context.evm.env().block = spec.block;
+        ctx.revm_ctx.context.evm.env().tx = spec.txs.remove(0);
         ctx
     }
 }
