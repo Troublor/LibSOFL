@@ -127,16 +127,16 @@ revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "ecb6c4b654
 ] }
 
 # reth
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15", features = [
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16", features = [
     "arbitrary",
 ] }
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15", features = [
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16", features = [
     "mdbx",
     "test-utils",
 ] }
-reth-provider = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15", features = [
+reth-provider = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16", features = [
     "test-utils",
 ] }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15" }
-reth-beacon-consensus = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15" }
-reth-blockchain-tree = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.15" }
+reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16" }
+reth-beacon-consensus = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16" }
+reth-blockchain-tree = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16" }
