@@ -115,12 +115,12 @@ alloy-rpc-types = { git = "https://github.com/alloy-rs/alloy" }
 #     "optional_no_base_fee",
 # ], default-features = false }
 # revision as of 2024-01-25
-revm = { git = "https://github.com/bluealloy/revm", rev = "ecb6c4b65461fcbcad6b51cf7ae9065181bb7617", features = [
+revm = { git = "https://github.com/bluealloy/revm", rev = "73b689d", features = [
     "std",
     "serde",
     "dev",
 ] }
-revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "ecb6c4b65461fcbcad6b51cf7ae9065181bb7617", features = [
+revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "73b689d", features = [
     "std",
     "serde",
     "dev",
