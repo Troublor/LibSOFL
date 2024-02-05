@@ -1,4 +1,5 @@
 use revm::inspector_handle_register;
+use revm::inspector_handle_register;
 use revm_primitives::StorageSlot;
 
 use crate::error::SoflError;
@@ -13,12 +14,6 @@ use super::{
         StateChange, Storage, U256,
     },
 };
-
-pub struct TransitionOutcome<I> {
-    pub state_change: StateChange,
-    pub execution_results: Vec<ExecutionResult>,
-    pub inspector: I,
-}
 
 /// BcState is a wrapper of revm's Database trait.
 /// It provides a set of basic methods to read the state of the blockchain.
@@ -50,7 +45,7 @@ pub trait BcState:
         let mut results = Vec::new();
         let mut evm = revm::EvmBuilder::default()
             .with_db(self)
-            .with_external_context(InspectorContext::new(&mut inspector))
+            .with_external_context(&mut inspector)
             .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();
@@ -64,7 +59,7 @@ pub trait BcState:
                 .build();
 
             // inspector pre-transaction hook
-            let insp = evm.context.external.get_evm_inspector();
+            let insp = &mut evm.context.external;
             if !insp.transaction(&evm.context.evm.env.tx, &evm.context.evm.db) {
                 // return false to skip transaction
                 results.push(revm::primitives::ExecutionResult::Halt {
@@ -91,7 +86,7 @@ pub trait BcState:
             })?;
 
             // inspector post-transaction hook
-            let insp = evm.context.external.get_evm_inspector();
+            let insp = &mut evm.context.external;
             insp.transaction_end(
                 &evm.context.evm.env.tx,
                 &evm.context.evm.db,
@@ -168,7 +163,7 @@ pub trait BcState:
         let mut changes = Vec::new();
         let mut evm = revm::EvmBuilder::default()
             .with_db(self)
-            .with_external_context(InspectorContext::new(&mut inspector))
+            .with_external_context(&mut inspector)
             .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();
@@ -183,7 +178,7 @@ pub trait BcState:
                 .build();
 
             // inspector pre-transaction hook
-            let insp = evm.context.external.get_evm_inspector();
+            let insp = &mut evm.context.external;
             if !insp.transaction(&evm.context.evm.env.tx, &evm.context.evm.db) {
                 // return false to skip transaction
                 results.push(revm::primitives::ExecutionResult::Halt {
@@ -211,7 +206,7 @@ pub trait BcState:
                 })?;
 
             // inspector post-transaction hook
-            let insp = evm.context.external.get_evm_inspector();
+            let insp = &mut evm.context.external;
             insp.transaction_end(
                 &evm.context.evm.env.tx,
                 &evm.context.evm.db,
