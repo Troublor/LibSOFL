@@ -1,5 +1,4 @@
 use revm::inspector_handle_register;
-use revm::inspector_handle_register;
 use revm_primitives::StorageSlot;
 
 use crate::error::SoflError;
