@@ -67,12 +67,13 @@ impl RethProvider {
         let maybe_db = db_cache.get(&datadir_str);
         let db;
         if maybe_db.is_none() {
-            let db_inner =
-                open_db_read_only(datadir.join("db").as_path(), None).map_err(
-                    |e| {
-                        SoflError::Provider(format!("failed to open db: {}", e))
-                    },
-                )?;
+            let db_inner = open_db_read_only(
+                datadir.join("db").as_path(),
+                Default::default(),
+            )
+            .map_err(|e| {
+                SoflError::Provider(format!("failed to open db: {}", e))
+            })?;
             db = Arc::new(db_inner);
             db_cache.insert(datadir_str, db.clone());
         } else {
