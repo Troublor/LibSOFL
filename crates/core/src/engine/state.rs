@@ -4,7 +4,6 @@ use revm_primitives::StorageSlot;
 
 use crate::error::SoflError;
 
-use super::inspector::InspectorContext;
 use super::types::{Bytecode, Database, Env};
 use super::{
     inspector::EvmInspector,

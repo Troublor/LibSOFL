@@ -5,7 +5,7 @@ use revm_primitives::ResultAndState;
 
 use crate::{
     engine::{
-        inspector::{EvmInspector, InspectorContext},
+        inspector::EvmInspector,
         interruptable::breakpoint::RunResult,
         revm::revm::{
             interpreter::{
@@ -30,7 +30,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     #[inline]
     pub fn run(
         &self,
-        context: &mut ResumableContext<S>,
+        context: &mut ResumableContext<S, I>,
         breakpoints: Vec<Breakpoint>,
     ) -> Result<RunResult, SoflError> {
         self.run_until_breakpoint(context, breakpoints)
@@ -55,7 +55,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     #[inline]
     pub fn run_until_breakpoint(
         &self,
-        context: &mut ResumableContext<S>,
+        context: &mut ResumableContext<S, I>,
         breakpoints: Vec<Breakpoint>,
     ) -> Result<RunResult, EVMError<S::Error>> {
         let initial_gas_spend = if context.is_new_transaction() {
@@ -109,7 +109,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     #[inline]
     fn run_until_breakpoint_inner(
         &self,
-        context: &mut ResumableContext<S>,
+        context: &mut ResumableContext<S, I>,
         breakpoints: Vec<Breakpoint>,
         initial_gas_spend: Option<u64>, // None indicate that this is an resumed execution.
     ) -> Result<RunResult, EVMError<S::Error>> {
@@ -197,7 +197,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     #[inline]
     fn start_the_loop(
         &self,
-        context: &mut ResumableContext<S>,
+        context: &mut ResumableContext<S, I>,
         breakpoints: Vec<Breakpoint>,
         first_frame: Option<Frame>,
     ) -> BreakpointResult {
@@ -227,13 +227,13 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     #[inline]
     pub fn run_the_loop<'a, FN>(
         &self,
-        context: &mut ResumableContext<'a, S>,
+        context: &mut ResumableContext<'a, S, I>,
         breakpoints: Vec<Breakpoint>,
         table: &[FN; 256],
         first_frame: Option<Frame>, // None indicate that this is an resumed execution.
     ) -> BreakpointResult
     where
-        FN: Fn(&mut Interpreter, &mut Evm<'a, InspectorContext<'a, S>, S>),
+        FN: Fn(&mut Interpreter, &mut Evm<'a, I, S>),
     {
         let mut call_stack = context.take_call_stack();
         let mut shared_memory = context.take_shared_memory();
@@ -527,12 +527,15 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     #[inline]
     pub fn execute_message_call<FN>(
         &mut self,
-        _context: &mut ResumableContext<S>,
+        _context: &mut ResumableContext<S, I>,
         _instruction_table: &[FN; 256],
         _call: CallInputs,
         _breakpoints: Vec<Breakpoint>,
     ) where
-        FN: Fn(&mut Interpreter, &mut ResumableContext<S>) -> InterpreterResult,
+        FN: Fn(
+            &mut Interpreter,
+            &mut ResumableContext<S, I>,
+        ) -> InterpreterResult,
     {
         todo!()
     }

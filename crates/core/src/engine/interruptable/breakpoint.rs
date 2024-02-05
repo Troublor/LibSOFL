@@ -1,4 +1,4 @@
-use revm::{Frame, FrameResult};
+use revm::{Frame, FrameResult, GetInspector};
 
 use crate::engine::{
     state::BcState,
@@ -34,9 +34,9 @@ pub enum BreakpointResult {
 }
 
 impl Breakpoint {
-    pub fn check_msg_call_before<'a, S: BcState>(
+    pub fn check_msg_call_before<'a, S: BcState, I: GetInspector<S>>(
         breakpoints: &Vec<Breakpoint>,
-        _context: &ResumableContext<'a, S>,
+        _context: &ResumableContext<S, I>,
         inputs: &CallInputs,
     ) -> Option<Breakpoint> {
         breakpoints
@@ -52,9 +52,9 @@ impl Breakpoint {
             .next()
     }
 
-    pub fn check_msg_call_begin<'a, S: BcState>(
+    pub fn check_msg_call_begin<'a, S: BcState, I: GetInspector<S>>(
         breakpoints: &Vec<Breakpoint>,
-        _context: &ResumableContext<'a, S>,
+        _context: &ResumableContext<S, I>,
         frame: &Frame,
     ) -> Option<Breakpoint> {
         breakpoints
@@ -70,9 +70,9 @@ impl Breakpoint {
             .next()
     }
 
-    pub fn check_msg_call_end<'a, S: BcState>(
+    pub fn check_msg_call_end<'a, S: BcState, I: GetInspector<S>>(
         breakpoints: &Vec<Breakpoint>,
-        _context: &ResumableContext<'a, S>,
+        _context: &ResumableContext<S, I>,
         address: Address,
         _result: &Frame,
     ) -> Option<Breakpoint> {
@@ -89,9 +89,9 @@ impl Breakpoint {
             .next()
     }
 
-    pub fn check_msg_call_after<'a, S: BcState>(
+    pub fn check_msg_call_after<'a, S: BcState, I: GetInspector<S>>(
         breakpoints: &Vec<Breakpoint>,
-        _context: &ResumableContext<'a, S>,
+        _context: &ResumableContext<S, I>,
         address: Address,
         _result: &FrameResult,
     ) -> Option<Breakpoint> {

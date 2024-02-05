@@ -6,14 +6,14 @@ pub mod evm;
 
 use std::fmt;
 
-use revm::{inspector_handle_register, Evm, EvmBuilder, Frame};
+use revm::{inspector_handle_register, Evm, EvmBuilder, Frame, GetInspector};
 
 use crate::engine::revm::revm::interpreter::SharedMemory;
 
 use self::evm::Action;
 
 use super::{
-    inspector::{no_inspector, EvmInspector, InspectorContext, NoInspector},
+    inspector::{no_inspector, EvmInspector, NoInspector},
     state::BcState,
     transition::TransitionSpec,
     types::SpecId,
@@ -22,19 +22,19 @@ use super::{
 /// EVM call stack limit.
 pub const CALL_STACK_LIMIT: u64 = 1024;
 
-pub struct ResumableContext<'a, DB: BcState> {
-    pub revm_ctx: Evm<'a, InspectorContext<'a, DB>, DB>,
+pub struct ResumableContext<'a, DB: BcState, I: GetInspector<DB>> {
+    pub revm_ctx: Evm<'a, I, DB>,
     pub call_stack: Vec<Frame>,
     pub shared_memory: SharedMemory,
     pub next_action: Action,
     pub in_progress: bool,
 }
 
-impl<'a, DB: BcState> ResumableContext<'a, DB> {
+impl<'a, DB: BcState> ResumableContext<'a, DB, &mut NoInspector> {
     pub fn new(state: DB, spec_id: SpecId) -> Self {
         let revm_ctx = EvmBuilder::default()
             .with_db(state)
-            .with_external_context(InspectorContext::new(no_inspector()))
+            .with_external_context(no_inspector())
             .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();
@@ -50,7 +50,9 @@ impl<'a, DB: BcState> ResumableContext<'a, DB> {
             in_progress: false,
         }
     }
+}
 
+impl<'a, DB: BcState, I: GetInspector<DB>> ResumableContext<'a, DB, I> {
     pub fn take_call_stack(&mut self) -> Vec<Frame> {
         std::mem::take(&mut self.call_stack)
     }
@@ -123,7 +125,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
         &self,
         state: S,
         mut spec: TransitionSpec,
-    ) -> ResumableContext<S> {
+    ) -> ResumableContext<S, &mut NoInspector> {
         let mut ctx = ResumableContext::new(state, self.spec_id);
         assert_eq!(spec.txs.len(), 1, "only one tx is supported");
         ctx.revm_ctx.context.evm.env().cfg = spec.cfg;
