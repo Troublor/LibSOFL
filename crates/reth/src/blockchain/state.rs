@@ -1,7 +1,7 @@
 use libsofl_core::engine::types::{
     AccountInfo, Address, Bytecode, DatabaseRef, B256, U256,
 };
-use reth_provider::{ProviderError, StateProviderBox};
+pub use reth_provider::{ProviderError, StateProviderBox};
 use reth_revm::{
     database::StateProviderDatabase, DatabaseRef as reth_DatabaseRef,
 };
@@ -10,6 +10,14 @@ use crate::conversion::ConvertTo;
 
 pub struct RethBcStateRef {
     pub reth_db: StateProviderDatabase<StateProviderBox>,
+}
+
+impl From<StateProviderBox> for RethBcStateRef {
+    fn from(reth_db: StateProviderBox) -> Self {
+        Self {
+            reth_db: StateProviderDatabase::new(reth_db),
+        }
+    }
 }
 
 impl From<StateProviderDatabase<StateProviderBox>> for RethBcStateRef {

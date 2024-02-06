@@ -1,6 +1,7 @@
-#[macro_use]
 extern crate derive_more;
+pub mod blockchain;
 pub mod executor;
+pub mod fuzzer;
 pub mod input;
 pub mod state;
 

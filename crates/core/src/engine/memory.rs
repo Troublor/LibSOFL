@@ -8,7 +8,13 @@ use super::types::{
 
 /// In-memory BcState implementation, using revm's CacheDB.
 #[derive(
-    Debug, Clone, derive_more::AsRef, derive_more::Deref, derive_more::DerefMut,
+    Debug,
+    Clone,
+    derive_more::AsRef,
+    derive_more::Deref,
+    derive_more::DerefMut,
+    serde::Serialize,
+    serde::Deserialize,
 )]
 pub struct MemoryBcState<S: BcStateRef>(
     #[as_ref]

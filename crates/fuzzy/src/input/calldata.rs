@@ -8,6 +8,24 @@ pub enum StructuredCalldata {
     Raw(Bytes),
 }
 
+impl<'de> serde::Deserialize<'de> for StructuredCalldata {
+    fn deserialize<D>(_deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        todo!()
+    }
+}
+
+impl serde::Serialize for StructuredCalldata {
+    fn serialize<S>(&self, _serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        todo!()
+    }
+}
+
 impl Default for StructuredCalldata {
     fn default() -> Self {
         StructuredCalldata::Raw(Bytes::new())
@@ -18,7 +36,7 @@ impl StructuredCalldata {
     pub fn bytes(&self) -> Bytes {
         match self {
             StructuredCalldata::Typed(func, args) => {
-                let mut data =
+                let data =
                     func.abi_encode_input(args).expect("invalid input data");
                 data.cvt()
             }
