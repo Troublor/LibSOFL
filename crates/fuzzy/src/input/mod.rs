@@ -36,3 +36,23 @@ where
         format!("call_seq_{}", idx)
     }
 }
+
+impl<S> MsgCallSeq<S> {
+    pub fn is_executed(&self) -> bool {
+        self.states.len() > self.calls.len()
+    }
+
+    pub fn get_execution_data(&self) -> (Arc<S>, Vec<MsgCall>) {
+        let last_state = self
+            .states
+            .last()
+            .expect("bad input: states vector should not be empty")
+            .clone();
+        if self.is_executed() {
+            return (last_state, vec![]);
+        } else {
+            let calls = self.calls[self.states.len() - 1..].to_vec();
+            (last_state, calls)
+        }
+    }
+}

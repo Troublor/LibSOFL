@@ -2,6 +2,7 @@ extern crate derive_more;
 pub mod blockchain;
 pub mod executor;
 pub mod fuzzer;
+pub mod ingredient;
 pub mod input;
 pub mod state;
 

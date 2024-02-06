@@ -3,7 +3,7 @@ use libafl::{
 };
 
 use crate::{
-    blockchain::state_ref::FuzzBcStateRef, executor::MsgCallSeqExecutor,
+    blockchain::state_ref::FuzzBcStateRef, executor::FuzzExecutor,
     state::FuzzState,
 };
 
@@ -15,17 +15,16 @@ impl<SR: FuzzBcStateRef, EM, ST> UsesState for SoflFuzzer<SR, EM, ST> {
     type State = FuzzState<SR>;
 }
 
-impl<SR, EM, ST> Fuzzer<MsgCallSeqExecutor<SR>, EM, ST>
-    for SoflFuzzer<SR, EM, ST>
+impl<SR, EM, ST> Fuzzer<FuzzExecutor<SR>, EM, ST> for SoflFuzzer<SR, EM, ST>
 where
     SR: FuzzBcStateRef,
     EM: ProgressReporter<State = Self::State>,
-    ST: StagesTuple<MsgCallSeqExecutor<SR>, EM, Self::State, Self>,
+    ST: StagesTuple<FuzzExecutor<SR>, EM, Self::State, Self>,
 {
     fn fuzz_one(
         &mut self,
         _stages: &mut ST,
-        _executor: &mut MsgCallSeqExecutor<SR>,
+        _executor: &mut FuzzExecutor<SR>,
         _state: &mut EM::State,
         _manager: &mut EM,
     ) -> Result<libafl::prelude::CorpusId, libafl::prelude::Error> {
