@@ -39,10 +39,10 @@ serde_json.workspace = true
 signal-hook = "0.3"
 signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
 
-foundry-block-explorers = { version = "0.2.1", features = [
+foundry-block-explorers = { version = "0.2.3", features = [
     "foundry-compilers",
 ] }
-foundry-compilers = { version = "0.2.2", features = ["svm-solc"] }
+foundry-compilers = { version = "0.3.1", features = ["svm-solc"] }
 regex = "1.10.2"
 
 semver = "1.0"
