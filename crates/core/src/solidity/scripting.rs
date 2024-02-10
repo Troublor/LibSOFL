@@ -1,13 +1,6 @@
 use std::path::PathBuf;
 
-use alloy_dyn_abi::JsonAbiExt;
-use alloy_json_abi::Function;
-pub use alloy_sol_types::sol_data;
-use foundry_compilers::{
-    artifacts::{Error, Source, Sources},
-    CompilerInput, Solc,
-};
-use libsofl_core::{
+use crate::{
     conversion::ConvertTo,
     engine::{
         inspector::no_inspector,
@@ -15,6 +8,13 @@ use libsofl_core::{
         types::{Address, BlockEnv, Bytes, CfgEnv, SpecId, U256},
     },
     error::SoflError,
+};
+use alloy_dyn_abi::JsonAbiExt;
+use alloy_json_abi::Function;
+pub use alloy_sol_types::sol_data;
+use foundry_compilers::{
+    artifacts::{Error, Source, Sources},
+    CompilerInput, Solc,
 };
 use tracing::error;
 
@@ -257,10 +257,7 @@ pub fn run_yul<S: BcState>(
 
 #[cfg(test)]
 mod tests {
-    use alloy_dyn_abi::JsonAbiExt;
-    use alloy_json_abi::Function;
-    use alloy_sol_types::{sol_data, SolType};
-    use libsofl_core::{
+    use crate::{
         conversion::ConvertTo,
         engine::{
             inspector::no_inspector,
@@ -268,6 +265,9 @@ mod tests {
             types::{Address, Database, SpecId},
         },
     };
+    use alloy_dyn_abi::JsonAbiExt;
+    use alloy_json_abi::Function;
+    use alloy_sol_types::{sol_data, SolType};
 
     use crate::solidity::{
         caller::HighLevelCaller, scripting::SolScriptConfig,

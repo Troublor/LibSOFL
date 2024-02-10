@@ -17,11 +17,17 @@ revm.workspace = true
 alloy-primitives.workspace = true
 revm-primitives.workspace = true
 
+alloy-sol-types.workspace = true
+alloy-dyn-abi.workspace = true
+alloy-json-abi.workspace = true
+foundry-compilers = { version = "0.2.2", features = ["svm-solc"] }
+
 auto_impl.workspace = true
 derive_more.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 lazy_static.workspace = true
+tracing.workspace = true
 
 thiserror = "1.0.40"
 hex = { version = "0.4", default-features = false, features = ["alloc"] }

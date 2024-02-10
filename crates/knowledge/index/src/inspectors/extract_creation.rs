@@ -48,7 +48,7 @@ impl<BS: BcState> EvmInspector<BS> for ExtractCreationInspector {}
 #[cfg(test)]
 mod tests {
     use libsofl_core::engine::{memory::MemoryBcState, types::SpecId};
-    use libsofl_utils::solidity::{
+    use libsofl_core::solidity::{
         caller::HighLevelCaller, scripting::compile_solidity,
     };
 

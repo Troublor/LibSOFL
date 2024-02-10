@@ -36,16 +36,16 @@ impl<BS: BcState> EvmInspector<BS> for ExtractInvocationInspector {}
 mod tests {
     use alloy_dyn_abi::JsonAbiExt;
     use alloy_json_abi::Function;
+    use libsofl_core::solidity::{
+        caller::HighLevelCaller,
+        scripting::{deploy_contracts, SolScriptConfig},
+    };
     use libsofl_core::{
         conversion::ConvertTo,
         engine::{
             memory::MemoryBcState,
             types::{Address, SpecId, U256},
         },
-    };
-    use libsofl_utils::solidity::{
-        caller::HighLevelCaller,
-        scripting::{deploy_contracts, SolScriptConfig},
     };
 
     #[test]
