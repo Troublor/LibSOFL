@@ -8,11 +8,10 @@ use libafl::{
     },
 };
 use libafl_bolts::rands::RomuDuoJrRand;
-use libsofl_core::engine::memory::MemoryBcState;
+use libsofl_core::engine::{memory::MemoryBcState, types::Address};
 
 use crate::{
-    blockchain::state_ref::FuzzBcStateRef,
-    input::{FuzzInput, MsgCallSeq},
+    blockchain::state_ref::FuzzBcStateRef, ingredient::pentry::IngrediantPantry, input::{FuzzInput, MsgCallSeq}
 };
 
 /// Fuzzing state
@@ -26,24 +25,26 @@ where
     SR: FuzzBcStateRef,
 {
     /// random number generator
-    rand: RomuDuoJrRand,
+    pub rand: RomuDuoJrRand,
 
     /// corpus
-    corpus: InMemoryCorpus<FuzzInput<SR>>,
+    pub corpus: InMemoryCorpus<FuzzInput<SR>>,
 
     /// solutions
-    solutions: OnDiskCorpus<FuzzInput<SR>>,
+    pub solutions: OnDiskCorpus<FuzzInput<SR>>,
 
     /// number of executions
-    executions: usize,
+    pub executions: usize,
 
     /// last report time
-    last_report_time: Option<Duration>,
+    pub last_report_time: Option<Duration>,
 
     /// arbitrary metadata
-    metadata: libafl_bolts::prelude::SerdeAnyMap,
-    named_metadata: libafl_bolts::prelude::NamedSerdeAnyMap,
-    // chefs: those accounts/contracts controlled by the attacker
+    pub metadata: libafl_bolts::prelude::SerdeAnyMap,
+    pub named_metadata: libafl_bolts::prelude::NamedSerdeAnyMap,
+
+    // attacker-owned-accounts: those accounts/contracts controlled by the attacker
+    pub attacker_accounts: IngrediantPantry<RomuDuoJrRand, Address>,
 }
 
 impl<SR: FuzzBcStateRef> UsesInput for FuzzState<SR> {

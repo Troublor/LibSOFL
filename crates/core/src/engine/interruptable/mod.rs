@@ -3,6 +3,7 @@
 pub mod breakpoint;
 pub mod differential_testing;
 pub mod evm;
+mod tests;
 
 use std::fmt;
 
@@ -22,12 +23,11 @@ use super::{
 /// EVM call stack limit.
 pub const CALL_STACK_LIMIT: u64 = 1024;
 
-pub struct ResumableContext<'a, DB: BcState, I: GetInspector<DB>> {
+pub struct ResumableContext<'a, DB: BcState, I> {
     pub revm_ctx: Evm<'a, I, DB>,
-    pub call_stack: Vec<Frame>,
+    pub call_stack_stages: Vec<Vec<Frame>>, // stages of call stacks
     pub shared_memory: SharedMemory,
-    pub next_action: Action,
-    pub in_progress: bool,
+    pub next_action_stages: Vec<Action>, // stages of next actions
 }
 
 impl<'a, DB: BcState> ResumableContext<'a, DB, &mut NoInspector> {
@@ -38,23 +38,37 @@ impl<'a, DB: BcState> ResumableContext<'a, DB, &mut NoInspector> {
             .spec_id(spec_id)
             .append_handler_register(inspector_handle_register)
             .build();
-        let call_stack = Vec::with_capacity(CALL_STACK_LIMIT as usize + 1);
         let shared_memory = SharedMemory::new_with_memory_limit(
             revm_ctx.context.evm.env.cfg.memory_limit,
         );
         Self {
             revm_ctx,
-            call_stack,
+            call_stack_stages: vec![],
             shared_memory,
-            next_action: Action::Continue,
-            in_progress: false,
+            next_action_stages: vec![],
         }
     }
 }
 
 impl<'a, DB: BcState, I: GetInspector<DB>> ResumableContext<'a, DB, I> {
+    pub fn begin_stage(&mut self) {
+        self.call_stack_stages.push(Vec::with_capacity(CALL_STACK_LIMIT as usize + 1));
+        self.next_action_stages.push(Action::Continue);
+    }
+
+    pub fn end_stage(&mut self) {
+        self.call_stack_stages.pop().expect("call stack is empty");
+        self.next_action_stages.pop().expect("next action is empty");
+    }
+
     pub fn take_call_stack(&mut self) -> Vec<Frame> {
-        std::mem::take(&mut self.call_stack)
+        let len = self.call_stack_stages.len();
+        std::mem::take(&mut self.call_stack_stages[len - 1])
+    }
+
+    pub fn replace_call_stack(&mut self, call_stack: Vec<Frame>) {
+        let len = self.call_stack_stages.len();
+        let _ = std::mem::replace(&mut self.call_stack_stages[len - 1], call_stack);
     }
 
     pub fn take_shared_memory(&mut self) -> SharedMemory {
@@ -62,11 +76,18 @@ impl<'a, DB: BcState, I: GetInspector<DB>> ResumableContext<'a, DB, I> {
     }
 
     pub fn take_next_action(&mut self) -> Action {
-        std::mem::take(&mut self.next_action)
+        let len = self.next_action_stages.len();
+        std::mem::take(&mut self.next_action_stages[len - 1])
+    }
+
+    pub fn replace_next_action(&mut self, next_action: Action) {
+        let len = self.next_action_stages.len();
+        let _ = std::mem::replace(&mut self.next_action_stages[len - 1], next_action);
     }
 
     pub fn is_new_transaction(&self) -> bool {
-        !self.in_progress
+        // !self.in_progress
+        self.call_stack_stages.is_empty()
     }
 }
 

@@ -10,7 +10,7 @@
 - There are two types of message calls, performed by two different kinds of accounts/contracts (see below), respectively. 
 
 ### Two kinds of contracts/accounts:
-- Dishes: the contracts to be fuzz tested, (those we'd like to find bugs in)
+- Subjects: the contracts to be fuzz tested, (those we'd like to find bugs in)
 - Outsiders: the contracts/accounts that call the subject contracts. (Usually, composers are attackers in the fuzzing)
     - Composers can either be 
         - an EOA, which initiates the top-level call to the subject contracts, or

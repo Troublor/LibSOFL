@@ -4,15 +4,32 @@ use super::calldata::StructuredCalldata;
 
 #[derive(Debug, Clone, serde::Serialize, serde::Deserialize)]
 pub enum MsgCall {
+    /// The direct message call to subject contracts.
     TopLevel(Call),
-    Nested(Call),
+
+    /// The message call to subject contracts in the callback of outsider contracts.
+    Nested { call: Call, depth: u32 },
 }
 
 impl MsgCall {
     pub fn into_call(self) -> Call {
         match self {
             MsgCall::TopLevel(call) => call,
-            MsgCall::Nested(call) => call,
+            MsgCall::Nested { call, .. } => call,
+        }
+    }
+
+    pub fn as_call(&self) -> &Call {
+        match self {
+            MsgCall::TopLevel(call) => call,
+            MsgCall::Nested { call, .. } => call,
+        }
+    }
+
+    pub fn depth(&self) -> u32 {
+        match self {
+            MsgCall::TopLevel(_) => 0,
+            MsgCall::Nested { depth, .. } => *depth,
         }
     }
 }

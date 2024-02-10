@@ -34,12 +34,28 @@ impl<R: Rand, T: RandomlyGeneratable<R> + Ord + Clone> IngrediantPantry<R, T> {
         self.values.insert(v.clone());
         return self.values.get(&v).expect("impossible: value not found");
     }
+}
 
+impl<R, T: Ord> IngrediantPantry<R, T> {
     pub fn insert(&mut self, v: T) {
         self.values.insert(v);
     }
 
     pub fn remove(&mut self, v: &T) {
         self.values.remove(v);
+    }
+
+    pub fn contains(&self, v: &T) -> bool {
+        self.values.contains(v)
+    }
+}
+
+impl<R, T> IngrediantPantry<R, T> {
+    pub fn iter(&self) -> std::collections::btree_set::Iter<T> {
+        self.values.iter()
+    }
+
+    pub fn into_iter(self) -> std::collections::btree_set::IntoIter<T> {
+        self.values.into_iter()
     }
 }

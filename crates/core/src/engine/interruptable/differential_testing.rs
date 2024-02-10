@@ -1,8 +1,6 @@
 // This module perform differential testing between the InterruptableEvm and the original Evm.
 
-use std::{collections::HashSet, sync::Arc};
-
-use revm::Inspector;
+use std::sync::Arc;
 
 use crate::{
     blockchain::{
@@ -11,16 +9,16 @@ use crate::{
     },
     conversion::ConvertTo,
     engine::{
-        inspector::EvmInspector,
+        inspector::no_inspector,
         interruptable::{breakpoint::RunResult, InterruptableEvm},
         state::BcState,
         transition::{TransitionSpec, TransitionSpecBuilder},
-        types::{Address, BcStateRef, ExecutionResult, StateChange, TxHash},
+        types::{BcStateRef, ExecutionResult, StateChange, TxHash},
     },
     error::SoflError,
 };
 
-use super::breakpoint::Breakpoint;
+use super::breakpoint::{break_everywhere, break_nowhere, IBreakpoint};
 
 #[derive(Debug)]
 pub struct BehaviorDeivation {
@@ -66,9 +64,8 @@ pub fn differential_testing_one_tx<T: Tx, S: BcState, P: BcProvider<T>>(
     tx_hash: TxHash,
     spec: TransitionSpec,
 ) -> Result<Option<BehaviorDeivation>, SoflError> {
-    let mut breakpoint_collector = AllBreakpointCollector::default();
     let (mut state_change, mut execution_result) =
-        state.simulate(spec.clone(), &mut breakpoint_collector)?;
+        state.simulate(spec.clone(), no_inspector())?;
     let oracle_state_change = state_change.remove(0);
     let oracle_execution_result = execution_result.remove(0);
 
@@ -93,7 +90,7 @@ pub fn differential_testing_one_tx<T: Tx, S: BcState, P: BcProvider<T>>(
     let output_with_breakpoints = run_interrutable_evm_with_breakpoints(
         &mut state,
         spec.clone(),
-        breakpoint_collector.breakpoints(),
+        break_everywhere(),
     )?;
     let RunResult::Done((state_change, execution_result)) =
         output_with_breakpoints
@@ -115,21 +112,26 @@ pub fn differential_testing_one_tx<T: Tx, S: BcState, P: BcProvider<T>>(
     Ok(None)
 }
 
-fn run_interruptable_evm_no_breakpoints<S: BcState>(
+fn run_interruptable_evm_no_breakpoints<'a, S: BcState>(
     state: S,
     spec: TransitionSpec,
-) -> Result<RunResult, SoflError> {
+) -> Result<RunResult<()>, SoflError> {
     let evm = InterruptableEvm::new(spec.get_evm_version());
     let mut run_ctx = evm.build_resumable_run_context(state, spec);
-    let output = evm.run(&mut run_ctx, vec![])?;
+    let output = evm.run(&mut run_ctx, break_nowhere())?;
     Ok(output)
 }
 
-fn run_interrutable_evm_with_breakpoints<S: BcState>(
+fn run_interrutable_evm_with_breakpoints<
+    'a,
+    S: BcState + 'a,
+    M,
+    B: IBreakpoint<M>,
+>(
     state: S,
     spec: TransitionSpec,
-    breakpoints: Vec<Breakpoint>,
-) -> Result<RunResult, SoflError> {
+    breakpoints: Arc<B>,
+) -> Result<RunResult<M>, SoflError> {
     let evm = InterruptableEvm::new(spec.get_evm_version());
     let mut run_ctx = evm.build_resumable_run_context(state, spec);
     let mut output = evm.run(&mut run_ctx, breakpoints.clone())?;
@@ -138,38 +140,3 @@ fn run_interrutable_evm_with_breakpoints<S: BcState>(
     }
     Ok(output)
 }
-
-#[derive(Default)]
-struct AllBreakpointCollector {
-    contracts: HashSet<Address>,
-}
-
-impl AllBreakpointCollector {
-    pub fn breakpoints(&self) -> Vec<Breakpoint> {
-        self.contracts
-            .iter()
-            .flat_map(|addr| {
-                vec![
-                    Breakpoint::MsgCallBefore(*addr),
-                    Breakpoint::MsgCallBegin(*addr),
-                    Breakpoint::MsgCallEnd(*addr),
-                    Breakpoint::MsgCallAfter(*addr),
-                ]
-            })
-            .collect()
-    }
-}
-
-impl<S: BcState> Inspector<S> for AllBreakpointCollector {
-    fn call(
-        &mut self,
-        _context: &mut revm::EvmContext<S>,
-        inputs: &mut revm::interpreter::CallInputs,
-        _return_memory_offset: std::ops::Range<usize>,
-    ) -> Option<revm::interpreter::CallOutcome> {
-        self.contracts.insert(inputs.contract);
-        None
-    }
-}
-
-impl<S: BcState> EvmInspector<S> for AllBreakpointCollector {}
