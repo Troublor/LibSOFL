@@ -67,6 +67,9 @@ impl<S: BcState> TaintPolicy<S> for CallPolicy {
 
 #[cfg(test)]
 mod tests {
+    use libsofl_core::solidity::{
+        caller::HighLevelCaller, scripting::compile_yul,
+    };
     use libsofl_core::{
         conversion::ConvertTo,
         engine::{
@@ -74,9 +77,6 @@ mod tests {
             state::BcState,
             types::{opcode, Address},
         },
-    };
-    use libsofl_utils::solidity::{
-        caller::HighLevelCaller, scripting::compile_yul,
     };
 
     use crate::{

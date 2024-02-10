@@ -74,6 +74,9 @@ impl<S: BcState> TaintPolicy<S> for MathPolicy {
 #[cfg(test)]
 mod tests {
     use alloy_sol_types::{sol_data, SolType};
+    use libsofl_core::solidity::{
+        caller::HighLevelCaller, scripting::compile_yul,
+    };
     use libsofl_core::{
         conversion::ConvertTo,
         engine::{
@@ -81,9 +84,6 @@ mod tests {
             state::BcState,
             types::{opcode, Address, SpecId, U256},
         },
-    };
-    use libsofl_utils::solidity::{
-        caller::HighLevelCaller, scripting::compile_yul,
     };
 
     use crate::{

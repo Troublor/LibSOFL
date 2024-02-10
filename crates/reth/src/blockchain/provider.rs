@@ -27,6 +27,7 @@ use reth_blockchain_tree::{
     BlockchainTree, ShareableBlockchainTree, TreeExternals,
 };
 use reth_db::{open_db_read_only, DatabaseEnv};
+use reth_node_ethereum::EthEvmConfig;
 use reth_primitives::ChainSpecBuilder;
 pub use reth_provider::{
     providers::BlockchainProvider, BlockHashReader, BlockNumReader,
@@ -44,7 +45,10 @@ use super::{state::RethBcStateRef, transaction::RethTx};
 
 pub type RethBlockchainProvider = BlockchainProvider<
     Arc<DatabaseEnv>,
-    ShareableBlockchainTree<Arc<DatabaseEnv>, EvmProcessorFactory>,
+    ShareableBlockchainTree<
+        Arc<DatabaseEnv>,
+        EvmProcessorFactory<EthEvmConfig>,
+    >,
 >;
 
 lazy_static! {
@@ -87,7 +91,10 @@ impl RethProvider {
 
         let provider_factory =
             ProviderFactory::new(db.clone(), chain_spec.clone());
-        let executor_factory = EvmProcessorFactory::new(chain_spec.clone());
+        let executor_factory = EvmProcessorFactory::new(
+            chain_spec.clone(),
+            EthEvmConfig::default(),
+        );
         let tree_externals =
             TreeExternals::new(provider_factory, consensus, executor_factory);
         let blockchain_tree =
@@ -103,7 +110,10 @@ impl RethProvider {
         let database = ProviderFactory::new(db, chain_spec);
         let bp: BlockchainProvider<
             Arc<DatabaseEnv>,
-            ShareableBlockchainTree<Arc<DatabaseEnv>, EvmProcessorFactory>,
+            ShareableBlockchainTree<
+                Arc<DatabaseEnv>,
+                EvmProcessorFactory<EthEvmConfig>,
+            >,
         > = BlockchainProvider::new(database, shareable_blockchain_tree)
             .map_err(|e| {
                 SoflError::Provider(format!(
@@ -233,7 +243,11 @@ impl BcProvider<RethTx> for RethProvider {
     ) -> Result<(), SoflError> {
         let mut reth_env: reth_revm::primitives::CfgEnv = env.clone().cvt();
         self.bp
-            .fill_cfg_env_at(&mut reth_env, block.cvt())
+            .fill_cfg_env_at(
+                &mut reth_env,
+                block.cvt(),
+                EthEvmConfig::default(),
+            )
             .map_err(|e| {
                 SoflError::Provider(format!("failed to fill cfg env: {}", e))
             })?;

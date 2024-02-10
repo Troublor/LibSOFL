@@ -26,13 +26,21 @@ derive_more.workspace = true
 lazy_static.workspace = true
 tokio.workspace = true
 
-#reth
-reth-primitives.workspace = true
-reth-db.workspace = true
-reth-provider.workspace = true
-reth-revm.workspace = true
-reth-beacon-consensus.workspace = true
-reth-blockchain-tree.workspace = true
+# reth
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.17", features = [
+    "arbitrary",
+] }
+reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.17", features = [
+    "mdbx",
+    "test-utils",
+] }
+reth-provider = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.17", features = [
+    "test-utils",
+] }
+reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.17" }
+reth-beacon-consensus = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.17" }
+reth-blockchain-tree = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.17" }
+reth-node-ethereum = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.17" }
 
 [dev-dependencies]
 criterion = "0.4"

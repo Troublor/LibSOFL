@@ -92,56 +92,14 @@ alloy-transport-http = { git = "https://github.com/alloy-rs/alloy" }
 alloy-rpc-client = { git = "https://github.com/alloy-rs/alloy" }
 alloy-rpc-types = { git = "https://github.com/alloy-rs/alloy" }
 
-
 # revm
-# revm = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze", features = [
-#     "std",
-#     "secp256k1",
-#     "serde",
-#     "memory_limit",
-#     "optional_balance_check",
-#     "optional_block_gas_limit",
-#     "optional_eip3607",
-#     "optional_gas_refund",
-#     "optional_no_base_fee",
-# ], default-features = false }
-# revm-primitives = { git = "https://github.com/bluealloy/revm", branch = "reth_freeze", features = [
-#     "std",
-#     "serde",
-#     "memory_limit",
-#     "optional_balance_check",
-#     "optional_block_gas_limit",
-#     "optional_eip3607",
-#     "optional_gas_refund",
-#     "optional_no_base_fee",
-# ], default-features = false }
-# revision as of 2024-01-25
-revm = { git = "https://github.com/bluealloy/revm", rev = "73b689d", features = [
+revm = { git = "https://github.com/bluealloy/revm", rev = "73b689d04f70187241577def1b34b40eb6906a17", features = [
     "std",
     "serde",
     "dev",
 ] }
-revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "73b689d", features = [
+revm-primitives = { git = "https://github.com/bluealloy/revm", rev = "73b689d04f70187241577def1b34b40eb6906a17", features = [
     "std",
     "serde",
     "dev",
 ] }
-
-# reth
-reth-primitives = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16", features = [
-    "arbitrary",
-] }
-reth-db = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16", features = [
-    "mdbx",
-    "test-utils",
-] }
-reth-provider = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16", features = [
-    "test-utils",
-] }
-reth-revm = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16" }
-reth-beacon-consensus = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16" }
-reth-blockchain-tree = { git = "https://github.com/paradigmxyz/reth.git", tag = "v0.1.0-alpha.16" }
-
-# LibAFL
-libafl = { version = "0.11.2" }
-libafl_bolts = { version = "0.11.2" }
