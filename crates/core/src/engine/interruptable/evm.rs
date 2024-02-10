@@ -31,7 +31,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     pub fn msg_call<M, B: IBreakpoint<M>>(
         &self,
         context: &mut ResumableContext<S, I>,
-        inputs : CallInputs,
+        inputs: CallInputs,
         breakpoints: B,
     ) -> Result<BreakpointResult<M>, SoflError> {
         let action = Action::BeforeCall(Box::new(inputs), Default::default());
@@ -67,7 +67,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     /// Run evm until one of the breakpoints.
     /// Akin to `transact` function in the original revm.
     #[inline]
-    pub fn run_until_breakpoint<M, B: IBreakpoint< M>>(
+    pub fn run_until_breakpoint<M, B: IBreakpoint<M>>(
         &self,
         context: &mut ResumableContext<S, I>,
         breakpoints: B,
@@ -261,8 +261,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
             shared_memory.new_context();
         }
 
-        let mut loop_result =
-            LoopResult::Continue(context.take_next_action());
+        let mut loop_result = LoopResult::Continue(context.take_next_action());
         loop {
             // whether or not to interrupt the execution.
             let action = match loop_result {
@@ -475,32 +474,18 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
             // whether a breakpoint is hit
             let maybe_breakpoint: Option<M> = match &loop_action {
                 Action::BeforeCall(inputs, _) => {
-                    breakpoints.should_break_before_msg_call(
-                        context,
-                        &*inputs,
-                    )
+                    breakpoints.should_break_before_msg_call(context, &*inputs)
                 }
-                Action::AfterCall(address, result) => {
-                    breakpoints.should_break_after_msg_call(
-                        context,
-                        *address,
-                        result,
-                    )
-                }
+                Action::AfterCall(address, result) => breakpoints
+                    .should_break_after_msg_call(context, *address, result),
                 Action::FrameBegin => {
                     let frame = call_stack.last().unwrap();
-                    breakpoints.should_break_begin_msg_call(
-                        context,
-                        frame,
-                    )
+                    breakpoints.should_break_begin_msg_call(context, frame)
                 }
                 Action::FrameEnd(address, _) => {
                     let frame = call_stack.last().unwrap();
-                    breakpoints.should_break_end_msg_call(
-                        context,
-                        *address,
-                        frame,
-                    )
+                    breakpoints
+                        .should_break_end_msg_call(context, *address, frame)
                 }
                 _ => None,
             };
@@ -537,10 +522,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
 }
 
 pub enum LoopResult<M> {
-    Pause {
-        breakpoint: M,
-        next: Action,
-    },
+    Pause { breakpoint: M, next: Action },
     Continue(Action),
     Finish(FrameResult),
 }

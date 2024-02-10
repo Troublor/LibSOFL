@@ -52,7 +52,8 @@ impl<'a, DB: BcState> ResumableContext<'a, DB, &mut NoInspector> {
 
 impl<'a, DB: BcState, I: GetInspector<DB>> ResumableContext<'a, DB, I> {
     pub fn begin_stage(&mut self) {
-        self.call_stack_stages.push(Vec::with_capacity(CALL_STACK_LIMIT as usize + 1));
+        self.call_stack_stages
+            .push(Vec::with_capacity(CALL_STACK_LIMIT as usize + 1));
         self.next_action_stages.push(Action::Continue);
     }
 
@@ -68,7 +69,8 @@ impl<'a, DB: BcState, I: GetInspector<DB>> ResumableContext<'a, DB, I> {
 
     pub fn replace_call_stack(&mut self, call_stack: Vec<Frame>) {
         let len = self.call_stack_stages.len();
-        let _ = std::mem::replace(&mut self.call_stack_stages[len - 1], call_stack);
+        let _ =
+            std::mem::replace(&mut self.call_stack_stages[len - 1], call_stack);
     }
 
     pub fn take_shared_memory(&mut self) -> SharedMemory {
@@ -82,7 +84,10 @@ impl<'a, DB: BcState, I: GetInspector<DB>> ResumableContext<'a, DB, I> {
 
     pub fn replace_next_action(&mut self, next_action: Action) {
         let len = self.next_action_stages.len();
-        let _ = std::mem::replace(&mut self.next_action_stages[len - 1], next_action);
+        let _ = std::mem::replace(
+            &mut self.next_action_stages[len - 1],
+            next_action,
+        );
     }
 
     pub fn is_new_transaction(&self) -> bool {

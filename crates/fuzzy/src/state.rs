@@ -11,7 +11,9 @@ use libafl_bolts::rands::RomuDuoJrRand;
 use libsofl_core::engine::{memory::MemoryBcState, types::Address};
 
 use crate::{
-    blockchain::state_ref::FuzzBcStateRef, ingredient::pentry::IngrediantPantry, input::{FuzzInput, MsgCallSeq}
+    blockchain::state_ref::FuzzBcStateRef,
+    ingredient::pentry::IngrediantPantry,
+    input::{FuzzInput, MsgCallSeq},
 };
 
 /// Fuzzing state

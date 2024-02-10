@@ -17,8 +17,8 @@ libsofl-reth.workspace = true
 
 revm.workspace = true
 
-libafl.workspace = true
-libafl_bolts.workspace = true
+libafl = { version = "0.11.2" }
+libafl_bolts = { version = "0.11.2" }
 
 alloy-dyn-abi.workspace = true
 alloy-json-abi.workspace = true

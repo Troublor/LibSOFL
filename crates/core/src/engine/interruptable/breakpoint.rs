@@ -66,17 +66,14 @@ pub enum BreakpointResult<M> {
 }
 
 pub fn break_everywhere() -> Arc<AllBreakpoints> {
-    Arc::new(AllBreakpoints {
-    })
+    Arc::new(AllBreakpoints {})
 }
 
 pub fn break_nowhere() -> Arc<NoBreakpoints> {
-    Arc::new(NoBreakpoints {
-    })
+    Arc::new(NoBreakpoints {})
 }
 
-pub struct NoBreakpoints {
-}
+pub struct NoBreakpoints {}
 
 impl IBreakpoint<()> for NoBreakpoints {
     fn should_break_before_msg_call<S: BcState, I>(
@@ -106,7 +103,7 @@ impl IBreakpoint<()> for NoBreakpoints {
 
     fn should_break_after_msg_call<S: BcState, I>(
         &self,
-        _context: & ResumableContext<S, I>,
+        _context: &ResumableContext<S, I>,
         _address: Address,
         _result: &FrameResult,
     ) -> Option<()> {
@@ -114,8 +111,7 @@ impl IBreakpoint<()> for NoBreakpoints {
     }
 }
 
-pub struct AllBreakpoints {
-}
+pub struct AllBreakpoints {}
 
 impl IBreakpoint<()> for AllBreakpoints {
     fn should_break_before_msg_call<S: BcState, I>(
