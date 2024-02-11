@@ -22,13 +22,13 @@ use crate::{
 };
 
 use super::{
-    breakpoint::{BreakpointResult, IBreakpoint},
+    breakpoint::{Breakpoint, BreakpointResult},
     InterruptableEvm, ResumableContext,
 };
 
 impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     #[inline]
-    pub fn msg_call<M, B: IBreakpoint<M>>(
+    pub fn msg_call<M, B: Breakpoint<M>>(
         &self,
         context: &mut ResumableContext<S, I>,
         inputs: CallInputs,
@@ -38,11 +38,12 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
         context.begin_stage();
         context.replace_next_action(action);
         let result = self.start_the_loop(context, breakpoints, None);
+        context.end_stage();
         Ok(result)
     }
 
     #[inline]
-    pub fn run<M, B: IBreakpoint<M>>(
+    pub fn run<M, B: Breakpoint<M>>(
         &self,
         context: &mut ResumableContext<S, I>,
         breakpoints: B,
@@ -67,7 +68,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     /// Run evm until one of the breakpoints.
     /// Akin to `transact` function in the original revm.
     #[inline]
-    pub fn run_until_breakpoint<M, B: IBreakpoint<M>>(
+    pub fn run_until_breakpoint<M, B: Breakpoint<M>>(
         &self,
         context: &mut ResumableContext<S, I>,
         breakpoints: B,
@@ -124,7 +125,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
 
     /// Akin to `transact_preverified_inner` function in the original revm.
     #[inline]
-    fn run_until_breakpoint_inner<M, B: IBreakpoint<M>>(
+    fn run_until_breakpoint_inner<M, B: Breakpoint<M>>(
         &self,
         context: &mut ResumableContext<S, I>,
         breakpoints: B,
@@ -212,7 +213,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     }
 
     #[inline]
-    fn start_the_loop<'a, M, B: IBreakpoint<M>>(
+    fn start_the_loop<'a, M, B: Breakpoint<M>>(
         &self,
         context: &mut ResumableContext<S, I>,
         breakpoints: B,
@@ -242,7 +243,7 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
     }
 
     #[inline]
-    pub fn run_the_loop<'a, FN, M, B: IBreakpoint<M>>(
+    pub fn run_the_loop<'a, FN, M, B: Breakpoint<M>>(
         &self,
         context: &mut ResumableContext<'a, S, I>,
         breakpoints: B,
@@ -255,13 +256,31 @@ impl<S: BcState, I: EvmInspector<S>> InterruptableEvm<S, I> {
         let mut call_stack = context.take_call_stack();
         let mut shared_memory = context.take_shared_memory();
 
+        let next_action = context.take_next_action();
+
         // push the top-level frame to the call stack, if this is a new transaction
-        if let Some(first_frame) = first_frame {
+        let mut loop_result = if let Some(first_frame) = first_frame {
             call_stack.push(first_frame);
             shared_memory.new_context();
-        }
 
-        let mut loop_result = LoopResult::Continue(context.take_next_action());
+            // check begin call breakpoint
+            let maybe_breakpoint: Option<M> = breakpoints
+                .should_break_begin_msg_call(
+                    context,
+                    call_stack.last().expect("call stack is empty"),
+                );
+            if let Some(breakpoint) = maybe_breakpoint {
+                LoopResult::Pause {
+                    breakpoint,
+                    next: next_action,
+                }
+            } else {
+                LoopResult::Continue(next_action)
+            }
+        } else {
+            LoopResult::Continue(next_action)
+        };
+
         loop {
             // whether or not to interrupt the execution.
             let action = match loop_result {

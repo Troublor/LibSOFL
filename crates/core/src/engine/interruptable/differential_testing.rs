@@ -18,7 +18,7 @@ use crate::{
     error::SoflError,
 };
 
-use super::breakpoint::{break_everywhere, break_nowhere, IBreakpoint};
+use super::breakpoint::{break_everywhere, break_nowhere, Breakpoint};
 
 #[derive(Debug)]
 pub struct BehaviorDeivation {
@@ -126,7 +126,7 @@ fn run_interrutable_evm_with_breakpoints<
     'a,
     S: BcState + 'a,
     M,
-    B: IBreakpoint<M>,
+    B: Breakpoint<M>,
 >(
     state: S,
     spec: TransitionSpec,

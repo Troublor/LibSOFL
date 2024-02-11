@@ -92,6 +92,7 @@ pub type AnalysisKind = revm::primitives::AnalysisKind;
 pub type BlobExcessGasAndPrice = revm::primitives::BlobExcessGasAndPrice;
 
 pub type TransactTo = revm::primitives::TransactTo;
+pub type Transfer = revm::interpreter::Transfer;
 pub type TxEnv = revm::primitives::TxEnv;
 pub type BlockEnv = revm::primitives::BlockEnv;
 pub type CfgEnv = revm::primitives::CfgEnv;
@@ -102,6 +103,7 @@ pub type InterpreterResult = revm::interpreter::InterpreterResult;
 pub type CreateInputs = revm::interpreter::CreateInputs;
 pub type CallInputs = revm::interpreter::CallInputs;
 pub type CallOutcome = revm::interpreter::CallOutcome;
+pub type CallContext = revm::interpreter::CallContext;
 pub type CallScheme = revm::interpreter::CallScheme;
 pub type Output = revm::primitives::Output;
 pub type CreateScheme = revm::primitives::CreateScheme;
