@@ -33,7 +33,19 @@ pub trait EvmInspector<BS: BcState>: revm::Inspector<BS> {
 // /// Any inspector that implements `revm::Inspector` can be used as `EvmInspector`.
 // impl<I: revm::Inspector<BS>, BS: BcState> EvmInspector<BS> for I {}
 
-pub type NoInspector = revm::inspectors::NoOpInspector;
+#[derive(
+    Default,
+    Clone,
+    PartialEq,
+    Eq,
+    Copy,
+    Debug,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct NoInspector;
+
+impl<BS: BcState> Inspector<BS> for NoInspector {}
 
 impl<BS: BcState> EvmInspector<BS> for NoInspector {}
 

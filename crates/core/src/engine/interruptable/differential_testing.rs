@@ -10,7 +10,7 @@ use crate::{
     conversion::ConvertTo,
     engine::{
         inspector::no_inspector,
-        interruptable::{breakpoint::RunResult, InterruptableEvm},
+        interruptable::breakpoint::RunResult,
         state::BcState,
         transition::{TransitionSpec, TransitionSpecBuilder},
         types::{BcStateRef, ExecutionResult, StateChange, TxHash},
@@ -18,7 +18,10 @@ use crate::{
     error::SoflError,
 };
 
-use super::breakpoint::{break_everywhere, break_nowhere, Breakpoint};
+use super::{
+    breakpoint::{break_everywhere, break_nowhere, Breakpoint},
+    evm::InterruptableEvm,
+};
 
 #[derive(Debug)]
 pub struct BehaviorDeivation {
@@ -80,6 +83,8 @@ pub fn differential_testing_one_tx<T: Tx, S: BcState, P: BcProvider<T>>(
     if state_change != oracle_state_change
         || execution_result != oracle_execution_result
     {
+        println!("{:?}", oracle_state_change);
+        println!("{:?}", state_change);
         return Ok(Some(BehaviorDeivation {
             tx: tx_hash,
             oracle: (oracle_state_change, oracle_execution_result),
@@ -116,9 +121,13 @@ fn run_interruptable_evm_no_breakpoints<'a, S: BcState>(
     state: S,
     spec: TransitionSpec,
 ) -> Result<RunResult<()>, SoflError> {
-    let evm = InterruptableEvm::new(spec.get_evm_version());
-    let mut run_ctx = evm.build_resumable_run_context(state, spec);
-    let output = evm.run(&mut run_ctx, break_nowhere())?;
+    let mut evm = InterruptableEvm::new(
+        spec.get_evm_version(),
+        state,
+        spec,
+        *no_inspector(),
+    );
+    let output = evm.run(break_nowhere())?;
     Ok(output)
 }
 
@@ -132,11 +141,15 @@ fn run_interrutable_evm_with_breakpoints<
     spec: TransitionSpec,
     breakpoints: Arc<B>,
 ) -> Result<RunResult<M>, SoflError> {
-    let evm = InterruptableEvm::new(spec.get_evm_version());
-    let mut run_ctx = evm.build_resumable_run_context(state, spec);
-    let mut output = evm.run(&mut run_ctx, breakpoints.clone())?;
+    let mut evm = InterruptableEvm::new(
+        spec.get_evm_version(),
+        state,
+        spec,
+        *no_inspector(),
+    );
+    let mut output = evm.run(breakpoints.clone())?;
     while matches!(output, RunResult::Breakpoint(_)) {
-        output = evm.run(&mut run_ctx, breakpoints.clone())?;
+        output = evm.run(breakpoints.clone())?;
     }
     Ok(output)
 }

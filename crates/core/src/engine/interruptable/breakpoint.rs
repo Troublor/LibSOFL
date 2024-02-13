@@ -8,32 +8,32 @@ use crate::engine::{
     types::{Address, CallInputs, ExecutionResult, StateChange},
 };
 
-use super::ResumableContext;
+use super::execution::Executor;
 
 #[auto_impl(&, Box, Arc)]
 pub trait Breakpoint<M> {
     fn should_break_before_msg_call<S: BcState, I>(
         &self,
-        context: &ResumableContext<S, I>,
+        executor: &Executor<S, I>,
         inputs: &CallInputs,
     ) -> Option<M>;
 
     fn should_break_begin_msg_call<S: BcState, I>(
         &self,
-        context: &ResumableContext<S, I>,
+        executor: &Executor<S, I>,
         frame: &Frame,
     ) -> Option<M>;
 
     fn should_break_end_msg_call<S: BcState, I>(
         &self,
-        context: &ResumableContext<S, I>,
+        executor: &Executor<S, I>,
         address: Address,
         result: &Frame,
     ) -> Option<M>;
 
     fn should_break_after_msg_call<S: BcState, I>(
         &self,
-        context: &ResumableContext<S, I>,
+        executor: &Executor<S, I>,
         address: Address,
         result: &FrameResult,
     ) -> Option<M>;
@@ -63,7 +63,7 @@ impl Breakpoint<()> for NoBreakpoints {
     #[inline]
     fn should_break_before_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _inputs: &CallInputs,
     ) -> Option<()> {
         None
@@ -72,7 +72,7 @@ impl Breakpoint<()> for NoBreakpoints {
     #[inline]
     fn should_break_begin_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _frame: &Frame,
     ) -> Option<()> {
         None
@@ -81,7 +81,7 @@ impl Breakpoint<()> for NoBreakpoints {
     #[inline]
     fn should_break_end_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _address: Address,
         _result: &Frame,
     ) -> Option<()> {
@@ -91,7 +91,7 @@ impl Breakpoint<()> for NoBreakpoints {
     #[inline]
     fn should_break_after_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _address: Address,
         _result: &FrameResult,
     ) -> Option<()> {
@@ -105,7 +105,7 @@ impl Breakpoint<()> for AllBreakpoints {
     #[inline]
     fn should_break_before_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _inputs: &CallInputs,
     ) -> Option<()> {
         Some(())
@@ -114,7 +114,7 @@ impl Breakpoint<()> for AllBreakpoints {
     #[inline]
     fn should_break_begin_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _frame: &Frame,
     ) -> Option<()> {
         Some(())
@@ -123,7 +123,7 @@ impl Breakpoint<()> for AllBreakpoints {
     #[inline]
     fn should_break_end_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _address: Address,
         _result: &Frame,
     ) -> Option<()> {
@@ -133,7 +133,7 @@ impl Breakpoint<()> for AllBreakpoints {
     #[inline]
     fn should_break_after_msg_call<S: BcState, I>(
         &self,
-        _context: &ResumableContext<S, I>,
+        _executor: &Executor<S, I>,
         _address: Address,
         _result: &FrameResult,
     ) -> Option<()> {

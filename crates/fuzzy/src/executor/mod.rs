@@ -41,6 +41,10 @@ where
         }
         // execute the call sequence on the pre-execution state.
         // note that the call sequence may contain nested calls.
+        // let evm = InterruptableEvm::new(SpecId::LATEST);
+        let (mut _state, calls) = input.get_execution_data();
+        for _call in calls {}
+
         todo!()
     }
 }

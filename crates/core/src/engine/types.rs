@@ -78,9 +78,17 @@ pub type Storage =
 pub type StorageSlot = revm::primitives::StorageSlot;
 
 pub use revm::db::DatabaseRef;
+pub use revm::handler::Handler;
 pub use revm::interpreter::opcode;
+pub use revm::interpreter::Host;
+pub use revm::precompile::PrecompileSpecId;
+pub use revm::precompile::Precompiles;
+pub use revm::primitives::HandlerCfg;
 pub use revm::Database;
 pub use revm::DatabaseCommit;
+pub use revm::Evm;
+pub use revm::EvmBuilder;
+pub use revm::JournaledState;
 pub trait BcStateRef: revm::db::DatabaseRef + Sync + Send {}
 impl<T: revm::db::DatabaseRef + Sync + Send> BcStateRef for T {}
 pub use revm::Inspector;
@@ -91,15 +99,28 @@ pub type Env = revm::primitives::Env;
 pub type AnalysisKind = revm::primitives::AnalysisKind;
 pub type BlobExcessGasAndPrice = revm::primitives::BlobExcessGasAndPrice;
 
+pub type Context<EXT, DB> = revm::Context<EXT, DB>;
+
 pub type TransactTo = revm::primitives::TransactTo;
 pub type Transfer = revm::interpreter::Transfer;
 pub type TxEnv = revm::primitives::TxEnv;
 pub type BlockEnv = revm::primitives::BlockEnv;
 pub type CfgEnv = revm::primitives::CfgEnv;
 pub type StateChange = revm::primitives::State;
+pub type SharedMemory = revm::interpreter::SharedMemory;
+pub type Stack = revm::interpreter::Stack;
+pub type JournalCheckpoint = revm::JournalCheckpoint;
 pub type ExecutionResult = revm::primitives::ExecutionResult;
 pub type Gas = revm::interpreter::Gas;
 pub type InterpreterResult = revm::interpreter::InterpreterResult;
+pub type InterpreterAction = revm::interpreter::InterpreterAction;
+pub type BytecodeLocked = revm::interpreter::BytecodeLocked;
+pub type Contract = revm::interpreter::Contract;
+pub type CallFrame = revm::CallFrame;
+pub type FrameData = revm::FrameData;
+pub type FrameResult = revm::FrameResult;
+pub type CreateFrame = revm::CreateFrame;
+pub type Frame = revm::Frame;
 pub type CreateInputs = revm::interpreter::CreateInputs;
 pub type CallInputs = revm::interpreter::CallInputs;
 pub type CallOutcome = revm::interpreter::CallOutcome;
