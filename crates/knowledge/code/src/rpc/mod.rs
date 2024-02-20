@@ -14,6 +14,18 @@ use crate::{error::Error, query::query::CodeQuery};
 
 #[rpc(client, server, namespace = "kb")]
 pub trait CodeRpc {
+    #[method(name = "contractName")]
+    async fn contract_name(
+        &self,
+        address: Address,
+    ) -> Result<Option<String>, Error>;
+
+    #[method(name = "logicAddress")]
+    async fn logic_address(
+        &self,
+        address: Address,
+    ) -> Result<Option<String>, Error>;
+
     #[method(name = "compilerInput")]
     async fn compiler_input(
         &self,
@@ -54,6 +66,26 @@ pub struct CodeRpcImpl {
 
 #[async_trait]
 impl CodeRpcServer for CodeRpcImpl {
+    async fn contract_name(
+        &self,
+        address: Address,
+    ) -> Result<Option<String>, Error> {
+        self.query
+            .get_model_async(address)
+            .await
+            .map(|x| x.map(|n| n.name.clone()))
+    }
+
+    async fn logic_address(
+        &self,
+        proxy: Address,
+    ) -> Result<Option<String>, Error> {
+        self.query
+            .get_model_async(proxy)
+            .await
+            .map(|x| x.and_then(|p| p.implementation.clone()))
+    }
+
     async fn compiler_input(
         &self,
         address: Address,
