@@ -1,27 +1,40 @@
 [package]
-name = "libsofl-knowledge-base"
+name = "libsofl-knowledge-service"
 version.workspace = true
 authors.workspace = true
-description = "Historical transaction mining"
+description = "Knowledge service of the libsofl project"
 homepage.workspace = true
 rust-version.workspace = true
 license.workspace = true
 edition.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "libsofl_knowledge_service"
+path = "bin/main.rs"
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
 libsofl-utils.workspace = true
 libsofl-reth.workspace = true
-
-alloy-primitives.workspace = true
+libsofl-knowledge-code.workspace = true
+libsofl-knowledge-base.workspace = true
+libsofl-knowledge-index.workspace = true
 
 log = "0.4"
+
 eyre.workspace = true
 stable-eyre.workspace = true
-jsonrpsee.workspace = true
+signal-hook = "0.3"
+signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
 
+clap.workspace = true
+jsonrpsee.workspace = true
 tokio.workspace = true
+futures.workspace = true
 sea-orm.workspace = true
 serde.workspace = true
 serde_json.workspace = true

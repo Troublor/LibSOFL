@@ -38,6 +38,8 @@ serde_json.workspace = true
 
 signal-hook = "0.3"
 signal-hook-tokio = { version = "0.3", features = ["futures-v0_3"] }
+eyre.workspace = true
+stable-eyre.workspace = true
 
 foundry-block-explorers = { version = "0.2.3", features = [
     "foundry-compilers",
@@ -46,8 +48,8 @@ foundry-compilers = { version = "0.3.1", features = ["svm-solc"] }
 regex = "1.10.2"
 
 semver = "1.0"
-jsonrpsee = { version = "0.21", features = ["client", "server", "macros"] }
+jsonrpsee.workspace = true
 moka = { version = "0.12", features = ["sync", "future"] }
 lazy_static.workspace = true
 
-clap = { version = "4.4", features = ["derive"] }
+clap.workspace = true

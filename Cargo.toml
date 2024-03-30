@@ -19,6 +19,7 @@ members = [
     "crates/analysis",
     "crates/knowledge/code",
     "crates/knowledge/migration",
+    "crates/knowledge/service",
 ]
 resolver = "2"
 
@@ -38,6 +39,8 @@ libsofl-analysis = { path = "crates/analysis" }
 auto_impl = "1.0"
 derive_more = "0.99.17"
 lazy_static = "1.4.0"
+eyre = "0.2"
+stable-eyre = "0.2"
 
 # async
 tokio = { version = "1", features = ["full"] }
@@ -67,6 +70,12 @@ tracing-subscriber = { version = "0.3.18", features = [
     "json",
     "env-filter",
 ] }
+
+# jsonrpc
+jsonrpsee = { version = "0.21", features = ["client", "server", "macros"] }
+
+# clap (The CLI framework)
+clap = { version = "4.4", features = ["derive"] }
 
 # serialization
 serde = { version = "1.0.164", features = ["derive"] }

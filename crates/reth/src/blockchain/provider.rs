@@ -56,8 +56,10 @@ lazy_static! {
     static ref DB_CACHE: Mutex<HashMap<String, Arc<DatabaseEnv>>> = Mutex::new(HashMap::default());
 }
 
-#[derive(Clone)]
+#[derive(Clone, derive_more::Deref, derive_more::DerefMut)]
 pub struct RethProvider {
+    #[deref]
+    #[deref_mut]
     pub bp: RethBlockchainProvider,
 }
 

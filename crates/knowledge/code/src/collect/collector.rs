@@ -64,8 +64,8 @@ impl CollectorService {
         let current_bn = Arc::new(current_bn);
         let cbn = current_bn.clone();
         let handle = tokio::task::spawn(async move {
-            let collector = Collector::new(db, query, provider, cbn, max_bn);
-            collector.worker_loop().await;
+            let collector = Collector::new(Arc::new(db), query, provider, cbn);
+            collector.worker_loop(max_bn).await;
         });
 
         info!(block = progress, "started collecting code knowledge");
@@ -90,8 +90,7 @@ where
 {
     provider: Arc<P>,
     query: Arc<CodeQuery>,
-    db: DatabaseConnection,
-    max_bn: u64, // exclusive
+    db: Arc<DatabaseConnection>,
     current_bn: Arc<AtomicU64>,
 
     _phantom: std::marker::PhantomData<(T, D)>,
@@ -106,11 +105,10 @@ where
 {
     /// Start a background thread to collect code until `max_bn` (exclusive).
     pub fn new(
-        db: DatabaseConnection,
+        db: Arc<DatabaseConnection>,
         query: Arc<CodeQuery>,
         p: Arc<P>,
         current_bn: Arc<AtomicU64>,
-        max_bn: u64,
     ) -> Self
     where
         T: Tx + 'static,
@@ -122,14 +120,13 @@ where
             provider: p,
             query: query,
             db,
-            max_bn,
             current_bn,
             _phantom: std::marker::PhantomData,
         }
     }
 
-    pub async fn worker_loop(&self) {
-        while self.current_bn.load_consume() < self.max_bn {
+    pub async fn worker_loop(&self, until: u64) {
+        while self.current_bn.load_consume() <= until {
             let bn = self
                 .current_bn
                 .fetch_add(1, std::sync::atomic::Ordering::SeqCst);
@@ -140,10 +137,10 @@ where
                 }
             };
         }
-        info!(block = self.max_bn, "finished collecting code knowledge")
+        info!(block = until, "finished collecting code knowledge")
     }
 
-    async fn process_one_block(&self, bn: u64) -> Result<(), Error> {
+    pub async fn process_one_block(&self, bn: u64) -> Result<(), Error> {
         let txs = self.provider.txs_in_block(bn.cvt()).map_err(Error::Sofl)?;
         info!(block = bn, txs = txs.len(), "collecting code knowledge");
 
@@ -227,7 +224,7 @@ where
                 )
                 .to_owned(),
             )
-            .exec(&self.db)
+            .exec(self.db.as_ref())
             .await
             .map_err(Error::Database)?;
         Ok(())

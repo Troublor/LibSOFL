@@ -22,6 +22,7 @@ libsofl-core.workspace = true
 libsofl-utils.workspace = true
 
 serde.workspace = true
+derive_more.workspace = true
 lazy_static.workspace = true
 tokio.workspace = true
 
