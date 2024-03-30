@@ -6,8 +6,7 @@ use foundry_compilers::{
     artifacts::{
         output_selection::OutputSelection, Contract, Source, Sources,
         StorageLayout,
-    },
-    Artifact, CompilerInput, CompilerOutput, Solc,
+    }, Artifact, CompilerInput, CompilerOutput, Solc
 };
 use libsofl_core::engine::types::{Address, FixedBytes};
 use libsofl_knowledge_base::config::KnowledgeConfig;
@@ -116,7 +115,7 @@ impl CodeQuery {
 
         let model = self.get_model_async(address).await?;
         if let Some(model) = model {
-            if model.compiler_version().major < 4 {
+            if model.compiler_version().minor < 4 {
                 Err(Error::SolidityVersionTooLow)
             } else {
                 let layout = serde_json::from_value::<StorageLayout>(
@@ -157,10 +156,11 @@ impl CodeQuery {
         }
 
         // compile
-        let compiler = Solc::find_or_install_svm_version(format!(
+        let version_str = format!(
             "{}.{}.{}",
             version.major, version.minor, version.patch
-        ))
+        );
+        let compiler = Solc::find_or_install_svm_version(version_str)
         .map_err(Error::Solc)?;
         let output = compiler.compile_exact(&input).map_err(Error::Solc)?;
         let output = Arc::new(output);
@@ -354,10 +354,11 @@ impl CodeQuery {
             };
             let version = Version::parse(&compiler_version)
                 .expect("failed to parse version");
-            if let Ok(compiler) = Solc::find_or_install_svm_version(format!(
+            let version_str = format!(
                 "{}.{}.{}",
                 version.major, version.minor, version.patch
-            ))
+            );
+            if let Ok(compiler) = Solc::find_or_install_svm_version(version_str)
             .map_err(Error::Solc)
             {
                 // compile
