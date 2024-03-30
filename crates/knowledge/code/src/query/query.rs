@@ -6,7 +6,8 @@ use foundry_compilers::{
     artifacts::{
         output_selection::OutputSelection, Contract, Source, Sources,
         StorageLayout,
-    }, Artifact, CompilerInput, CompilerOutput, Solc
+    },
+    Artifact, CompilerInput, CompilerOutput, Solc,
 };
 use libsofl_core::engine::types::{Address, FixedBytes};
 use libsofl_knowledge_base::config::KnowledgeConfig;
@@ -156,12 +157,10 @@ impl CodeQuery {
         }
 
         // compile
-        let version_str = format!(
-            "{}.{}.{}",
-            version.major, version.minor, version.patch
-        );
+        let version_str =
+            format!("{}.{}.{}", version.major, version.minor, version.patch);
         let compiler = Solc::find_or_install_svm_version(version_str)
-        .map_err(Error::Solc)?;
+            .map_err(Error::Solc)?;
         let output = compiler.compile_exact(&input).map_err(Error::Solc)?;
         let output = Arc::new(output);
         self.compiler_output_cache.insert(address, output.clone());
@@ -359,7 +358,7 @@ impl CodeQuery {
                 version.major, version.minor, version.patch
             );
             if let Ok(compiler) = Solc::find_or_install_svm_version(version_str)
-            .map_err(Error::Solc)
+                .map_err(Error::Solc)
             {
                 // compile
                 let input = CompilerInput {
