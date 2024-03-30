@@ -68,6 +68,7 @@ async fn main() -> Result<()> {
 
     // services
     let services: Vec<Box<dyn KnowledgeService>> = vec![
+        create_base_service(db.clone()),
         create_code_service(provider.clone(), db.clone(), &base_cfg).await?,
     ];
 
@@ -115,4 +116,11 @@ async fn create_code_service(
     let service =
         CodeService::new(provider, db, base_cfg, &code_knowledge_cfg).await?;
     Ok(Box::new(service))
+}
+
+fn create_base_service(
+    db: Arc<DatabaseConnection>,
+) -> Box<dyn KnowledgeService> {
+    let service = libsofl_knowledge_base::service::BaseService { db };
+    Box::new(service)
 }
