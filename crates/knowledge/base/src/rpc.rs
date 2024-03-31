@@ -28,7 +28,7 @@ impl From<Error> for jsonrpsee::types::ErrorObject<'static> {
 
 #[rpc(client, server, namespace = "kb")]
 pub trait BaseRpc {
-    #[method(name = "ping")]
+    #[method(name = "metadata")]
     async fn metadata(&self, key: String) -> Result<String, Error>;
 }
 

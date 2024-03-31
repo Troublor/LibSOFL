@@ -39,6 +39,7 @@ impl<BS: BcState> EvmInspector<BS> for NoInspector {}
 
 pub static mut NO_INSPECTOR: NoInspector = NoInspector {};
 
+#[allow(static_mut_refs)]
 pub fn no_inspector() -> &'static mut NoInspector {
     unsafe { &mut NO_INSPECTOR }
 }

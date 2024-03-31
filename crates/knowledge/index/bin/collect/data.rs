@@ -103,6 +103,8 @@ impl<'a> DataStore<'a> {
                     .pending_invocations
                     .remove(&pending_addr)
                     .expect("impossible: pending address not found");
+                let from_block = from_block as i64;
+                let block = block as i64;
                 let invocation = entities::invocation::Model {
                     contract: pending_addr,
                     from_block,
@@ -123,6 +125,7 @@ impl<'a> DataStore<'a> {
         creations: Vec<(String, String, bool)>,
     ) -> Result<(), sea_orm::DbErr> {
         for (contract, tx, destruct) in creations {
+            let block = block as i64;
             let creation = entities::creation::Model {
                 contract,
                 tx,

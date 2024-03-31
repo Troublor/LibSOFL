@@ -70,6 +70,7 @@ async fn main() -> Result<()> {
     let services: Vec<Box<dyn KnowledgeService>> = vec![
         create_base_service(db.clone()),
         create_code_service(provider.clone(), db.clone(), &base_cfg).await?,
+        create_index_service(db.clone()),
     ];
 
     // server
@@ -122,5 +123,12 @@ fn create_base_service(
     db: Arc<DatabaseConnection>,
 ) -> Box<dyn KnowledgeService> {
     let service = libsofl_knowledge_base::service::BaseService { db };
+    Box::new(service)
+}
+
+fn create_index_service(
+    db: Arc<DatabaseConnection>,
+) -> Box<dyn KnowledgeService> {
+    let service = libsofl_knowledge_index::rpc::service::IndexService { db };
     Box::new(service)
 }
