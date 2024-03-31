@@ -283,8 +283,13 @@ impl CodeQuery {
                     },
                 }
             };
-            let mut settings =
-                data.settings().expect("failed to parse settings");
+            // get settings may fail due to https://github.com/foundry-rs/block-explorers/issues/38
+            let mut settings = data.settings().map_err(|e| {
+                Error::Etherscan(EtherscanError::Unknown(format!(
+                    "failed to parse settings: {:?}",
+                    e
+                )))
+            })?;
             settings.output_selection =
                 OutputSelection::complete_output_selection();
             {
