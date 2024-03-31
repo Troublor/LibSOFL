@@ -11,10 +11,6 @@ edition.workspace = true
 [lib]
 path = "src/lib.rs"
 
-[[bin]]
-name = "code_knowledge_server"
-path = "bin/server/main.rs"
-
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]

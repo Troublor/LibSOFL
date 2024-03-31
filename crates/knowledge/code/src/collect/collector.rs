@@ -14,7 +14,6 @@ use libsofl_core::{
 };
 use libsofl_utils::log::{error, info};
 use sea_orm::{sea_query::OnConflict, DatabaseConnection, EntityTrait};
-use tokio::task::JoinHandle;
 
 use crate::{
     collect::{
@@ -23,63 +22,6 @@ use crate::{
     error::Error,
     query::query::CodeQuery,
 };
-
-pub struct CollectorService {
-    task: JoinHandle<()>,
-}
-
-impl CollectorService {
-    pub async fn new<T, D, P>(
-        provider: Arc<P>,
-        query: Arc<CodeQuery>,
-        db: DatabaseConnection,
-        max_bn: u64,
-    ) -> Self
-    where
-        T: Tx + 'static,
-        D: BcStateRef + 'static,
-        D::Error: std::fmt::Debug,
-        P: BcProvider<T> + BcStateProvider<D> + 'static,
-    {
-        let metadata =
-            libsofl_knowledge_base::entities::metadata::Entity::find_by_id(
-                CODE_KNOWLEDGE_METADATA_KEY,
-            )
-            .one(&db)
-            .await
-            .expect("failed to load metadata");
-        let progress = match metadata {
-            Some(metadata) => {
-                let metadata: CodeKnowledgeMetadata =
-                    metadata.try_decode().expect("failed to decode metadata");
-                info!(
-                    progress = metadata.progress,
-                    "resuming collecting code knowledge"
-                );
-                metadata.progress
-            }
-            None => 1,
-        };
-        let current_bn = AtomicU64::new(progress);
-        let current_bn = Arc::new(current_bn);
-        let cbn = current_bn.clone();
-        let handle = tokio::task::spawn(async move {
-            let collector = Collector::new(Arc::new(db), query, provider, cbn);
-            collector.worker_loop(max_bn).await;
-        });
-
-        info!(block = progress, "started collecting code knowledge");
-
-        Self { task: handle }
-    }
-}
-
-impl Drop for CollectorService {
-    fn drop(&mut self) {
-        self.task.abort();
-        info!("stopped collecting code knowledge");
-    }
-}
 
 pub struct Collector<T, D, P>
 where

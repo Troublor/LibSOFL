@@ -6,6 +6,8 @@ pub struct CodeKnowledgeConfig {
     pub api_keys: Vec<String>,
     pub requests_per_second: Option<f32>,
     pub cache_size: u64,
+    // eager mode will recheck if a previously checked contract has been verified now
+    pub eager: bool,
 }
 
 impl Default for CodeKnowledgeConfig {
@@ -15,6 +17,7 @@ impl Default for CodeKnowledgeConfig {
             api_keys: vec![],
             requests_per_second: None,
             cache_size: 999,
+            eager: false,
         }
     }
 }
